@@ -1,0 +1,20 @@
+apiVersion: v1
+data:
+  config.yaml: |-
+    debugmode: {{ .Values.debugMode }}
+    metric_config:
+      interval: {{ .Values.config.metricCacheInterval }}
+      port: {{ .Values.config.metricServerPort }}
+      verbose: {{ .Values.config.metricLabelVerbose }}
+      probes:{{- range .Values.config.metricProbes }}
+      - {{ . }}{{- end }}
+    event_config:
+      port: {{ .Values.config.eventServerPort }}
+      loki_enable: {{ .Values.config.enableEventServer }}
+      loki_address: {{ .Values.config.remoteLokiAddress }}
+      probes: {{- range .Values.config.eventProbes }}
+      - {{ . }}{{- end }}
+kind: ConfigMap
+metadata:
+  name: inspector-config
+  namespace: {{ .Values.namespace }}

@@ -1,0 +1,36 @@
+image:
+  repository: "registry.cn-hangzhou.aliyuncs.com/acs/inspector"
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "v0.1.0-16-gc8eeb09-aliyun"
+
+initcontainer:
+  tag: latest
+  pullPolicy: Always
+  repository: registry.cn-hangzhou.aliyuncs.com/acs/btfhack
+
+name: skoop-exporter
+namespace: skoop
+debugMode: false
+
+resources: 
+  limits:
+    cpu: 1000m
+    memory: 2048Mi
+  requests:
+    cpu: 400m
+    memory: 1024Mi
+
+config:
+  enableEventServer: true
+  enableMetricServer: true
+  remoteLokiAddress: "loki-service.skoop.svc.cluster.local"
+  metricLabelVerbose: true
+  metricCacheInterval: 15
+  metricServerPort: 9102
+  metricProbes: ["netdev", "io","socketlatency","packetloss","net_softirq","tcpext","tcpsummary","tcp","sock","softnet","udp","virtcmdlatency","kernellatency"]
+  eventProbes: ["tcpreset","packetloss","socketlatency","net_softirq","kernellatency","virtcmdlatency"] 
+  eventServerPort: 19102
+
+nodeSelector: {}
+  

@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package proto;
+
+option go_package = "github.com/alibaba/kubeskoop/proto";
+
+service inspector {
+  rpc WatchEvent(WatchRequest) returns (stream WatchReply) {}
+  rpc QueryMetric(QueryMetricRequest) returns (QueryMetricResponse) {}
+}
+
+message WatchRequest {
+  string name = 1;
+  Meta filter = 2;
+}
+
+message WatchReply {
+  string name = 1;
+  Event event = 2;
+}
+
+message QueryMetricRequest {
+  string name = 1;
+  Meta filter = 2;
+}
+
+message QueryMetricResponse {
+  string name = 1;
+  repeated Metric metrics = 2;
+}
+
+message Meta {
+  string node = 1;
+  string pod = 2;
+  string namespace = 3;
+  string netns = 4;
+}
+
+message Metric {
+  Meta meta = 1;
+  string name = 2;
+  float value = 3;
+}
+
+message Event {
+  Meta meta = 1;
+  string name = 2;
+  string value = 3;
+}
