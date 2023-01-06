@@ -1,0 +1,22 @@
+syntax="proto3";
+
+package nettop;
+
+message Kernel {
+    string release = 1;
+    string version = 2;
+    string architecture = 3;
+}
+
+message CriMeta {
+    string version = 1;
+    string runtime_name = 2;
+    string runtime_version = 3;
+    string runtime_sock = 4;
+}
+
+message NodeMeta {
+    string node_name = 1;
+    Kernel kernel = 2;
+    CriMeta crimeta = 3;
+}

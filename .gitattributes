@@ -1,0 +1,9 @@
+# Always check-out / check-in files with LF line endings.
+* text=auto eol=lf
+
+**/zz_generated.*.go linguist-generated=true
+**/types.generated.go linguist-generated=true
+**/generated.pb.go linguist-generated=true
+**/generated.proto
+
+bpf/headers/** -linguist-vendored

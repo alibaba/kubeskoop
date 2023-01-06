@@ -1,0 +1,107 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ .Values.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: skoop-exporter
+spec:
+  selector:
+    matchLabels:
+      app: skoop-exporter
+  template:
+    metadata:
+      labels:
+        app: skoop-exporter
+      annotations:
+        prometheus.io/path: /metrics
+        prometheus.io/port: "9102"
+        prometheus.io/scheme: http
+        prometheus.io/scrape: "true"
+      name: skoop-exporter
+    spec:
+      hostNetwork: true
+      hostPID: true
+      hostIPC: true
+      dnsPolicy: ClusterFirstWithHostNet
+      initContainers:
+        - name: inspector-prepare
+          image: "{{ .Values.initcontainer.repository }}:{{ .Values.initcontainer.tag }}"
+          volumeMounts:
+            - name: btf-rawdata
+              mountPath: /etc/net-exporter/btf
+            - mountPath: /boot/
+              name: boot
+          command: [btfhack, discover,-p ,/etc/net-exporter/btf/]
+      containers:
+      - image:  "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        name: inspector
+        env:
+        - name: INSPECTOR_NODENAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        volumeMounts:
+          - name: config-volume
+            mountPath: /etc/config/
+          - name: btf-rawdata
+            mountPath: /etc/net-exporter/btf
+          - name: proc
+            mountPath: /proc
+          - mountPath: /run/containerd/
+            name: containerd
+          - mountPath: /var/run/
+            name: dockershim
+          - mountPath: /sys/fs/bpf
+            name: bpf-maps
+            mountPropagation: HostToContainer
+          - mountPath: /sys/fs/cgroup
+            name: cgroup
+            mountPropagation: HostToContainer
+          - mountPath: /sys/kernel/debug
+            name: bpf-events
+            mountPropagation: HostToContainer
+          - mountPath: /etc/node-hostname
+            name: hostname
+        command: [/bin/inspector,server]
+        securityContext:
+          privileged: true
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: proc
+          hostPath:
+            path: /proc
+        - name: containerd
+          hostPath:
+            path: /run/containerd/
+        - name: boot
+          hostPath:
+            path: /boot/
+        - name: dockershim
+          hostPath:
+            path: /var/run/
+        - hostPath:
+            path: /sys/fs/bpf
+            type: DirectoryOrCreate
+          name: bpf-maps
+        - hostPath:
+            path: /sys/fs/cgroup
+            type: DirectoryOrCreate
+          name: cgroup
+        - hostPath:
+            path: /sys/kernel/debug
+          name: bpf-events
+        - name: hostname
+          hostPath:
+            path: /etc/hostname
+            type: FileOrCreate
+        - name: config-volume
+          configMap:
+            name: inspector-config
+        - name: btf-rawdata
+          emptyDir: {}
