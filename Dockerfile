@@ -1,8 +1,10 @@
 FROM docker.io/library/golang:1.19.4-alpine AS build
+ARG GOPROXY # --build-arg GOPROXY=https://goproxy.cn,direct
+ARG ALPINE_MIRROR # --build-arg ALPINE_MIRROR=mirrors.aliyun.com
 
-RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories && \
+RUN if [ ! -z "$ALPINE_MIRROR" ]; then sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories; fi && \
     apk add gcc g++ linux-headers && \
-    go env -w GOPROXY=https://goproxy.cn,direct
+    go env -w GOPROXY=$GOPROXY
 
 WORKDIR /go/src/github.com/alibaba/kubeskoop/
 ADD . /go/src/github.com/alibaba/kubeskoop/
@@ -13,8 +15,7 @@ RUN cd /go/src/github.com/alibaba/kubeskoop/cmd/skoop && go build -o /go/src/git
 
 FROM docker.io/library/alpine
 
-RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories \
-    && apk add --no-cache \
+RUN apk add --no-cache \
     iproute2 \
     ipset \
     iptables \
