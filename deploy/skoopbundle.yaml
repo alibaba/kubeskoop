@@ -1,13 +1,13 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: skoop
+  name: kubeskoop
 ---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: skoop-exporter
-  namespace: skoop
+  namespace: kubeskoop
   labels:
     app: skoop-exporter
 spec:
@@ -37,47 +37,47 @@ spec:
               mountPath: /etc/net-exporter/btf
             - mountPath: /boot/
               name: boot
-          command: [btfhack, discover,-p ,/etc/net-exporter/btf/]
+          command: [btfhack, discover, -p, /etc/net-exporter/btf/]
       containers:
-      - image: "registry.cn-hangzhou.aliyuncs.com/acs/inspector:v0.1.0-16-gc8eeb09-aliyun"
-        name: inspector
-        env:
-        - name: INSPECTOR_NODENAME
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.nodeName
-        volumeMounts:
-          - name: config-volume
-            mountPath: /etc/config/
-          - name: btf-rawdata
-            mountPath: /etc/net-exporter/btf
-          - name: proc
-            mountPath: /proc
-          - mountPath: /run/containerd/
-            name: containerd
-          - mountPath: /var/run/
-            name: dockershim
-          - mountPath: /sys/fs/bpf
-            name: bpf-maps
-            mountPropagation: HostToContainer
-          - mountPath: /sys/fs/cgroup
-            name: cgroup
-            mountPropagation: HostToContainer
-          - mountPath: /sys/kernel/debug
-            name: bpf-events
-            mountPropagation: HostToContainer
-          - mountPath: /etc/node-hostname
-            name: hostname
-        command: [/bin/inspector,server,-d]
-        securityContext:
-          privileged: true
-        resources:
-          requests:
-            cpu: 1000m
-            memory: 1000Mi
-          limits:
-            cpu: 1000m
-            memory: 2000Mi
+        - image: "registry.cn-hangzhou.aliyuncs.com/acs/inspector:v0.1.0-16-gc8eeb09-aliyun"
+          name: inspector
+          env:
+            - name: INSPECTOR_NODENAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - name: config-volume
+              mountPath: /etc/config/
+            - name: btf-rawdata
+              mountPath: /etc/net-exporter/btf
+            - name: proc
+              mountPath: /proc
+            - mountPath: /run/containerd/
+              name: containerd
+            - mountPath: /var/run/
+              name: dockershim
+            - mountPath: /sys/fs/bpf
+              name: bpf-maps
+              mountPropagation: HostToContainer
+            - mountPath: /sys/fs/cgroup
+              name: cgroup
+              mountPropagation: HostToContainer
+            - mountPath: /sys/kernel/debug
+              name: bpf-events
+              mountPropagation: HostToContainer
+            - mountPath: /etc/node-hostname
+              name: hostname
+          command: [/bin/inspector, server, -d]
+          securityContext:
+            privileged: true
+          resources:
+            requests:
+              cpu: 1000m
+              memory: 1000Mi
+            limits:
+              cpu: 1000m
+              memory: 2000Mi
       volumes:
         - name: proc
           hostPath:
@@ -85,6 +85,9 @@ spec:
         - name: containerd
           hostPath:
             path: /run/containerd/
+        - name: boot
+          hostPath:
+            path: /boot/
         - name: dockershim
           hostPath:
             path: /var/run/
@@ -92,10 +95,6 @@ spec:
             path: /sys/fs/bpf
             type: DirectoryOrCreate
           name: bpf-maps
-        - name: boot
-          hostPath:
-            path: /boot
-            type: DirectoryOrCreate
         - hostPath:
             path: /sys/fs/cgroup
             type: DirectoryOrCreate
@@ -138,7 +137,7 @@ data:
     event_config:
       port: 19102
       loki_enable: true
-      loki_address: loki-service.skoop.svc.cluster.local
+      loki_address: "grafana-loki-service.kubeskoop.svc"
       probes:
       - tcpreset
       - packetloss
@@ -149,28 +148,28 @@ data:
 kind: ConfigMap
 metadata:
   name: inspector-config
-  namespace: skoop
+  namespace: kubeskoop
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: prometheus
 rules:
-- apiGroups: [""]
-  resources:
-  - nodes
-  - nodes/proxy
-  - services
-  - endpoints
-  - pods
-  verbs: ["get", "list", "watch"]
-- apiGroups:
-  - extensions
-  resources:
-  - ingresses
-  verbs: ["get", "list", "watch"]
-- nonResourceURLs: ["/metrics"]
-  verbs: ["get"]
+  - apiGroups: [""]
+    resources:
+      - nodes
+      - nodes/proxy
+      - services
+      - endpoints
+      - pods
+    verbs: ["get", "list", "watch"]
+  - apiGroups:
+      - extensions
+    resources:
+      - ingresses
+    verbs: ["get", "list", "watch"]
+  - nonResourceURLs: ["/metrics"]
+    verbs: ["get"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -181,9 +180,9 @@ roleRef:
   kind: ClusterRole
   name: prometheus
 subjects:
-- kind: ServiceAccount
-  name: default
-  namespace: skoop
+  - kind: ServiceAccount
+    name: default
+    namespace: kubeskoop
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -191,7 +190,7 @@ metadata:
   name: prometheus-server-conf
   labels:
     name: prometheus-server-conf
-  namespace: skoop
+  namespace: kubeskoop
 data:
   prometheus.rules: |-
     groups:
@@ -250,7 +249,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: prometheus-deployment
-  namespace: skoop
+  namespace: kubeskoop
   labels:
     app: prometheus-server
 spec:
@@ -298,10 +297,10 @@ apiVersion: v1
 kind: Service
 metadata:
   name: prometheus-service
-  namespace: skoop
+  namespace: kubeskoop
   annotations:
-      prometheus.io/scrape: 'true'
-      prometheus.io/port:   '9090'
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
 spec:
   selector:
     app: prometheus-server
@@ -309,27 +308,15 @@ spec:
   ports:
     - port: 80
       targetPort: 9090
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: loki-service
-  namespace: skoop
-spec:
-  selector:
-    app: grafana-loki
-  type: ClusterIP
-  ports:
-    - port: 3100
-      targetPort: 3100
+      nodePort: 32000
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: grafana-datasources
-  namespace: skoop
+  namespace: kubeskoop
 data:
-  prometheus.yaml: |-
+  datasource.yaml: |-
     {
         "apiVersion": 1,
         "datasources": [
@@ -339,7 +326,16 @@ data:
                 "name": "prometheus",
                 "orgId": 1,
                 "type": "prometheus",
-                "url": "http://prometheus-service.skoop.svc",
+                "url": "http://prometheus-service.kubeskoop.svc",
+                "version": 1
+            },
+            {
+               "access":"proxy",
+                "editable": true,
+                "name": "loki",
+                "orgId": 1,
+                "type": "loki",
+                "url": "http://grafana-loki-service.kubeskoop.svc:3100",
                 "version": 1
             }
         ]
@@ -349,7 +345,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: grafana
-  namespace: skoop
+  namespace: kubeskoop
 spec:
   replicas: 1
   selector:
@@ -362,40 +358,40 @@ spec:
         app: grafana
     spec:
       containers:
-      - name: grafana
-        image: grafana/grafana:latest
-        ports:
         - name: grafana
-          containerPort: 3000
-        resources:
-          limits:
-            memory: "1Gi"
-            cpu: "1000m"
-          requests:
-            memory: 500M
-            cpu: "500m"
-        volumeMounts:
-          - mountPath: /var/lib/grafana
-            name: grafana-storage
-          - mountPath: /etc/grafana/provisioning/datasources
-            name: grafana-datasources
-            readOnly: false
+          image: grafana/grafana:latest
+          ports:
+            - name: grafana
+              containerPort: 3000
+          resources:
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+            requests:
+              memory: 500M
+              cpu: "500m"
+          volumeMounts:
+            - mountPath: /var/lib/grafana
+              name: grafana-storage
+            - mountPath: /etc/grafana/provisioning/datasources
+              name: grafana-datasources
+              readOnly: false
       volumes:
         - name: grafana-storage
           emptyDir: {}
         - name: grafana-datasources
           configMap:
-              defaultMode: 420
-              name: grafana-datasources
+            defaultMode: 420
+            name: grafana-datasources
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: grafana
-  namespace: skoop
+  namespace: kubeskoop
   annotations:
-      prometheus.io/scrape: 'true'
-      prometheus.io/port:   '3000'
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "3000"
 spec:
   selector:
     app: grafana
@@ -403,12 +399,13 @@ spec:
   ports:
     - port: 80
       targetPort: 3000
+      nodePort: 32100
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: grafana-loki
-  namespace: skoop
+  namespace: kubeskoop
 spec:
   replicas: 1
   selector:
@@ -421,37 +418,51 @@ spec:
         app: grafana-loki
     spec:
       containers:
-      - name: grafana-loki
-        image: grafana/loki:2.7.0
-        ports:
         - name: grafana-loki
-          containerPort: 3100
-        resources:
-          limits:
-            memory: "1Gi"
-            cpu: "1000m"
-          requests:
-            memory: 500M
-            cpu: "500m"
-        volumeMounts:
-          - mountPath: /var/lib/grafana
-            name: grafana-storage
-          - mountPath: /mnt/config/
-            name: grafana-loki-config
-            readOnly: false
+          image: grafana/loki:2.7.0
+          ports:
+            - name: grafana-loki
+              containerPort: 3100
+          resources:
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+            requests:
+              memory: 500M
+              cpu: "500m"
+          volumeMounts:
+            - mountPath: /var/lib/grafana
+              name: grafana-storage
+            - mountPath: /mnt/config/
+              name: grafana-loki-config
+              readOnly: false
       volumes:
         - name: grafana-storage
           emptyDir: {}
         - name: grafana-loki-config
           configMap:
-              defaultMode: 420
-              name: grafana-loki-config
+            defaultMode: 420
+            name: grafana-loki-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-loki-service
+  namespace: kubeskoop
+spec:
+  selector:
+    app: grafana-loki
+  type: NodePort
+  ports:
+    - port: 3100
+      targetPort: 3100
+      nodePort: 32101
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: grafana-loki-config
-  namespace: skoop
+  namespace: kubeskoop
 data:
   loki-config.yaml: |-
     auth_enabled: false
