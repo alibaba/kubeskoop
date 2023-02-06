@@ -13,7 +13,7 @@ require (
 	github.com/bastjan/netstat v1.0.0
 	github.com/beevik/etree v1.1.0
 	github.com/cilium/ebpf v0.9.3
-	github.com/containerd/containerd v1.6.15
+	github.com/containerd/containerd v1.6.16
 	github.com/docker/docker v20.10.22+incompatible
 	github.com/goccy/go-graphviz v0.1.0
 	github.com/golang/protobuf v1.5.2
