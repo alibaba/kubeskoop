@@ -1,6 +1,6 @@
 module github.com/alibaba/kubeskoop
 
-go 1.19
+go 1.18
 
 require (
 	github.com/afiskon/promtail-client v0.0.0-20190305142237-506f3f921e9c

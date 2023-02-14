@@ -1,4 +1,4 @@
-FROM docker.io/library/golang:1.19.4-alpine AS build
+FROM docker.io/library/golang:1.18.4-alpine AS build
 ARG GOPROXY # --build-arg GOPROXY=https://goproxy.cn,direct
 ARG ALPINE_MIRROR # --build-arg ALPINE_MIRROR=mirrors.aliyun.com
 
