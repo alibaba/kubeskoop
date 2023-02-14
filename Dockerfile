@@ -1,6 +1,8 @@
 FROM docker.io/library/golang:1.19.4-alpine AS build
-ARG GOPROXY # --build-arg GOPROXY=https://goproxy.cn,direct
-ARG ALPINE_MIRROR # --build-arg ALPINE_MIRROR=mirrors.aliyun.com
+# --build-arg GOPROXY=https://goproxy.cn,direct
+ARG GOPROXY
+# --build-arg ALPINE_MIRROR=mirrors.aliyun.com
+ARG ALPINE_MIRROR
 
 RUN if [ ! -z "$ALPINE_MIRROR" ]; then sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories; fi && \
     apk add gcc g++ linux-headers && \
