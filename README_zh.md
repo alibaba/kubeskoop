@@ -51,13 +51,13 @@ KubeSkoop是一个Kubernetes网络诊断工具。针对不同的网络插件和I
 通过`go install`来安装KubeSkoop的诊断客户端：
 
 ```shell
-go install github.com/alibaba/kubeskoop/cmd/kubeskoop@latest
+go install github.com/alibaba/kubeskoop/cmd/skoop@latest
 ```
 
 #### 一键诊断
 
 ```shell
-$ kubeskoop -s 172.18.0.4 -d 10.96.0.10 -p 53 --http # 执行诊断命令，通过src,dst指定源地址和目的地址，使用--http通过本地web服务展示诊断结果
+$ skoop -s 172.18.0.4 -d 10.96.0.10 -p 53 --http # 执行诊断命令，通过src,dst指定源地址和目的地址，使用--http通过本地web服务展示诊断结果
 I0118 11:43:23.383446    6280 web.go:97] http server listening on http://127.0.0.1:8080 # 在诊断完成后，将会显示用于查看诊断结果的链接
 ```
 

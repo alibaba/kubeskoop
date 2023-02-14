@@ -48,13 +48,13 @@ You can view the full documentation from the [KubeSkoop.io](https://kubeskoop.io
 Through `go install` to install KubeSkoop cli：
 
 ```shell
-go install github.com/alibaba/kubeskoop/cmd/kubeskoop
+go install github.com/alibaba/kubeskoop/cmd/skoop@latest
 ```
 
 #### One-Shot Diagnose
 
 ```shell
-$ kubeskoop -s 172.18.0.4 -d 10.96.0.10 -p 53 --http # Execute the diagnostic command, specify the src,dst, and use --http to provide the diagnostic result through the local web service
+$ skoop -s 172.18.0.4 -d 10.96.0.10 -p 53 --http # Execute the diagnostic command, specify the src,dst, and use --http to provide the diagnostic result through the local web service
 I0118 11:43:23.383446    6280 web.go:97] http server listening on http://127.0.0.1:8080 # After the diagnosis is completed, a link to the diagnosis result will be output
 ```
 
