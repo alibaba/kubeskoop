@@ -7,9 +7,9 @@ import (
 	"time"
 
 	lokiwrapper "github.com/alibaba/kubeskoop/pkg/exporter/loki"
-	nettop2 "github.com/alibaba/kubeskoop/pkg/exporter/nettop"
+	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
-	proto2 "github.com/alibaba/kubeskoop/pkg/exporter/proto"
+	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
 
 	"github.com/google/uuid"
 	"golang.org/x/exp/slog"
@@ -17,9 +17,9 @@ import (
 )
 
 type EServer struct {
-	proto2.UnimplementedInspectorServer
-	probes  map[string]proto2.EventProbe
-	cpool   map[string]chan<- proto2.RawEvent
+	proto.UnimplementedInspectorServer
+	probes  map[string]proto.EventProbe
+	cpool   map[string]chan<- proto.RawEvent
 	mtx     sync.Mutex
 	ctx     context.Context
 	control chan struct{}
@@ -28,8 +28,8 @@ type EServer struct {
 
 func NewEServer(ctx context.Context, config EventConfig) *EServer {
 	es := &EServer{
-		probes:  make(map[string]proto2.EventProbe),
-		cpool:   make(map[string]chan<- proto2.RawEvent),
+		probes:  make(map[string]proto.EventProbe),
+		cpool:   make(map[string]chan<- proto.RawEvent),
 		config:  config,
 		mtx:     sync.Mutex{},
 		ctx:     ctx,
@@ -59,8 +59,8 @@ func NewEServer(ctx context.Context, config EventConfig) *EServer {
 
 	// handle grafana loki ingester preparation
 	if config.LokiEnable && config.LokiAddress != "" {
-		datach := make(chan proto2.RawEvent)
-		ingester, err := lokiwrapper.NewIngester(config.LokiAddress, nettop2.GetNodeName(), datach)
+		datach := make(chan proto.RawEvent)
+		ingester, err := lokiwrapper.NewIngester(config.LokiAddress, nettop.GetNodeName(), datach)
 		if err != nil {
 			slog.Ctx(ctx).Info("new loki ingester", "err", err, "client", ingester.Name())
 		} else {
@@ -73,17 +73,17 @@ func NewEServer(ctx context.Context, config EventConfig) *EServer {
 	return es
 }
 
-func (e *EServer) WatchEvent(req *proto2.WatchRequest, srv proto2.Inspector_WatchEventServer) error {
+func (e *EServer) WatchEvent(req *proto.WatchRequest, srv proto.Inspector_WatchEventServer) error {
 	client := getPeerClient(srv.Context())
-	datach := make(chan proto2.RawEvent)
+	datach := make(chan proto.RawEvent)
 	slog.Ctx(e.ctx).Info("watch event income", "client", client)
 	e.subscribe(client, datach)
 	defer e.unsubscribe(client)
 
 	for evt := range datach {
-		resp := &proto2.WatchReply{
+		resp := &proto.WatchReply{
 			Name: evt.EventType,
-			Event: &proto2.Event{
+			Event: &proto.Event{
 				Name:  evt.EventType,
 				Value: evt.EventBody,
 				Meta:  getEventMetaByNetns(e.ctx, evt.Netns),
@@ -99,12 +99,12 @@ func (e *EServer) WatchEvent(req *proto2.WatchRequest, srv proto2.Inspector_Watc
 	return nil
 }
 
-func (e *EServer) QueryMetric(ctx context.Context, req *proto2.QueryMetricRequest) (*proto2.QueryMetricResponse, error) {
-	res := &proto2.QueryMetricResponse{}
+func (e *EServer) QueryMetric(ctx context.Context, req *proto.QueryMetricRequest) (*proto.QueryMetricResponse, error) {
+	res := &proto.QueryMetricResponse{}
 	return res, nil
 }
 
-func (e *EServer) subscribe(client string, ch chan<- proto2.RawEvent) {
+func (e *EServer) subscribe(client string, ch chan<- proto.RawEvent) {
 	e.mtx.Lock()
 	defer e.mtx.Unlock()
 
@@ -120,7 +120,7 @@ func (e *EServer) unsubscribe(client string) {
 
 func (e *EServer) dispatcher(ctx context.Context, stopc chan struct{}) {
 	pbs := e.probes
-	receiver := make(chan proto2.RawEvent)
+	receiver := make(chan proto.RawEvent)
 	for p, pb := range pbs {
 		err := pb.Register(receiver)
 		if err != nil {
@@ -147,7 +147,7 @@ func (e *EServer) dispatcher(ctx context.Context, stopc chan struct{}) {
 	}
 }
 
-func (e *EServer) broadcast(evt proto2.RawEvent) error {
+func (e *EServer) broadcast(evt proto.RawEvent) error {
 	pbs := e.cpool
 
 	ctx, cancelf := context.WithTimeout(e.ctx, 5*time.Second)
@@ -185,17 +185,17 @@ func getPeerClient(ctx context.Context) string {
 	return clientid
 }
 
-func getEventMetaByNetns(ctx context.Context, netns uint32) *proto2.Meta {
-	et, err := nettop2.GetEntityByNetns(int(netns))
+func getEventMetaByNetns(ctx context.Context, netns uint32) *proto.Meta {
+	et, err := nettop.GetEntityByNetns(int(netns))
 	if err != nil {
 		slog.Ctx(ctx).Info("nettop get entity", "err", err, "netns", netns)
 		return nil
 	}
 
-	return &proto2.Meta{
+	return &proto.Meta{
 		Pod:       et.GetPodName(),
 		Namespace: et.GetPodNamespace(),
 		Netns:     fmt.Sprintf("ns%d", netns),
-		Node:      nettop2.GetNodeName(),
+		Node:      nettop.GetNodeName(),
 	}
 }

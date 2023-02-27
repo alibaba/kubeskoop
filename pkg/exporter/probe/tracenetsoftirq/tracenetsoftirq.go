@@ -9,7 +9,7 @@ import (
 	"sync"
 	"unsafe"
 
-	bpfutil2 "github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
+	"github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
 	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
 
 	"github.com/cilium/ebpf"
@@ -159,7 +159,7 @@ func (p *NetSoftirqProbe) Start(ctx context.Context) {
 			continue
 		}
 
-		rawevt.EventBody = fmt.Sprintf("cpu=%d pid=%d latency=%s ", event.Cpu, event.Pid, bpfutil2.GetHumanTimes(event.Latency))
+		rawevt.EventBody = fmt.Sprintf("cpu=%d pid=%d latency=%s ", event.Cpu, event.Pid, bpfutil.GetHumanTimes(event.Latency))
 		if p.sub != nil {
 			slog.Ctx(ctx).Debug("broadcast event", "module", MODULE_NAME)
 			p.sub <- rawevt
@@ -192,7 +192,7 @@ func loadSync() error {
 	opts := ebpf.CollectionOptions{}
 	// 获取btf信息
 	opts.Programs = ebpf.ProgramOptions{
-		KernelTypes: bpfutil2.LoadBTFSpecOrNil(),
+		KernelTypes: bpfutil.LoadBTFSpecOrNil(),
 	}
 
 	// 获取Loaded的程序/map的fd信息

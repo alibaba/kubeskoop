@@ -6,18 +6,18 @@ import (
 	"net"
 
 	"github.com/alibaba/kubeskoop/pkg/skoop/k8s"
-	model2 "github.com/alibaba/kubeskoop/pkg/skoop/model"
+	model "github.com/alibaba/kubeskoop/pkg/skoop/model"
 	"github.com/alibaba/kubeskoop/pkg/skoop/service"
 
-	core_v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/networking/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
 )
 
 type NetworkPolicyHandler interface {
-	CheckNetworkPolicy(src, dst model2.Endpoint, protocol model2.Protocol) ([]model2.Suspicion, error)
+	CheckNetworkPolicy(src, dst model.Endpoint, protocol model.Protocol) ([]model.Suspicion, error)
 }
 
 type networkPolicy struct {
@@ -38,7 +38,7 @@ type networkPolicy struct {
 
 func NewNetworkPolicy(serviceAddrSkipCidrRule bool, inClusterAddrEmitCidrRule bool, ipCache *k8s.IPCache, k8sCli *clientset.Clientset, service service.Processor) (NetworkPolicyHandler, error) {
 	np := &networkPolicy{serviceAddrSkipCidrRule: serviceAddrSkipCidrRule, inClusterAddrEmitCidrRule: inClusterAddrEmitCidrRule, ipCache: ipCache, k8sCli: k8sCli, service: service}
-	policyList, err := np.k8sCli.NetworkingV1().NetworkPolicies("").List(context.TODO(), meta_v1.ListOptions{})
+	policyList, err := np.k8sCli.NetworkingV1().NetworkPolicies("").List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -46,15 +46,15 @@ func NewNetworkPolicy(serviceAddrSkipCidrRule bool, inClusterAddrEmitCidrRule bo
 	return np, nil
 }
 
-func (np *networkPolicy) CheckNetworkPolicy(src, dst model2.Endpoint, protocol model2.Protocol) ([]model2.Suspicion, error) {
+func (np *networkPolicy) CheckNetworkPolicy(src, dst model.Endpoint, protocol model.Protocol) ([]model.Suspicion, error) {
 	var denies []*v1.NetworkPolicy
-	var ret []model2.Suspicion
-	if src.Type == model2.EndpointTypePod {
+	var ret []model.Suspicion
+	if src.Type == model.EndpointTypePod {
 		pod, err := np.ipCache.GetPodFromIP(src.IP)
 		if err != nil {
 			return nil, fmt.Errorf("error get pod from ip ipCache: %v", err)
 		}
-		if dst.Type != model2.EndpointTypeService && dst.Type != model2.EndpointTypeLoadbalancer {
+		if dst.Type != model.EndpointTypeService && dst.Type != model.EndpointTypeLoadbalancer {
 			nps, err := np.checkEgress(pod, dst, protocol)
 			if err != nil {
 				return nil, fmt.Errorf("error check egress policies: %v", err)
@@ -69,7 +69,7 @@ func (np *networkPolicy) CheckNetworkPolicy(src, dst model2.Endpoint, protocol m
 			denies = append(denies, nps...)
 		}
 	}
-	if dst.Type == model2.EndpointTypePod {
+	if dst.Type == model.EndpointTypePod {
 		pod, err := np.ipCache.GetPodFromIP(dst.IP)
 		if err != nil {
 			return nil, fmt.Errorf("error get pod from ip ipCache: %v", err)
@@ -80,12 +80,12 @@ func (np *networkPolicy) CheckNetworkPolicy(src, dst model2.Endpoint, protocol m
 		}
 		denies = append(denies, nps...)
 	}
-	if dst.Type == model2.EndpointTypeService || dst.Type == model2.EndpointTypeLoadbalancer {
+	if dst.Type == model.EndpointTypeService || dst.Type == model.EndpointTypeLoadbalancer {
 		svc, err := np.ipCache.GetServiceFromIP(dst.IP)
 		if err != nil {
 			return nil, fmt.Errorf("error get service(%v) from ip ipCache: %v", dst.IP, err)
 		}
-		backends := np.service.Process(model2.Packet{
+		backends := np.service.Process(model.Packet{
 			Src:      net.ParseIP(src.IP),
 			Sport:    src.Port,
 			Dst:      net.ParseIP(dst.IP),
@@ -100,7 +100,7 @@ func (np *networkPolicy) CheckNetworkPolicy(src, dst model2.Endpoint, protocol m
 			if err != nil {
 				return nil, err
 			}
-			dst := model2.Endpoint{
+			dst := model.Endpoint{
 				IP:   backend.IP,
 				Type: backendType,
 				Port: backend.Port,
@@ -114,7 +114,7 @@ func (np *networkPolicy) CheckNetworkPolicy(src, dst model2.Endpoint, protocol m
 	}
 
 	for _, np := range denies {
-		ret = append(ret, model2.Suspicion{Level: model2.SuspicionLevelCritical, Message: fmt.Sprintf("network policy %v/%v deny the packet from %v to(%v) %v:%v",
+		ret = append(ret, model.Suspicion{Level: model.SuspicionLevelCritical, Message: fmt.Sprintf("network policy %v/%v deny the packet from %v to(%v) %v:%v",
 			np.Namespace, np.Name,
 			src.IP, protocol, dst.IP, dst.Port),
 		})
@@ -122,7 +122,7 @@ func (np *networkPolicy) CheckNetworkPolicy(src, dst model2.Endpoint, protocol m
 	return ret, nil
 }
 
-func (np *networkPolicy) checkEgress(pod *core_v1.Pod, dst model2.Endpoint, protocol model2.Protocol) ([]*v1.NetworkPolicy, error) {
+func (np *networkPolicy) checkEgress(pod *corev1.Pod, dst model.Endpoint, protocol model.Protocol) ([]*v1.NetworkPolicy, error) {
 	var denies []*v1.NetworkPolicy
 	for _, policy := range np.policies {
 		match, err := np.policyMatchPod(&policy, pod)
@@ -145,18 +145,18 @@ func (np *networkPolicy) checkEgress(pod *core_v1.Pod, dst model2.Endpoint, prot
 	return denies, nil
 }
 
-func toV1Protocol(p model2.Protocol) core_v1.Protocol {
+func toV1Protocol(p model.Protocol) corev1.Protocol {
 	switch p {
-	case model2.TCP:
-		return core_v1.ProtocolTCP
-	case model2.UDP:
-		return core_v1.ProtocolUDP
+	case model.TCP:
+		return corev1.ProtocolTCP
+	case model.UDP:
+		return corev1.ProtocolUDP
 	default:
-		return core_v1.ProtocolTCP
+		return corev1.ProtocolTCP
 	}
 }
 
-func (np *networkPolicy) containsPortWithProtocol(port uint16, protocol model2.Protocol, ports []v1.NetworkPolicyPort) bool {
+func (np *networkPolicy) containsPortWithProtocol(port uint16, protocol model.Protocol, ports []v1.NetworkPolicyPort) bool {
 	// no port means no limit
 	if len(ports) == 0 {
 		return true
@@ -168,7 +168,7 @@ func (np *networkPolicy) containsPortWithProtocol(port uint16, protocol model2.P
 			continue
 		}
 
-		policyProtocol := core_v1.ProtocolTCP
+		policyProtocol := corev1.ProtocolTCP
 		// If not specified, this field defaults to TCP.
 		if p.Protocol != nil {
 			policyProtocol = *p.Protocol
@@ -196,7 +196,7 @@ func (np *networkPolicy) containsPortWithProtocol(port uint16, protocol model2.P
 	return false
 }
 
-func (np *networkPolicy) checkEgressPolicyVerdict(policy *v1.NetworkPolicy, dstPod *core_v1.Pod, dst model2.Endpoint, protocol model2.Protocol) (deny bool, err error) {
+func (np *networkPolicy) checkEgressPolicyVerdict(policy *v1.NetworkPolicy, dstPod *corev1.Pod, dst model.Endpoint, protocol model.Protocol) (deny bool, err error) {
 	if !np.hasPolicyType(policy, v1.PolicyTypeEgress) {
 		return false, nil
 	}
@@ -211,7 +211,7 @@ func (np *networkPolicy) checkEgressPolicyVerdict(policy *v1.NetworkPolicy, dstP
 					if dstPod.GetNamespace() != policy.GetNamespace() {
 						continue
 					}
-					selector, err := meta_v1.LabelSelectorAsSelector(to.PodSelector)
+					selector, err := metav1.LabelSelectorAsSelector(to.PodSelector)
 					if err != nil {
 						return false, err
 					}
@@ -219,14 +219,14 @@ func (np *networkPolicy) checkEgressPolicyVerdict(policy *v1.NetworkPolicy, dstP
 						return false, nil
 					}
 				} else if to.NamespaceSelector != nil {
-					selector, err := meta_v1.LabelSelectorAsSelector(to.NamespaceSelector)
+					selector, err := metav1.LabelSelectorAsSelector(to.NamespaceSelector)
 					if err != nil {
 						return false, err
 					}
 					if selector.Empty() {
 						return false, nil
 					}
-					dstNamespace, err := np.k8sCli.CoreV1().Namespaces().Get(context.Background(), dstPod.GetNamespace(), meta_v1.GetOptions{})
+					dstNamespace, err := np.k8sCli.CoreV1().Namespaces().Get(context.Background(), dstPod.GetNamespace(), metav1.GetOptions{})
 					if err != nil {
 						return false, err
 					}
@@ -283,11 +283,11 @@ func (np *networkPolicy) hasPolicyType(policy *v1.NetworkPolicy, pt v1.PolicyTyp
 	return false
 }
 
-func (np *networkPolicy) policyMatchPod(policy *v1.NetworkPolicy, pod *core_v1.Pod) (bool, error) {
+func (np *networkPolicy) policyMatchPod(policy *v1.NetworkPolicy, pod *corev1.Pod) (bool, error) {
 	if policy.GetNamespace() != pod.GetNamespace() {
 		return false, nil
 	}
-	selector, err := meta_v1.LabelSelectorAsSelector(&policy.Spec.PodSelector)
+	selector, err := metav1.LabelSelectorAsSelector(&policy.Spec.PodSelector)
 	if err != nil {
 		return false, err
 	}
@@ -297,7 +297,7 @@ func (np *networkPolicy) policyMatchPod(policy *v1.NetworkPolicy, pod *core_v1.P
 	return true, nil
 }
 
-func (np *networkPolicy) checkIngress(pod *core_v1.Pod, src model2.Endpoint, protocol model2.Protocol) ([]*v1.NetworkPolicy, error) {
+func (np *networkPolicy) checkIngress(pod *corev1.Pod, src model.Endpoint, protocol model.Protocol) ([]*v1.NetworkPolicy, error) {
 	var denies []*v1.NetworkPolicy
 	for _, policy := range np.policies {
 		match, err := np.policyMatchPod(&policy, pod)
@@ -323,7 +323,7 @@ func (np *networkPolicy) checkIngress(pod *core_v1.Pod, src model2.Endpoint, pro
 	return denies, nil
 }
 
-func (np *networkPolicy) checkIngressPolicyVerdict(policy *v1.NetworkPolicy, srcPod *core_v1.Pod, src model2.Endpoint, protocol model2.Protocol) (deny bool, err error) {
+func (np *networkPolicy) checkIngressPolicyVerdict(policy *v1.NetworkPolicy, srcPod *corev1.Pod, src model.Endpoint, protocol model.Protocol) (deny bool, err error) {
 	if !np.hasPolicyType(policy, v1.PolicyTypeIngress) {
 		return false, nil
 	}
@@ -338,7 +338,7 @@ func (np *networkPolicy) checkIngressPolicyVerdict(policy *v1.NetworkPolicy, src
 						continue
 					}
 
-					selector, err := meta_v1.LabelSelectorAsSelector(from.PodSelector)
+					selector, err := metav1.LabelSelectorAsSelector(from.PodSelector)
 					if err != nil {
 						return false, err
 					}
@@ -348,7 +348,7 @@ func (np *networkPolicy) checkIngressPolicyVerdict(policy *v1.NetworkPolicy, src
 					}
 
 				} else if from.NamespaceSelector != nil {
-					selector, err := meta_v1.LabelSelectorAsSelector(from.NamespaceSelector)
+					selector, err := metav1.LabelSelectorAsSelector(from.NamespaceSelector)
 					if err != nil {
 						return false, err
 					}
@@ -356,7 +356,7 @@ func (np *networkPolicy) checkIngressPolicyVerdict(policy *v1.NetworkPolicy, src
 					if selector.Empty() {
 						return false, nil
 					}
-					srcNamespace, err := np.k8sCli.CoreV1().Namespaces().Get(context.Background(), srcPod.GetName(), meta_v1.GetOptions{})
+					srcNamespace, err := np.k8sCli.CoreV1().Namespaces().Get(context.Background(), srcPod.GetName(), metav1.GetOptions{})
 					if err != nil {
 						return false, err
 					}

@@ -10,7 +10,7 @@ import (
 	"sync"
 	"unsafe"
 
-	bpfutil2 "github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
+	"github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
 	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
 
@@ -123,12 +123,12 @@ func (p *BiolatencyProbe) Start(ctx context.Context) {
 		}
 		pid := event.Pid
 		if et, err := nettop.GetEntityByPid(int(pid)); err != nil || et == nil {
-			slog.Ctx(ctx).Warn("unspecified event", "pid", pid, "task", bpfutil2.GetCommString(event.Target))
+			slog.Ctx(ctx).Warn("unspecified event", "pid", pid, "task", bpfutil.GetCommString(event.Target))
 			continue
 		}
 		rawevt := proto.RawEvent{
 			EventType: "BIOLAT_10MS",
-			EventBody: fmt.Sprintf("%s %d latency %s", bpfutil2.GetCommString(event.Target), event.Pid, bpfutil2.GetHumanTimes(event.Latency)),
+			EventBody: fmt.Sprintf("%s %d latency %s", bpfutil.GetCommString(event.Target), event.Pid, bpfutil.GetHumanTimes(event.Latency)),
 		}
 
 		// 分发给注册的dispatcher，其余逻辑由框架完成
@@ -148,7 +148,7 @@ func start() error {
 	opts := ebpf.CollectionOptions{}
 
 	opts.Programs = ebpf.ProgramOptions{
-		KernelTypes: bpfutil2.LoadBTFSpecOrNil(),
+		KernelTypes: bpfutil.LoadBTFSpecOrNil(),
 	}
 	objs := bpfObjects{}
 	// Load pre-compiled programs and maps into the kernel.

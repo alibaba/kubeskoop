@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	nettop2 "github.com/alibaba/kubeskoop/pkg/exporter/nettop"
+	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 
 	"github.com/prometheus/procfs"
 	"golang.org/x/exp/slog"
@@ -71,7 +71,7 @@ func (s *ProcNetdev) GetMetricNames() []string {
 }
 
 func (s *ProcNetdev) Collect(ctx context.Context) (map[string]map[uint32]uint64, error) {
-	ets := nettop2.GetAllEntity()
+	ets := nettop.GetAllEntity()
 	if len(ets) == 0 {
 		slog.Ctx(ctx).Info("collect", "mod", MODULE_NAME, "ignore", "no entity found")
 	}
@@ -82,7 +82,7 @@ func metricUniqueID(subject string, m string) string {
 	return fmt.Sprintf("%s%s", subject, strings.ToLower(m))
 }
 
-func collect(ctx context.Context, nslist []*nettop2.Entity) (map[string]map[uint32]uint64, error) {
+func collect(ctx context.Context, nslist []*nettop.Entity) (map[string]map[uint32]uint64, error) {
 	resMap := make(map[string]map[uint32]uint64)
 	for _, mname := range NetdevMetrics {
 		resMap[metricUniqueID("netdev", mname)] = map[uint32]uint64{}
@@ -114,7 +114,7 @@ func collect(ctx context.Context, nslist []*nettop2.Entity) (map[string]map[uint
 	return resMap, nil
 }
 
-func getAllNetdev(nslist []*nettop2.Entity) map[uint32]procfs.NetDev {
+func getAllNetdev(nslist []*nettop.Entity) map[uint32]procfs.NetDev {
 	allnetdevs := map[uint32]procfs.NetDev{}
 
 	for idx := range nslist {

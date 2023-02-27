@@ -5,7 +5,7 @@ import (
 
 	"github.com/alibaba/kubeskoop/pkg/skoop/assertions"
 	ctx "github.com/alibaba/kubeskoop/pkg/skoop/context"
-	model2 "github.com/alibaba/kubeskoop/pkg/skoop/model"
+	"github.com/alibaba/kubeskoop/pkg/skoop/model"
 	"github.com/alibaba/kubeskoop/pkg/skoop/nodemanager"
 	"github.com/alibaba/kubeskoop/pkg/skoop/plugin"
 	"github.com/alibaba/kubeskoop/pkg/skoop/utils"
@@ -13,7 +13,7 @@ import (
 )
 
 type Diagnostor interface {
-	Diagnose(src, dst model2.Endpoint, protocol model2.Protocol) ([]model2.Suspicion, *model2.PacketPath, error)
+	Diagnose(src, dst model.Endpoint, protocol model.Protocol) ([]model.Suspicion, *model.PacketPath, error)
 }
 
 type defaultDiagnostor struct {
@@ -30,29 +30,29 @@ func NewDefaultDiagnostor(ctx *ctx.Context, netNodeManager nodemanager.NetNodeMa
 	}, nil
 }
 
-func toNodeType(typ model2.EndpointType) model2.NetNodeType {
+func toNodeType(typ model.EndpointType) model.NetNodeType {
 	switch typ {
-	case model2.EndpointTypePod:
-		return model2.NetNodeTypePod
-	case model2.EndpointTypeNode:
-		return model2.NetNodeTypeNode
+	case model.EndpointTypePod:
+		return model.NetNodeTypePod
+	case model.EndpointTypeNode:
+		return model.NetNodeTypeNode
 	default:
-		return model2.NetNodeTypeGeneric
+		return model.NetNodeTypeGeneric
 	}
 }
 
-func (d *defaultDiagnostor) createNode(ep model2.Endpoint) (model2.NetNodeAction, error) {
-	if ep.Type == model2.EndpointTypeNode {
+func (d *defaultDiagnostor) createNode(ep model.Endpoint) (model.NetNodeAction, error) {
+	if ep.Type == model.EndpointTypeNode {
 		node, err := d.ctx.ClusterConfig().IPCache.GetNodeFromIP(ep.IP)
 		if err != nil {
 			return nil, err
 		}
-		return d.netNodeManager.GetNetNodeFromID(model2.NetNodeTypeNode, node.Name)
+		return d.netNodeManager.GetNetNodeFromID(model.NetNodeTypeNode, node.Name)
 	}
 	return d.netNodeManager.GetNetNodeFromID(toNodeType(ep.Type), ep.IP)
 }
 
-func (d *defaultDiagnostor) diagnoseNetworkPolicy(src, dst model2.Endpoint, protocol model2.Protocol) []model2.Suspicion {
+func (d *defaultDiagnostor) diagnoseNetworkPolicy(src, dst model.Endpoint, protocol model.Protocol) []model.Suspicion {
 	if d.networkPolicyHandler == nil {
 		return nil
 	}
@@ -65,7 +65,7 @@ func (d *defaultDiagnostor) diagnoseNetworkPolicy(src, dst model2.Endpoint, prot
 	return ret
 }
 
-func (d *defaultDiagnostor) Diagnose(src, dst model2.Endpoint, protocol model2.Protocol) ([]model2.Suspicion, *model2.PacketPath, error) {
+func (d *defaultDiagnostor) Diagnose(src, dst model.Endpoint, protocol model.Protocol) ([]model.Suspicion, *model.PacketPath, error) {
 	globalSuspicion := d.diagnoseNetworkPolicy(src, dst, protocol)
 
 	srcNode, err := d.createNode(src)
@@ -73,12 +73,12 @@ func (d *defaultDiagnostor) Diagnose(src, dst model2.Endpoint, protocol model2.P
 		return globalSuspicion, nil, err
 	}
 
-	danglingTransmissions := utils.NewQueue[model2.Transmission]()
+	danglingTransmissions := utils.NewQueue[model.Transmission]()
 	transmissions, err := srcNode.Send(dst, protocol)
 	if err != nil {
 		if e, ok := err.(*assertions.CannotBuildTransmissionError); ok {
 			//log
-			return globalSuspicion, model2.NewPacketPath(e.SrcNode), nil
+			return globalSuspicion, model.NewPacketPath(e.SrcNode), nil
 		}
 		return globalSuspicion, nil, err
 	}
@@ -89,7 +89,7 @@ func (d *defaultDiagnostor) Diagnose(src, dst model2.Endpoint, protocol model2.P
 
 	srcNetNode := transmissions[0].Link.Source
 
-	graph := model2.NewPacketPath(srcNetNode)
+	graph := model.NewPacketPath(srcNetNode)
 
 	danglingTransmissions.Enqueue(transmissions...)
 

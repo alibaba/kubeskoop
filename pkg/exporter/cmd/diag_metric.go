@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"strings"
 
-	nettop2 "github.com/alibaba/kubeskoop/pkg/exporter/nettop"
+	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
 
 	"github.com/pterm/pterm"
@@ -24,7 +24,7 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(probeName) > 0 {
 				ctx := slog.NewContext(context.Background(), slog.Default())
-				err := nettop2.SyncNetTopology()
+				err := nettop.SyncNetTopology()
 				if err != nil {
 					slog.Ctx(ctx).Info("sync nettop", "err", err)
 					return
@@ -45,7 +45,7 @@ var (
 							continue
 						}
 						for nsinum, v := range d {
-							et, err := nettop2.GetEntityByNetns(int(nsinum))
+							et, err := nettop.GetEntityByNetns(int(nsinum))
 							if err != nil {
 								slog.Ctx(ctx).Info("get entity failed", "netns", nsinum, "err", err)
 								continue

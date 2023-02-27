@@ -4,8 +4,8 @@ import (
 	"net"
 
 	"github.com/alibaba/kubeskoop/pkg/skoop/assertions"
-	k8s2 "github.com/alibaba/kubeskoop/pkg/skoop/k8s"
-	model2 "github.com/alibaba/kubeskoop/pkg/skoop/model"
+	"github.com/alibaba/kubeskoop/pkg/skoop/k8s"
+	"github.com/alibaba/kubeskoop/pkg/skoop/model"
 	"github.com/alibaba/kubeskoop/pkg/skoop/netstack"
 
 	"github.com/samber/lo"
@@ -14,46 +14,46 @@ import (
 )
 
 type Plugin interface {
-	CreatePod(pod *k8s2.Pod) (model2.NetNodeAction, error)
-	CreateNode(node *k8s2.NodeInfo) (model2.NetNodeAction, error)
+	CreatePod(pod *k8s.Pod) (model.NetNodeAction, error)
+	CreateNode(node *k8s.NodeInfo) (model.NetNodeAction, error)
 }
 
-type transmissionFunc func(pkt *model2.Packet, iif string) (model2.Transmission, error)
+type transmissionFunc func(pkt *model.Packet, iif string) (model.Transmission, error)
 
 type SimplePluginNode interface {
-	ToPod(upstream *model2.Link, dst model2.Endpoint, protocol model2.Protocol, pod *v1.Pod) ([]model2.Transmission, error)
-	ToHost(upstream *model2.Link, dst model2.Endpoint, protocol model2.Protocol, node *v1.Node) ([]model2.Transmission, error)
-	ToService(upstream *model2.Link, dst model2.Endpoint, protocol model2.Protocol, service *v1.Service) ([]model2.Transmission, error)
-	ToExternal(upstream *model2.Link, dst model2.Endpoint, protocol model2.Protocol) ([]model2.Transmission, error)
-	Serve(upstream *model2.Link, dst model2.Endpoint, protocol model2.Protocol) ([]model2.Transmission, error)
+	ToPod(upstream *model.Link, dst model.Endpoint, protocol model.Protocol, pod *v1.Pod) ([]model.Transmission, error)
+	ToHost(upstream *model.Link, dst model.Endpoint, protocol model.Protocol, node *v1.Node) ([]model.Transmission, error)
+	ToService(upstream *model.Link, dst model.Endpoint, protocol model.Protocol, service *v1.Service) ([]model.Transmission, error)
+	ToExternal(upstream *model.Link, dst model.Endpoint, protocol model.Protocol) ([]model.Transmission, error)
+	Serve(upstream *model.Link, dst model.Endpoint, protocol model.Protocol) ([]model.Transmission, error)
 }
 
 type BasePluginNode struct {
-	*model2.NetNode
-	IPCache          *k8s2.IPCache
+	*model.NetNode
+	IPCache          *k8s.IPCache
 	SimplePluginNode SimplePluginNode
 }
 
-func (b *BasePluginNode) Send(dst model2.Endpoint, protocol model2.Protocol) (trans []model2.Transmission, err error) {
+func (b *BasePluginNode) Send(dst model.Endpoint, protocol model.Protocol) (trans []model.Transmission, err error) {
 	ipType, err := b.IPCache.GetIPType(dst.IP)
 	if err != nil {
 		return nil, err
 	}
 
 	switch ipType {
-	case model2.EndpointTypePod:
+	case model.EndpointTypePod:
 		pod, err := b.IPCache.GetPodFromIP(dst.IP)
 		if err != nil {
 			return nil, err
 		}
 		return b.SimplePluginNode.ToPod(nil, dst, protocol, pod)
-	case model2.EndpointTypeNode:
+	case model.EndpointTypeNode:
 		host, err := b.IPCache.GetNodeFromIP(dst.IP)
 		if err != nil {
 			return nil, err
 		}
 		return b.SimplePluginNode.ToHost(nil, dst, protocol, host)
-	case model2.EndpointTypeService:
+	case model.EndpointTypeService:
 		svc, err := b.IPCache.GetServiceFromIP(dst.IP)
 		if err != nil {
 			return nil, err
@@ -64,7 +64,7 @@ func (b *BasePluginNode) Send(dst model2.Endpoint, protocol model2.Protocol) (tr
 	}
 }
 
-func (b *BasePluginNode) Receive(upstream *model2.Link) (trans []model2.Transmission, err error) {
+func (b *BasePluginNode) Receive(upstream *model.Link) (trans []model.Transmission, err error) {
 	upstream.Destination = b.NetNode
 
 	dstIP := upstream.Packet.Dst.String()
@@ -73,17 +73,17 @@ func (b *BasePluginNode) Receive(upstream *model2.Link) (trans []model2.Transmis
 		return nil, err
 	}
 
-	dst := model2.Endpoint{IP: dstIP, Port: upstream.Packet.Dport, Type: dstType}
+	dst := model.Endpoint{IP: dstIP, Port: upstream.Packet.Dport, Type: dstType}
 	protocol := upstream.Packet.Protocol
 
 	switch dstType {
-	case model2.EndpointTypePod:
+	case model.EndpointTypePod:
 		pod, err := b.IPCache.GetPodFromIP(dst.IP)
 		if err != nil {
 			return nil, err
 		}
 		return b.SimplePluginNode.ToPod(upstream, dst, protocol, pod)
-	case model2.EndpointTypeNode:
+	case model.EndpointTypeNode:
 		host, err := b.IPCache.GetNodeFromIP(dst.IP)
 		if err != nil {
 			return nil, err
@@ -100,7 +100,7 @@ func (b *BasePluginNode) Receive(upstream *model2.Link) (trans []model2.Transmis
 			return b.SimplePluginNode.Serve(upstream, dst, protocol)
 		}
 		return b.SimplePluginNode.ToHost(upstream, dst, protocol, host)
-	case model2.EndpointTypeService:
+	case model.EndpointTypeService:
 		svc, err := b.IPCache.GetServiceFromIP(dst.IP)
 		if err != nil {
 			return nil, err
@@ -111,7 +111,7 @@ func (b *BasePluginNode) Receive(upstream *model2.Link) (trans []model2.Transmis
 	}
 }
 
-var _ model2.NetNodeAction = &BasePluginNode{}
+var _ model.NetNodeAction = &BasePluginNode{}
 
 type route struct {
 	routes map[string]assertions.RouteAssertion
@@ -137,7 +137,7 @@ func (r *route) AddRoute(cidr string, dev string, gateway *net.IP, scope netstac
 	return nil
 }
 
-func (r *route) Assert(netAssertion *assertions.NetstackAssertion, pkt *model2.Packet) error {
+func (r *route) Assert(netAssertion *assertions.NetstackAssertion, pkt *model.Packet) error {
 	cidrs := lo.MapToSlice(r.routes, func(k string, _ assertions.RouteAssertion) *net.IPNet {
 		_, n, _ := net.ParseCIDR(k)
 		return n
@@ -166,8 +166,8 @@ func smallestMatchingCIDR(ip net.IP, cidr []*net.IPNet) *net.IPNet {
 	return matched[0]
 }
 
-func ack(pkt *model2.Packet) *model2.Packet {
-	return &model2.Packet{
+func ack(pkt *model.Packet) *model.Packet {
+	return &model.Packet{
 		Src:      pkt.Dst,
 		Sport:    pkt.Dport,
 		Dst:      pkt.Src,

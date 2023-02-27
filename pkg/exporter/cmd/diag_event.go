@@ -8,7 +8,7 @@ import (
 	"os/signal"
 	"time"
 
-	nettop2 "github.com/alibaba/kubeskoop/pkg/exporter/nettop"
+	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
 	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
 
@@ -27,12 +27,12 @@ var (
 				return
 			}
 
-			err := nettop2.SyncNetTopology()
+			err := nettop.SyncNetTopology()
 			if err != nil {
 				slog.Ctx(cmd.Context()).Error("error sync net topology", err)
 			}
-			go nettop2.StartCache(cmd.Context())
-			defer nettop2.StopCache()
+			go nettop.StartCache(cmd.Context())
+			defer nettop.StopCache()
 
 			for _, p := range probeName {
 				pb := probe.GetEventProbe(p)
@@ -50,7 +50,7 @@ var (
 				go pb.Start(cmd.Context())
 				go func() {
 					for evt := range ch {
-						ets, err := nettop2.GetEntityByNetns(int(evt.Netns))
+						ets, err := nettop.GetEntityByNetns(int(evt.Netns))
 						if err != nil && ets == nil {
 							slog.Ctx(cmd.Context()).Info("ignore event", "err", err, "netns", evt.Netns)
 							continue

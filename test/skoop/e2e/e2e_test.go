@@ -28,7 +28,7 @@ func (o *options) BindFlags() {
 	flag.StringVar(&o.CloudProvider, "cloud-provider", "generic", "cloud provider of cluster")
 	flag.StringVar(&o.SkoopPath, "executable", "kubeskoop", "kubeskoop executable file")
 	flag.StringVar(&o.Testcases, "testcases", "generic", "testcases for e2e test, separated by comma.")
-	flag.StringVar(&o.CollectorImage, "collector-image", "registry.aliyuncs.com/wangbs/collector:latest", "collector image for skoop cli")
+	flag.StringVar(&o.CollectorImage, "collector-image", "kubeskoop/kubeskoop:v0.1.0", "collector image for skoop cli")
 	flag.StringVar(&o.ExtraDiagnoseArgs, "extra-diagnose-args", "", "extra args for skoop")
 }
 

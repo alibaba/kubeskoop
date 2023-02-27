@@ -11,7 +11,7 @@ import (
 	"sync"
 	"unsafe"
 
-	bpfutil2 "github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
+	"github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
 	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
 
@@ -108,8 +108,8 @@ func (p *NetifTxlatencyProbe) Start(ctx context.Context) {
 		rawevt := proto.RawEvent{
 			Netns: event.SkbMeta.Netns,
 		}
-		tuple := fmt.Sprintf("protocol=%s saddr=%s sport=%d daddr=%s dport=%d ", bpfutil2.GetProtoStr(event.Tuple.L4Proto), bpfutil2.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Saddr))), bits.ReverseBytes16(event.Tuple.Sport), bpfutil2.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Daddr))), bits.ReverseBytes16(event.Tuple.Dport))
-		rawevt.EventBody = fmt.Sprintf("%s latency:%s", tuple, bpfutil2.GetHumanTimes(event.Latency))
+		tuple := fmt.Sprintf("protocol=%s saddr=%s sport=%d daddr=%s dport=%d ", bpfutil.GetProtoStr(event.Tuple.L4Proto), bpfutil.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Saddr))), bits.ReverseBytes16(event.Tuple.Sport), bpfutil.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Daddr))), bits.ReverseBytes16(event.Tuple.Dport))
+		rawevt.EventBody = fmt.Sprintf("%s latency:%s", tuple, bpfutil.GetHumanTimes(event.Latency))
 		/*#define THRESH
 		#define ACTION_QDISC	    1
 		#define ACTION_XMIT	        2
@@ -205,7 +205,7 @@ func start() error {
 	opts := ebpf.CollectionOptions{}
 	// 获取btf信息
 	opts.Programs = ebpf.ProgramOptions{
-		KernelTypes: bpfutil2.LoadBTFSpecOrNil(),
+		KernelTypes: bpfutil.LoadBTFSpecOrNil(),
 	}
 
 	// 获取Loaded的程序/map的fd信息

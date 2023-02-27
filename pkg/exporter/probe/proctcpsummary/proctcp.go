@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	nettop2 "github.com/alibaba/kubeskoop/pkg/exporter/nettop"
+	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 
 	"golang.org/x/exp/slog"
 )
@@ -100,14 +100,14 @@ func (s *ProcTCP) GetMetricNames() []string {
 }
 
 func (s *ProcTCP) Collect(ctx context.Context) (map[string]map[uint32]uint64, error) {
-	ets := nettop2.GetAllEntity()
+	ets := nettop.GetAllEntity()
 	if len(ets) == 0 {
 		slog.Ctx(ctx).Info("collect", "mod", MODULE_NAME, "ignore", "no entity found")
 	}
 	return collect(ctx, ets), nil
 }
 
-func collect(ctx context.Context, pidlist []*nettop2.Entity) map[string]map[uint32]uint64 {
+func collect(ctx context.Context, pidlist []*nettop.Entity) map[string]map[uint32]uint64 {
 	resMap := make(map[string]map[uint32]uint64)
 
 	for idx := range TCPSummaryMetrics {

@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	nettop2 "github.com/alibaba/kubeskoop/pkg/exporter/nettop"
+	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 
 	"github.com/prometheus/procfs"
 	"golang.org/x/exp/slog"
@@ -59,20 +59,20 @@ func (s *ProcIO) GetMetricNames() []string {
 }
 
 func (s *ProcIO) Collect(ctx context.Context) (map[string]map[uint32]uint64, error) {
-	ets := nettop2.GetAllEntity()
+	ets := nettop.GetAllEntity()
 	if len(ets) == 0 {
 		slog.Ctx(ctx).Info("collect", "mod", MODULE_NAME, "ignore", "no entity found")
 	}
 	return collect(ctx, ets)
 }
 
-func collect(ctx context.Context, nslist []*nettop2.Entity) (map[string]map[uint32]uint64, error) {
+func collect(ctx context.Context, nslist []*nettop.Entity) (map[string]map[uint32]uint64, error) {
 	resMap := make(map[string]map[uint32]uint64)
 	for _, stat := range IOMetrics {
 		resMap[metricUniqueID("io", stat)] = map[uint32]uint64{}
 	}
 
-	procios, err := getAllProcessIO(nettop2.GetAllEntity())
+	procios, err := getAllProcessIO(nettop.GetAllEntity())
 	if err != nil {
 		return resMap, err
 	}
@@ -93,7 +93,7 @@ func metricUniqueID(subject string, m string) string {
 	return fmt.Sprintf("%s%s", subject, strings.ToLower(m))
 }
 
-func getAllProcessIO(nslist []*nettop2.Entity) (map[uint32][]procfs.ProcIO, error) {
+func getAllProcessIO(nslist []*nettop.Entity) (map[uint32][]procfs.ProcIO, error) {
 	allprocio := make(map[uint32][]procfs.ProcIO)
 	for idx := range nslist {
 		nslogic := nslist[idx]

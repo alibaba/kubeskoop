@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/alibaba/kubeskoop/pkg/skoop/infra/aliyun"
-	model2 "github.com/alibaba/kubeskoop/pkg/skoop/model"
+	"github.com/alibaba/kubeskoop/pkg/skoop/model"
 
 	ecs "github.com/alibabacloud-go/ecs-20140526/v2/client"
 	vpc "github.com/alibabacloud-go/vpc-20160428/v2/client"
@@ -37,12 +37,12 @@ func newVPCAssertion(cloudManager *aliyun.CloudManager) (*vpcAssertion, error) {
 	}, nil
 }
 
-func (a *vpcAssertion) AssertSecurityGroup(srcECS, dstECS string, pkt *model2.Packet) ([]model2.Suspicion, error) {
+func (a *vpcAssertion) AssertSecurityGroup(srcECS, dstECS string, pkt *model.Packet) ([]model.Suspicion, error) {
 	if srcECS == "" && dstECS == "" {
 		return nil, nil
 	}
 
-	var suspicions []model2.Suspicion
+	var suspicions []model.Suspicion
 
 	if srcECS != "" && dstECS != "" {
 		srcECSInfo, err := a.cloudManager.GetECSInfo(srcECS)
@@ -72,8 +72,8 @@ func (a *vpcAssertion) AssertSecurityGroup(srcECS, dstECS string, pkt *model2.Pa
 
 		sgIntersection := a.intersection(srcECSSecurityGroup, dstECSSecurityGroup)
 		if len(sgIntersection) == 0 {
-			suspicions = append(suspicions, model2.Suspicion{
-				Level: model2.SuspicionLevelWarning,
+			suspicions = append(suspicions, model.Suspicion{
+				Level: model.SuspicionLevelWarning,
 				Message: fmt.Sprintf("%s(%s) and %s(%s) do not have same security group",
 					srcECS, a.getECSIP(srcECSInfo), dstECS, a.getECSIP(dstECSInfo)),
 			})
@@ -97,8 +97,8 @@ func (a *vpcAssertion) AssertSecurityGroup(srcECS, dstECS string, pkt *model2.Pa
 				sgIDs := lo.MapToSlice(srcECSSecurityGroup,
 					func(id string, _ aliyun.SecurityGroupRule) string { return id })
 
-				suspicions = append(suspicions, model2.Suspicion{
-					Level: model2.SuspicionLevelFatal,
+				suspicions = append(suspicions, model.Suspicion{
+					Level: model.SuspicionLevelFatal,
 					Message: fmt.Sprintf("%s(%s) security group %v not allow packet to %s:%d",
 						srcECS, a.getECSIP(srcECSInfo), sgIDs, pkt.Dst.String(), pkt.Dport),
 				})
@@ -113,8 +113,8 @@ func (a *vpcAssertion) AssertSecurityGroup(srcECS, dstECS string, pkt *model2.Pa
 				if !checkResult {
 					sgIDs := lo.MapToSlice(dstECSSecurityGroup,
 						func(id string, _ aliyun.SecurityGroupRule) string { return id })
-					suspicions = append(suspicions, model2.Suspicion{
-						Level: model2.SuspicionLevelFatal,
+					suspicions = append(suspicions, model.Suspicion{
+						Level: model.SuspicionLevelFatal,
 						Message: fmt.Sprintf("%s(%s) security group %v not allow packet from %s to port %d",
 							dstECS, a.getECSIP(dstECSInfo), sgIDs, pkt.Src.String(), pkt.Dport),
 					})
@@ -143,8 +143,8 @@ func (a *vpcAssertion) AssertSecurityGroup(srcECS, dstECS string, pkt *model2.Pa
 		if !checkResult {
 			sgIDs := lo.MapToSlice(srcECSSecurityGroup,
 				func(id string, _ aliyun.SecurityGroupRule) string { return id })
-			suspicions = append(suspicions, model2.Suspicion{
-				Level: model2.SuspicionLevelFatal,
+			suspicions = append(suspicions, model.Suspicion{
+				Level: model.SuspicionLevelFatal,
 				Message: fmt.Sprintf("%s(%s) security group %v not allow packet from to %s:%d",
 					srcECS, a.getECSIP(srcECSInfo), sgIDs, pkt.Dst.String(), pkt.Dport),
 			})
@@ -154,8 +154,8 @@ func (a *vpcAssertion) AssertSecurityGroup(srcECS, dstECS string, pkt *model2.Pa
 	return suspicions, nil
 }
 
-func (a *vpcAssertion) AssertRoute(srcECS, dstECS string, pkt *model2.Packet, privateIP string) ([]model2.Suspicion, error) {
-	var suspicions []model2.Suspicion
+func (a *vpcAssertion) AssertRoute(srcECS, dstECS string, pkt *model.Packet, privateIP string) ([]model.Suspicion, error) {
+	var suspicions []model.Suspicion
 	var routeEntries []*vpc.DescribeRouteEntryListResponseBodyRouteEntrysRouteEntry
 	var srcECSInfo, dstECSInfo *aliyun.ECSInfo
 	var err error
@@ -192,8 +192,8 @@ func (a *vpcAssertion) AssertRoute(srcECS, dstECS string, pkt *model2.Packet, pr
 		return nil, err
 	}
 	if dstRouteEntry == nil {
-		suspicions = append(suspicions, model2.Suspicion{
-			Level:   model2.SuspicionLevelFatal,
+		suspicions = append(suspicions, model.Suspicion{
+			Level:   model.SuspicionLevelFatal,
 			Message: fmt.Sprintf("no route entry for destination ip %q", pkt.Dst),
 		})
 	}
@@ -204,8 +204,8 @@ func (a *vpcAssertion) AssertRoute(srcECS, dstECS string, pkt *model2.Packet, pr
 		nextHop := dstRouteEntry.NextHops.NextHop[0]
 		if *nextHop.NextHopType != "local" &&
 			!(*nextHop.NextHopType == "Instance" && *nextHop.NextHopId == dstECS) {
-			suspicions = append(suspicions, model2.Suspicion{
-				Level: model2.SuspicionLevelFatal,
+			suspicions = append(suspicions, model.Suspicion{
+				Level: model.SuspicionLevelFatal,
 				Message: fmt.Sprintf("error route next hop for destination ip \"%s\", expect: \"Instance-%s\", actually: \"%s-%s\"",
 					pkt.Dst.String(), dstECS, *nextHop.NextHopType, *nextHop.NextHopId),
 			})
@@ -238,8 +238,8 @@ func (a *vpcAssertion) AssertRoute(srcECS, dstECS string, pkt *model2.Packet, pr
 		}
 
 		if srcRouteEntry == nil {
-			suspicions = append(suspicions, model2.Suspicion{
-				Level:   model2.SuspicionLevelFatal,
+			suspicions = append(suspicions, model.Suspicion{
+				Level:   model.SuspicionLevelFatal,
 				Message: fmt.Sprintf("no route entry for src ip %q", pkt.Src.String()),
 			})
 		}
@@ -248,8 +248,8 @@ func (a *vpcAssertion) AssertRoute(srcECS, dstECS string, pkt *model2.Packet, pr
 			nextHop := srcRouteEntry.NextHops.NextHop[0]
 			if nextHop.NextHopRegionId != nil && *nextHop.NextHopRegionId != "local" &&
 				!(*nextHop.NextHopType == "Instance" && *nextHop.NextHopId == srcECS) {
-				suspicions = append(suspicions, model2.Suspicion{
-					Level: model2.SuspicionLevelFatal,
+				suspicions = append(suspicions, model.Suspicion{
+					Level: model.SuspicionLevelFatal,
 					Message: fmt.Sprintf("error route next hop for source ip: %q, expect: \"Instance-%s\", actual: \"%s-%s\"",
 						pkt.Src, srcECSInfo.ID, *nextHop.NextHopType, *nextHop.NextHopId),
 				})
@@ -261,8 +261,8 @@ func (a *vpcAssertion) AssertRoute(srcECS, dstECS string, pkt *model2.Packet, pr
 	return suspicions, nil
 }
 
-func (a *vpcAssertion) AssertSNAT(srcECS string, pkt *model2.Packet, privateIP string) ([]model2.Suspicion, error) {
-	var suspicions []model2.Suspicion
+func (a *vpcAssertion) AssertSNAT(srcECS string, pkt *model.Packet, privateIP string) ([]model.Suspicion, error) {
+	var suspicions []model.Suspicion
 	eniInfo, err := a.cloudManager.GetENIInfoFromVPCAndPrivateIP(a.cloudManager.VPC(), privateIP)
 	if err != nil {
 		return nil, err
@@ -277,16 +277,16 @@ func (a *vpcAssertion) AssertSNAT(srcECS string, pkt *model2.Packet, privateIP s
 	}
 
 	if nextHop == nil {
-		suspicions = append(suspicions, model2.Suspicion{
-			Level:   model2.SuspicionLevelFatal,
+		suspicions = append(suspicions, model.Suspicion{
+			Level:   model.SuspicionLevelFatal,
 			Message: fmt.Sprintf("no next hop for destination ip %q", pkt.Dst),
 		})
 		return suspicions, nil
 	}
 
 	if *nextHop.NextHopType != "NatGateway" {
-		suspicions = append(suspicions, model2.Suspicion{
-			Level: model2.SuspicionLevelFatal,
+		suspicions = append(suspicions, model.Suspicion{
+			Level: model.SuspicionLevelFatal,
 			Message: fmt.Sprintf("expect next hop for destination ip %q to be NatGateway, but \"%s-%s\"",
 				pkt.Dst, *nextHop.NextHopType, *nextHop.NextHopId),
 		})
@@ -300,8 +300,8 @@ func (a *vpcAssertion) AssertSNAT(srcECS string, pkt *model2.Packet, privateIP s
 	}
 
 	if snatEntry == nil {
-		suspicions = append(suspicions, model2.Suspicion{
-			Level:   model2.SuspicionLevelFatal,
+		suspicions = append(suspicions, model.Suspicion{
+			Level:   model.SuspicionLevelFatal,
 			Message: fmt.Sprintf("no snat entry on nat gateway %q for destination ip %q", ngwID, pkt.Dst),
 		})
 	}
@@ -344,7 +344,7 @@ func (a *vpcAssertion) getECSIP(ecs *aliyun.ECSInfo) string {
 	return ecs.Network.IP[0]
 }
 
-func (a *vpcAssertion) checkSourceOut(pkt *model2.Packet, sgs map[string]aliyun.SecurityGroupRule) (bool, error) {
+func (a *vpcAssertion) checkSourceOut(pkt *model.Packet, sgs map[string]aliyun.SecurityGroupRule) (bool, error) {
 	hasEnterpriseSg := false
 	var outRules []*ecs.DescribeSecurityGroupAttributeResponseBodyPermissionsPermission
 	for _, sg := range sgs {
@@ -362,7 +362,7 @@ func (a *vpcAssertion) checkSourceOut(pkt *model2.Packet, sgs map[string]aliyun.
 	return a.packetPassRules(pkt, outRules, securityPolicyVerdictAccept)
 }
 
-func (a *vpcAssertion) checkDestinationIn(pkt *model2.Packet, sgs map[string]aliyun.SecurityGroupRule, defaultPolicy securityPolicyVerdict) (bool, error) {
+func (a *vpcAssertion) checkDestinationIn(pkt *model.Packet, sgs map[string]aliyun.SecurityGroupRule, defaultPolicy securityPolicyVerdict) (bool, error) {
 	var inRules []*ecs.DescribeSecurityGroupAttributeResponseBodyPermissionsPermission
 	for _, sg := range sgs {
 		inRules = append(inRules, sg.InRule.Allows...)
@@ -376,7 +376,7 @@ func (a *vpcAssertion) checkDestinationIn(pkt *model2.Packet, sgs map[string]ali
 	return a.packetPassRules(pkt, inRules, defaultPolicy)
 }
 
-func (a *vpcAssertion) packetPassRules(pkt *model2.Packet, outRules []*ecs.DescribeSecurityGroupAttributeResponseBodyPermissionsPermission, defaultPolicy securityPolicyVerdict) (bool, error) {
+func (a *vpcAssertion) packetPassRules(pkt *model.Packet, outRules []*ecs.DescribeSecurityGroupAttributeResponseBodyPermissionsPermission, defaultPolicy securityPolicyVerdict) (bool, error) {
 	var filteredRules []*ecs.DescribeSecurityGroupAttributeResponseBodyPermissionsPermission
 	for _, rule := range outRules {
 		match, err := ruleMatchPacket(pkt, rule)
@@ -398,7 +398,7 @@ func (a *vpcAssertion) packetPassRules(pkt *model2.Packet, outRules []*ecs.Descr
 	return defaultPolicy == securityPolicyVerdictAccept, nil
 }
 
-func (a *vpcAssertion) findNextHop(pkt *model2.Packet, srcECS string) (*vpc.DescribeRouteEntryListResponseBodyRouteEntrysRouteEntryNextHopsNextHop, error) {
+func (a *vpcAssertion) findNextHop(pkt *model.Packet, srcECS string) (*vpc.DescribeRouteEntryListResponseBodyRouteEntrysRouteEntryNextHopsNextHop, error) {
 	ecsInfo, err := a.cloudManager.GetECSInfo(srcECS)
 	if err != nil {
 		return nil, err
@@ -417,7 +417,7 @@ func (a *vpcAssertion) findNextHop(pkt *model2.Packet, srcECS string) (*vpc.Desc
 	return route.NextHops.NextHop[0], nil
 }
 
-func (a *vpcAssertion) findSNATEntry(pkt *model2.Packet, ngwID, vswitchID string) (*vpc.DescribeSnatTableEntriesResponseBodySnatTableEntriesSnatTableEntry, error) {
+func (a *vpcAssertion) findSNATEntry(pkt *model.Packet, ngwID, vswitchID string) (*vpc.DescribeSnatTableEntriesResponseBodySnatTableEntriesSnatTableEntry, error) {
 	vswitch, err := a.cloudManager.GetVSwitch(vswitchID)
 	if err != nil {
 		return nil, err
@@ -452,7 +452,7 @@ func (a *vpcAssertion) findSNATEntry(pkt *model2.Packet, ngwID, vswitchID string
 	return defaultEntry, nil
 }
 
-func ruleMatchPacket(pkt *model2.Packet, rule *ecs.DescribeSecurityGroupAttributeResponseBodyPermissionsPermission) (bool, error) {
+func ruleMatchPacket(pkt *model.Packet, rule *ecs.DescribeSecurityGroupAttributeResponseBodyPermissionsPermission) (bool, error) {
 	if rule.DestCidrIp != nil && *rule.DestCidrIp != "" {
 		_, dstCidrIP, err := net.ParseCIDR(*rule.DestCidrIp)
 		if err != nil {

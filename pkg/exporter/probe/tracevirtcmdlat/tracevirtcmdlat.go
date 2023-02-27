@@ -9,7 +9,7 @@ import (
 	"sync"
 	"unsafe"
 
-	bpfutil2 "github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
+	"github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
 	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
 
 	"github.com/cilium/ebpf"
@@ -153,7 +153,7 @@ func (p *VirtcmdLatencyProbe) Start(ctx context.Context) {
 			p.updateMetrics(VIRTCMD)
 		}
 
-		rawevt.EventBody = fmt.Sprintf("cpu=%d  pid=%d  latency=%s", event.Cpu, event.Pid, bpfutil2.GetHumanTimes(event.Latency))
+		rawevt.EventBody = fmt.Sprintf("cpu=%d  pid=%d  latency=%s", event.Cpu, event.Pid, bpfutil.GetHumanTimes(event.Latency))
 		if p.sub != nil {
 			slog.Ctx(ctx).Debug("broadcast event", "module", MODULE_NAME)
 			p.sub <- rawevt
@@ -177,7 +177,7 @@ func loadSync() error {
 	opts := ebpf.CollectionOptions{}
 
 	opts.Programs = ebpf.ProgramOptions{
-		KernelTypes: bpfutil2.LoadBTFSpecOrNil(),
+		KernelTypes: bpfutil.LoadBTFSpecOrNil(),
 	}
 
 	// Load pre-compiled programs and maps into the kernel.

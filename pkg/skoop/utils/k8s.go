@@ -55,19 +55,7 @@ func Normalize(objType string, obj interface{}) string {
 	return ""
 }
 
-func ClusterNetworkConfig(k8sCli *kubernetes.Clientset) (ipvsmode, clusterCIDR, networkName string, err error) {
-	ipvsmode, clusterCIDR, err = kubeproxyConfig(k8sCli)
-	if err != nil {
-		return "", "", "", err
-	}
-	networkName, err = networkMode(k8sCli)
-	if err != nil {
-		return "", "", "", err
-	}
-	return
-}
-
-func networkMode(k8sCli *kubernetes.Clientset) (networkMode string, err error) {
+func DetectNetworkPlugin(k8sCli *kubernetes.Clientset) (networkMode string, err error) {
 	dss, err := k8sCli.AppsV1().DaemonSets("").List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		return "", err
@@ -82,39 +70,64 @@ func networkMode(k8sCli *kubernetes.Clientset) (networkMode string, err error) {
 			return "terway-eniip", nil
 		}
 	}
-	return "generic", nil
+	return "", nil
 }
 
-var kubeproxyConfigMap = []string{"kube-proxy", "kube-proxy-worker"}
+var kubeProxyConfigmaps = []string{"kube-proxy", "kube-proxy-worker"}
 
-func kubeproxyConfig(k8sCli *kubernetes.Clientset) (proxyMode string, clusterCIDR string, err error) {
-	var kubeproxyCM *v1.ConfigMap
-	for _, cmName := range kubeproxyConfigMap {
-		kubeproxyCM, err = k8sCli.CoreV1().ConfigMaps("kube-system").Get(context.Background(), cmName, metav1.GetOptions{})
+func getKubeProxyConfigFromConfigMap(k8sCli *kubernetes.Clientset) (string, error) {
+	var cm *v1.ConfigMap
+	var err error
+	for _, cmName := range kubeProxyConfigmaps {
+		cm, err = k8sCli.CoreV1().ConfigMaps("kube-system").Get(context.Background(), cmName, metav1.GetOptions{})
 		if err != nil && !errors.IsNotFound(err) {
-			return "", "", err
+			return "", err
 		}
 		if err == nil {
 			break
 		}
 	}
-	if kubeproxyCM == nil {
-		return "", "", fmt.Errorf("cannot found kube-proxy configmap for ProxyMode & ClusterCIDR")
+	if cm == nil {
+		return "", fmt.Errorf("cannot find kube-proxy configmap")
 	}
-	configYaml, ok := kubeproxyCM.Data["config.conf"]
-	if !ok {
-		proxyMode = "iptables"
-	} else {
-		kubeproxyCfg := struct {
-			Mode        string `yaml:"mode"`
-			ClusterCIDR string `yaml:"clusterCIDR"`
-		}{}
-		err = yaml.Unmarshal([]byte(configYaml), &kubeproxyCfg)
-		if err != nil {
-			return "", "", err
-		}
-		proxyMode = kubeproxyCfg.Mode
-		clusterCIDR = kubeproxyCfg.ClusterCIDR
+	return cm.Data["config.conf"], nil
+}
+
+func DetectKubeProxyMode(k8sCli *kubernetes.Clientset) (string, error) {
+	conf, err := getKubeProxyConfigFromConfigMap(k8sCli)
+	if err != nil {
+		return "", err
 	}
-	return proxyMode, clusterCIDR, nil
+
+	if conf == "" {
+		return "iptables", nil
+	}
+
+	cfg := struct {
+		Mode string `yaml:"mode"`
+	}{}
+	err = yaml.Unmarshal([]byte(conf), &cfg)
+	if err != nil {
+		return "", err
+	}
+	if cfg.Mode == "" {
+		return "iptables", nil
+	}
+	return cfg.Mode, nil
+}
+
+func DetectClusterCIDR(k8sCli *kubernetes.Clientset) (string, error) {
+	conf, err := getKubeProxyConfigFromConfigMap(k8sCli)
+	if err != nil {
+		return "", err
+	}
+
+	cfg := struct {
+		ClusterCIDR string `yaml:"clusterCIDR"`
+	}{}
+	err = yaml.Unmarshal([]byte(conf), &cfg)
+	if err != nil {
+		return "", err
+	}
+	return cfg.ClusterCIDR, nil
 }
