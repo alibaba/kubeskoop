@@ -81,7 +81,8 @@ func (c *Context) BuildCluster() error {
 			return err
 		}
 		if plugin == "" {
-			return errors.New("cannot auto detect network plugin, you can use \"--network-plugin\" to specify it")
+			return errors.New("cannot auto detect network plugin, you can use \"--network-plugin\" to specify it, " +
+				"supported plugins: flannel,calico")
 		}
 		c.ClusterConfig().NetworkPlugin = plugin
 		klog.V(3).Infof("Detected network plugin %q.", plugin)
@@ -92,10 +93,10 @@ func (c *Context) BuildCluster() error {
 	if c.ClusterConfig().ProxyMode == "" {
 		mode, err := utils.DetectKubeProxyMode(clientSet)
 		if err != nil {
-			return fmt.Errorf("cannoot auto detect kube-proxy mode: %v, you can use \"--proxy-mode\" to specify it", err)
+			return fmt.Errorf("cannot auto detect kube-proxy mode: %v, you can use \"--proxy-mode\" to specify it", err)
 		}
 		if mode == "" {
-			return fmt.Errorf("cannoot auto detect kube-proxy mode, you can use \"--proxy-mode\" to specify it")
+			return fmt.Errorf("cannot auto detect kube-proxy mode, you can use \"--proxy-mode\" to specify it")
 		}
 
 		c.ClusterConfig().ProxyMode = mode
@@ -107,10 +108,10 @@ func (c *Context) BuildCluster() error {
 	if c.ClusterConfig().ClusterCIDRString == "" {
 		clusterCIDR, err := utils.DetectClusterCIDR(clientSet)
 		if err != nil {
-			return fmt.Errorf("cannoot auto detect cluster cidr: %v, you can use \"--cluster-cidr\" to specify it", err)
+			return fmt.Errorf("cannot auto detect cluster cidr: %v, you can use \"--cluster-cidr\" to specify it", err)
 		}
 		if clusterCIDR == "" {
-			return fmt.Errorf("cannoot auto detect clutser cidr, you can use \"--cluster-cidr\" to specify it")
+			return fmt.Errorf("cannot auto detect clutser cidr, you can use \"--cluster-cidr\" to specify it")
 		}
 
 		_, cidr, err := net.ParseCIDR(clusterCIDR)
