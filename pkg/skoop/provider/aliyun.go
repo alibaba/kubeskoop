@@ -22,6 +22,6 @@ func (p aliyunProvider) CreateNetwork(ctx *context.Context) (network.Network, er
 	case context.NetworkPluginCalico:
 		return aliyun.NewCalicoNetwork(ctx)
 	default:
-		return nil, fmt.Errorf("not support cni type %s", ctx.ClusterConfig().NetworkPlugin)
+		return nil, fmt.Errorf("not support cni type %q", ctx.ClusterConfig().NetworkPlugin)
 	}
 }

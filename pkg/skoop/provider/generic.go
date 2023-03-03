@@ -18,6 +18,6 @@ func (g genericProvider) CreateNetwork(ctx *context.Context) (network.Network, e
 	case context.NetworkPluginCalico:
 		return generic.NewCalicoNetwork(ctx)
 	default:
-		return nil, fmt.Errorf("not support cni type %s", ctx.ClusterConfig().NetworkPlugin)
+		return nil, fmt.Errorf("not support cni type %q", ctx.ClusterConfig().NetworkPlugin)
 	}
 }

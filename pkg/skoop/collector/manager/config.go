@@ -15,7 +15,7 @@ type ConfigSet struct {
 var Config = &ConfigSet{}
 
 func init() {
-	context.RegisterConfigBinder(&Config.SimplePodCollectorConfig)
+	context.RegisterConfigBinder("Simple pod collector", &Config.SimplePodCollectorConfig)
 }
 
 type SimplePodCollectorConfig struct {

@@ -2,7 +2,6 @@ package context
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"net"
 
@@ -37,9 +36,6 @@ func (cc *ClusterConfig) BindFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&cc.NetworkPlugin, "network-plugin", "", "Network plugin used in cluster. If not set, will try to auto detect it.")
 	fs.StringVar(&cc.ProxyMode, "proxy-mode", "", "Proxy mode for kube-proxy. If not set, will try to detect it automatically.")
 	fs.StringVar(&cc.ClusterCIDRString, "cluster-cidr", "", "Cluster pod CIDR. If not set, will try to detect it automatically.")
-	logFlag := flag.NewFlagSet("", flag.ExitOnError)
-	klog.InitFlags(logFlag)
-	fs.AddGoFlagSet(logFlag)
 }
 
 func (cc *ClusterConfig) Validate() error {

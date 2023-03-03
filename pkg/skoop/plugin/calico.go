@@ -48,7 +48,7 @@ func (c *CalicoConfig) Validate() error {
 var Calico = &CalicoConfig{}
 
 func init() {
-	ctx.RegisterConfigBinder(Calico)
+	ctx.RegisterConfigBinder("Calico plugin", Calico)
 }
 
 type CalicoNetworkMode string

@@ -14,7 +14,7 @@ type ProviderConfig struct {
 var Config = &ProviderConfig{}
 
 func init() {
-	context.RegisterConfigBinder(Config)
+	context.RegisterConfigBinder("Aliyun provider", Config)
 }
 
 func (pc *ProviderConfig) BindFlags(fs *pflag.FlagSet) {

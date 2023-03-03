@@ -52,7 +52,7 @@ func (f *FlannelConfig) Validate() error {
 var Flannel = &FlannelConfig{}
 
 func init() {
-	ctx.RegisterConfigBinder(Flannel)
+	ctx.RegisterConfigBinder("Flannel plugin", Flannel)
 }
 
 const (
