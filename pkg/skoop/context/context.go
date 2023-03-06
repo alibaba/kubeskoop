@@ -3,6 +3,8 @@ package context
 import (
 	"sync"
 
+	cliflag "k8s.io/component-base/cli/flag"
+
 	"github.com/spf13/pflag"
 )
 
@@ -19,19 +21,27 @@ type ConfigBinder interface {
 	Validate() error
 }
 
-var binders []ConfigBinder
+type NamedConfigBinder struct {
+	Name   string
+	Binder ConfigBinder
+}
 
-func RegisterConfigBinder(binder ConfigBinder) {
-	binders = append(binders, binder)
+var binders []NamedConfigBinder
+
+func RegisterConfigBinder(name string, binder ConfigBinder) {
+	binders = append(binders, NamedConfigBinder{
+		Name:   name,
+		Binder: binder,
+	})
 }
 
 func init() {
 	tc := &TaskConfig{}
 	cc := &ClusterConfig{}
 	uc := &UIConfig{}
-	RegisterConfigBinder(tc)
-	RegisterConfigBinder(cc)
-	RegisterConfigBinder(uc)
+	RegisterConfigBinder("Diagnose task", tc)
+	RegisterConfigBinder("Cluster config", cc)
+	RegisterConfigBinder("UI config", uc)
 
 	SkoopContext.Ctx.Store(taskConfigKey, tc)
 	SkoopContext.Ctx.Store(clusterConfigKey, cc)
@@ -48,13 +58,20 @@ type Context struct {
 
 func (c *Context) BindFlags(fs *pflag.FlagSet) {
 	for _, b := range binders {
-		b.BindFlags(fs)
+		b.Binder.BindFlags(fs)
+	}
+}
+
+func (c *Context) BindNamedFlags(fss *cliflag.NamedFlagSets) {
+	for _, b := range binders {
+		fs := fss.FlagSet(b.Name)
+		b.Binder.BindFlags(fs)
 	}
 }
 
 func (c *Context) Validate() error {
 	for _, b := range binders {
-		err := b.Validate()
+		err := b.Binder.Validate()
 		if err != nil {
 			return err
 		}

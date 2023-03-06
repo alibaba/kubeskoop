@@ -1,31 +1,31 @@
 package ui
 
 import (
-	model2 "github.com/alibaba/kubeskoop/pkg/skoop/model"
+	"github.com/alibaba/kubeskoop/pkg/skoop/model"
 	"k8s.io/apimachinery/pkg/util/json"
 )
 
 type DiagnoseSummaryNodeSuspicion struct {
-	Level   model2.SuspicionLevel `json:"level"`
-	Message string                `json:"message"`
+	Level   model.SuspicionLevel `json:"level"`
+	Message string               `json:"message"`
 }
 
 type DiagnoseSummaryNodeAction struct {
-	Type model2.ActionType `json:"type"`
+	Type model.ActionType `json:"type"`
 }
 
 type DiagnoseSummaryNode struct {
 	ID         string                               `json:"id"`
-	Type       model2.NetNodeType                   `json:"type"`
+	Type       model.NetNodeType                    `json:"type"`
 	Suspicions []DiagnoseSummaryNodeSuspicion       `json:"suspicions"`
 	Actions    map[string]DiagnoseSummaryNodeAction `json:"actions"`
 }
 
 type DiagnoseSummaryPacket struct {
-	Src      string          `json:"source"`
-	Dst      string          `json:"destination"`
-	Dport    uint16          `json:"dport"`
-	Protocol model2.Protocol `json:"protocol"`
+	Src      string         `json:"source"`
+	Dst      string         `json:"destination"`
+	Dport    uint16         `json:"dport"`
+	Protocol model.Protocol `json:"protocol"`
 }
 
 type DiagnoseSummaryLink struct {
@@ -34,8 +34,8 @@ type DiagnoseSummaryLink struct {
 	SourceAttribute      map[string]string     `json:"source_attributes"`
 	DestinationAttribute map[string]string     `json:"destination_attributes"`
 	Destination          string                `json:"destination"`
-	Type                 model2.LinkType       `json:"type"`
-	ActionType           model2.ActionType     `json:"action"`
+	Type                 model.LinkType        `json:"type"`
+	ActionType           model.ActionType      `json:"action"`
 	Packet               DiagnoseSummaryPacket `json:"packet"`
 }
 
@@ -45,10 +45,10 @@ type DiagnoseSummary struct {
 }
 
 type JSONFormatter struct {
-	p *model2.PacketPath
+	p *model.PacketPath
 }
 
-func NewJSONFormatter(p *model2.PacketPath) *JSONFormatter {
+func NewJSONFormatter(p *model.PacketPath) *JSONFormatter {
 	return &JSONFormatter{p: p}
 }
 

@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"strings"
 
-	model2 "github.com/alibaba/kubeskoop/pkg/skoop/model"
-	netstack2 "github.com/alibaba/kubeskoop/pkg/skoop/netstack"
+	"github.com/alibaba/kubeskoop/pkg/skoop/model"
+	"github.com/alibaba/kubeskoop/pkg/skoop/netstack"
 
 	"github.com/samber/lo"
 	"golang.org/x/exp/slices"
@@ -15,14 +15,14 @@ import (
 
 type NetstackAssertion struct {
 	Assertion
-	netns *netstack2.NetNS
+	netns *netstack.NetNS
 }
 
-func NewNetstackAssertion(assertion Assertion, netns *netstack2.NetNS) *NetstackAssertion {
+func NewNetstackAssertion(assertion Assertion, netns *netstack.NetNS) *NetstackAssertion {
 	return &NetstackAssertion{Assertion: assertion, netns: netns}
 }
 
-func (na *NetstackAssertion) AssertSysctls(expectSysctls map[string]string, suspicionLevel model2.SuspicionLevel) {
+func (na *NetstackAssertion) AssertSysctls(expectSysctls map[string]string, suspicionLevel model.SuspicionLevel) {
 	for s, expect := range expectSysctls {
 		actual, ok := na.netns.NetNSInfo.SysctlInfo[s]
 		if !ok {
@@ -36,7 +36,7 @@ func (na *NetstackAssertion) AssertSysctls(expectSysctls map[string]string, susp
 }
 
 func (na *NetstackAssertion) AssertIPForwardedEnabled() {
-	na.AssertSysctls(map[string]string{"net.ipv4.ip_forward": "1"}, model2.SuspicionLevelFatal)
+	na.AssertSysctls(map[string]string{"net.ipv4.ip_forward": "1"}, model.SuspicionLevelFatal)
 }
 
 func (na *NetstackAssertion) AssertRpFilterDisabled(dev string) {
@@ -46,26 +46,26 @@ func (na *NetstackAssertion) AssertRpFilterDisabled(dev string) {
 
 	na.AssertSysctls(map[string]string{
 		fmt.Sprintf("net.ipv4.conf.%s.rp_filter", dev): "0",
-	}, model2.SuspicionLevelFatal)
+	}, model.SuspicionLevelFatal)
 }
 
 func (na *NetstackAssertion) AssertDefaultRule() {
 	for _, r := range na.netns.NetNSInfo.RuleInfo {
 		// main & local table
-		if r.Table == netstack2.RtTableMain || r.Table == netstack2.RtTableLocal {
+		if r.Table == netstack.RtTableMain || r.Table == netstack.RtTableLocal {
 			if r.Src != nil || r.IifName != "" || r.OifName != "" || r.Dst != nil {
-				na.AddSuspicion(model2.SuspicionLevelCritical,
+				na.AddSuspicion(model.SuspicionLevelCritical,
 					"default policy to table main is wrong with non zero fields")
 				return
 			}
 			return
 		}
 	}
-	na.AddSuspicion(model2.SuspicionLevelCritical,
+	na.AddSuspicion(model.SuspicionLevelCritical,
 		"default policy to table main is deleted")
 }
 
-func (na *NetstackAssertion) AssertNetDevice(s string, expect netstack2.Interface) {
+func (na *NetstackAssertion) AssertNetDevice(s string, expect netstack.Interface) {
 	for _, ni := range na.netns.Interfaces {
 		if ni.Name == s {
 			niType := reflect.TypeOf(expect)
@@ -73,7 +73,7 @@ func (na *NetstackAssertion) AssertNetDevice(s string, expect netstack2.Interfac
 			actualv := reflect.ValueOf(ni)
 			for i := 0; i < niType.NumField(); i++ {
 				AssertTrue(na, expectv.Field(i).IsZero() || (expectv.Field(i).Interface() == actualv.Field(i).Interface()),
-					model2.SuspicionLevelFatal,
+					model.SuspicionLevelFatal,
 					fmt.Sprintf("netdevice %q field: %v is not expect: actual(%v) != expect(%v)", s, niType.Field(i).Name, actualv.Field(i), expectv.Field(i)),
 				)
 			}
@@ -81,26 +81,26 @@ func (na *NetstackAssertion) AssertNetDevice(s string, expect netstack2.Interfac
 		}
 	}
 
-	na.AddSuspicion(model2.SuspicionLevelCritical,
+	na.AddSuspicion(model.SuspicionLevelCritical,
 		fmt.Sprintf("cannot found interface: %s to assert", s),
 	)
 }
 
 func (na *NetstackAssertion) AssertNoPolicyRoute() {
-	defaultRoutes := []int{netstack2.RtTableMain, netstack2.RtTableLocal, netstack2.RtTableDefault}
+	defaultRoutes := []int{netstack.RtTableMain, netstack.RtTableLocal, netstack.RtTableDefault}
 	var policyRoutes []int
 	for _, rule := range na.netns.NetNSInfo.RuleInfo {
 		if !slices.Contains(defaultRoutes, rule.Table) {
 			policyRoutes = append(policyRoutes, rule.Table)
 		}
 	}
-	AssertTrue(na, len(policyRoutes) == 0, model2.SuspicionLevelWarning,
+	AssertTrue(na, len(policyRoutes) == 0, model.SuspicionLevelWarning,
 		fmt.Sprintf("policy route enabled, tables: %+v", policyRoutes))
 }
 
-func (na *NetstackAssertion) AssertListen(localIP net.IP, localPort uint16, protocol model2.Protocol) {
-	socks := lo.Filter(na.netns.NetNSInfo.ConnStats, func(stat netstack2.ConnStat, index int) bool {
-		if stat.State == netstack2.SockStatListen && strings.EqualFold(string(stat.Protocol), string(protocol)) && localPort == stat.LocalPort {
+func (na *NetstackAssertion) AssertListen(localIP net.IP, localPort uint16, protocol model.Protocol) {
+	socks := lo.Filter(na.netns.NetNSInfo.ConnStats, func(stat netstack.ConnStat, index int) bool {
+		if stat.State == netstack.SockStatListen && strings.EqualFold(string(stat.Protocol), string(protocol)) && localPort == stat.LocalPort {
 			if localIP.String() == stat.LocalIP {
 				return true
 			}
@@ -111,60 +111,60 @@ func (na *NetstackAssertion) AssertListen(localIP net.IP, localPort uint16, prot
 		return false
 	})
 
-	AssertTrue(na, len(socks) != 0, model2.SuspicionLevelFatal,
+	AssertTrue(na, len(socks) != 0, model.SuspicionLevelFatal,
 		fmt.Sprintf("no process listening on 0.0.0.0:%v or %v:%v", localPort, localIP, localPort))
 }
 
 func (na *NetstackAssertion) AssertHostBridge(name string) {
-	bridge, ok := lo.Find(na.netns.Interfaces, func(iface netstack2.Interface) bool { return iface.Name == name })
+	bridge, ok := lo.Find(na.netns.Interfaces, func(iface netstack.Interface) bool { return iface.Name == name })
 	if !ok {
-		na.AddSuspicion(model2.SuspicionLevelFatal,
+		na.AddSuspicion(model.SuspicionLevelFatal,
 			fmt.Sprintf("bridge %s is not existed", name))
 		return
 	}
 
-	AssertTrue(na, bridge.State == netstack2.LinkUP, model2.SuspicionLevelFatal, fmt.Sprintf("bridge %s state is down", name))
+	AssertTrue(na, bridge.State == netstack.LinkUP, model.SuspicionLevelFatal, fmt.Sprintf("bridge %s state is down", name))
 }
 
-func (na *NetstackAssertion) AssertVEthPeerBridge(peerInterfaceName string, peerNS *netstack2.NetNSInfo, expectedBridgeName string) {
-	peer, ok := lo.Find(peerNS.Interfaces, func(iface netstack2.Interface) bool { return iface.Name == peerInterfaceName })
+func (na *NetstackAssertion) AssertVEthPeerBridge(peerInterfaceName string, peerNS *netstack.NetNSInfo, expectedBridgeName string) {
+	peer, ok := lo.Find(peerNS.Interfaces, func(iface netstack.Interface) bool { return iface.Name == peerInterfaceName })
 	if !ok {
-		na.AddSuspicion(model2.SuspicionLevelFatal,
+		na.AddSuspicion(model.SuspicionLevelFatal,
 			fmt.Sprintf("cannot find eth0 in peer netns %s", peerNS.NetnsID))
 		return
 	}
 
-	dev, ok := lo.Find(na.netns.Interfaces, func(iface netstack2.Interface) bool { return iface.Index == peer.PeerIndex })
+	dev, ok := lo.Find(na.netns.Interfaces, func(iface netstack.Interface) bool { return iface.Index == peer.PeerIndex })
 	if !ok {
-		na.AddSuspicion(model2.SuspicionLevelFatal,
+		na.AddSuspicion(model.SuspicionLevelFatal,
 			fmt.Sprintf("veth index %d is not existed", peer.PeerIndex),
 		)
 		return
 	}
 
-	if dev.Driver != netstack2.LinkDriverVeth {
-		na.AddSuspicion(model2.SuspicionLevelFatal,
+	if dev.Driver != netstack.LinkDriverVeth {
+		na.AddSuspicion(model.SuspicionLevelFatal,
 			fmt.Sprintf("%s is not a veth interface", dev.Name))
 		return
 	}
 
-	AssertTrue(na, dev.State == netstack2.LinkUP, model2.SuspicionLevelWarning,
+	AssertTrue(na, dev.State == netstack.LinkUP, model.SuspicionLevelWarning,
 		fmt.Sprintf("state of veth peer %s is DOWN", dev.Name))
 
 	if dev.MasterIndex == 0 {
-		na.AddSuspicion(model2.SuspicionLevelFatal, fmt.Sprintf("%s has no master", dev.Name))
+		na.AddSuspicion(model.SuspicionLevelFatal, fmt.Sprintf("%s has no master", dev.Name))
 		return
 	}
 
-	bridge, ok := lo.Find(na.netns.Interfaces, func(iface netstack2.Interface) bool { return iface.Index == dev.MasterIndex })
+	bridge, ok := lo.Find(na.netns.Interfaces, func(iface netstack.Interface) bool { return iface.Index == dev.MasterIndex })
 	if !ok {
-		na.AddSuspicion(model2.SuspicionLevelFatal,
+		na.AddSuspicion(model.SuspicionLevelFatal,
 			fmt.Sprintf("cannot find master interface %d in peer ns %s", dev.MasterIndex, na.netns.NetNSInfo.NetnsID))
 		return
 	}
 
 	if expectedBridgeName != "" {
-		AssertTrue(na, bridge.Name == expectedBridgeName, model2.SuspicionLevelFatal,
+		AssertTrue(na, bridge.Name == expectedBridgeName, model.SuspicionLevelFatal,
 			fmt.Sprintf("bridge of %s is %s, not %s", dev.Name, bridge.Name, expectedBridgeName))
 	}
 
@@ -172,37 +172,37 @@ func (na *NetstackAssertion) AssertVEthPeerBridge(peerInterfaceName string, peer
 }
 
 func (na *NetstackAssertion) AssertVEthOnBridge(index int, expectedBridgeName string) {
-	dev, ok := lo.Find(na.netns.Interfaces, func(iface netstack2.Interface) bool { return iface.Index == index })
+	dev, ok := lo.Find(na.netns.Interfaces, func(iface netstack.Interface) bool { return iface.Index == index })
 	if !ok {
-		na.AddSuspicion(model2.SuspicionLevelFatal,
+		na.AddSuspicion(model.SuspicionLevelFatal,
 			fmt.Sprintf("veth peer index %d is not existed", index),
 		)
 		return
 	}
 
-	if dev.Driver != netstack2.LinkDriverVeth {
-		na.AddSuspicion(model2.SuspicionLevelFatal,
+	if dev.Driver != netstack.LinkDriverVeth {
+		na.AddSuspicion(model.SuspicionLevelFatal,
 			fmt.Sprintf("%s is not a veth interface", dev.Name))
 		return
 	}
 
-	AssertTrue(na, dev.State == netstack2.LinkUP, model2.SuspicionLevelWarning,
+	AssertTrue(na, dev.State == netstack.LinkUP, model.SuspicionLevelWarning,
 		fmt.Sprintf("state of veth peer %s is DOWN", dev.Name))
 
 	if dev.MasterIndex == 0 {
-		na.AddSuspicion(model2.SuspicionLevelFatal, fmt.Sprintf("%s has no master", dev.Name))
+		na.AddSuspicion(model.SuspicionLevelFatal, fmt.Sprintf("%s has no master", dev.Name))
 		return
 	}
 
-	bridge, ok := lo.Find(na.netns.Interfaces, func(iface netstack2.Interface) bool { return iface.Index == dev.MasterIndex })
+	bridge, ok := lo.Find(na.netns.Interfaces, func(iface netstack.Interface) bool { return iface.Index == dev.MasterIndex })
 	if !ok {
-		na.AddSuspicion(model2.SuspicionLevelFatal,
+		na.AddSuspicion(model.SuspicionLevelFatal,
 			fmt.Sprintf("cannot find master interface %d, for dev %s", dev.MasterIndex, dev.Name))
 		return
 	}
 
 	if expectedBridgeName != "" {
-		AssertTrue(na, bridge.Name == expectedBridgeName, model2.SuspicionLevelFatal,
+		AssertTrue(na, bridge.Name == expectedBridgeName, model.SuspicionLevelFatal,
 			fmt.Sprintf("bridge of %s is %s, not %s", dev.Name, bridge.Name, expectedBridgeName))
 	}
 
@@ -211,13 +211,13 @@ func (na *NetstackAssertion) AssertVEthOnBridge(index int, expectedBridgeName st
 
 func (na *NetstackAssertion) AssertIPVSServiceExists(service, servicePort, protocol string) {
 	key := fmt.Sprintf("%s:%s:%s", protocol, service, servicePort)
-	AssertTrue(na, slices.Contains(na.netns.NetNSInfo.IPVSInfo, key), model2.SuspicionLevelWarning,
+	AssertTrue(na, slices.Contains(na.netns.NetNSInfo.IPVSInfo, key), model.SuspicionLevelWarning,
 		fmt.Sprintf("ipvs has no service %s", key))
 }
 
 type RouteAssertion struct {
 	Dev      *string
-	Scope    *netstack2.Scope
+	Scope    *netstack.Scope
 	Type     *int
 	Dst      *net.IPNet
 	Src      *net.IP
@@ -231,10 +231,10 @@ func (a RouteAssertion) String() string {
 		formattedString = append(formattedString, fmt.Sprintf("dev: %s", *a.Dev))
 	}
 	if a.Scope != nil {
-		formattedString = append(formattedString, fmt.Sprintf("scope: %s", netstack2.RouteScopeToString(*a.Scope)))
+		formattedString = append(formattedString, fmt.Sprintf("scope: %s", netstack.RouteScopeToString(*a.Scope)))
 	}
 	if a.Type != nil {
-		formattedString = append(formattedString, fmt.Sprintf("type: %s", netstack2.RouteTypeToString(*a.Type)))
+		formattedString = append(formattedString, fmt.Sprintf("type: %s", netstack.RouteTypeToString(*a.Type)))
 	}
 	if a.Src != nil {
 		formattedString = append(formattedString, fmt.Sprintf("src: %s", *a.Src))
@@ -246,16 +246,16 @@ func (a RouteAssertion) String() string {
 		formattedString = append(formattedString, fmt.Sprintf("gateway: %s", *a.Gw))
 	}
 	if a.Protocol != nil {
-		formattedString = append(formattedString, fmt.Sprintf("protocol: %s", netstack2.RouteProtocolToString(*a.Protocol)))
+		formattedString = append(formattedString, fmt.Sprintf("protocol: %s", netstack.RouteProtocolToString(*a.Protocol)))
 	}
 	return strings.Join(formattedString, " ")
 }
 
-func (na *NetstackAssertion) AssertRoute(expected RouteAssertion, packet model2.Packet, iif, oif string) error {
+func (na *NetstackAssertion) AssertRoute(expected RouteAssertion, packet model.Packet, iif, oif string) error {
 	router := na.netns.Router
 	route, err := router.Route(&packet, iif, oif)
-	if err == netstack2.ErrNoRouteToHost {
-		na.AddSuspicion(model2.SuspicionLevelFatal,
+	if err == netstack.ErrNoRouteToHost {
+		na.AddSuspicion(model.SuspicionLevelFatal,
 			fmt.Sprintf("no route to host %s", packet.Dst))
 		return nil
 	}
@@ -264,54 +264,54 @@ func (na *NetstackAssertion) AssertRoute(expected RouteAssertion, packet model2.
 		return err
 	}
 
-	if slices.Contains([]int{netstack2.RtnUnreachable, netstack2.RtnBlackhole, netstack2.RtnProhibit, netstack2.RtnThrow}, route.Type) {
-		na.AddSuspicion(model2.SuspicionLevelFatal,
+	if slices.Contains([]int{netstack.RtnUnreachable, netstack.RtnBlackhole, netstack.RtnProhibit, netstack.RtnThrow}, route.Type) {
+		na.AddSuspicion(model.SuspicionLevelFatal,
 			fmt.Sprintf("route with type %d which indicates %s is unreachable", route.Type, packet.Dst))
 		return nil
 	}
 
-	if route.Type == netstack2.RtnLocal {
+	if route.Type == netstack.RtnLocal {
 		return nil
 	}
 
 	if expected.Dev != nil && *expected.Dev != route.OifName {
-		na.AddSuspicion(model2.SuspicionLevelFatal,
+		na.AddSuspicion(model.SuspicionLevelFatal,
 			fmt.Sprintf("invalid route %q for packet {src=%s, dst=%s}, expected: %q",
 				route, packet.Src, packet.Dst, expected))
 		return nil
 	}
 	if expected.Scope != nil && *expected.Scope != route.Scope {
-		na.AddSuspicion(model2.SuspicionLevelFatal,
+		na.AddSuspicion(model.SuspicionLevelFatal,
 			fmt.Sprintf("invalid route %q for packet {src=%s, dst=%s}, expected: %q",
 				route, packet.Src, packet.Dst, expected))
 		return nil
 	}
 	if expected.Src != nil && !route.Src.Equal(*expected.Src) {
-		na.AddSuspicion(model2.SuspicionLevelFatal,
+		na.AddSuspicion(model.SuspicionLevelFatal,
 			fmt.Sprintf("invalid route %q for packet {src=%s, dst=%s}, expected: %q",
 				route, packet.Src, packet.Dst, expected))
 		return nil
 	}
 	if expected.Dst != nil && (*route.Dst).String() != (*expected.Dst).String() {
-		na.AddSuspicion(model2.SuspicionLevelFatal,
+		na.AddSuspicion(model.SuspicionLevelFatal,
 			fmt.Sprintf("invalid route %q for packet {src=%s, dst=%s}, expected: %q",
 				route, packet.Src, packet.Dst, expected))
 		return nil
 	}
 	if expected.Gw != nil && !route.Gw.Equal(*expected.Gw) {
-		na.AddSuspicion(model2.SuspicionLevelFatal,
+		na.AddSuspicion(model.SuspicionLevelFatal,
 			fmt.Sprintf("invalid route %q for packet {src=%s, dst=%s}, expected: %q",
 				route, packet.Src, packet.Dst, expected))
 		return nil
 	}
 	if expected.Type != nil && *expected.Type != route.Type {
-		na.AddSuspicion(model2.SuspicionLevelFatal,
+		na.AddSuspicion(model.SuspicionLevelFatal,
 			fmt.Sprintf("invalid route %q for packet {src=%s, dst=%s}, expected: %q",
 				route, packet.Src, packet.Dst, expected))
 		return nil
 	}
 	if expected.Protocol != nil && *expected.Protocol != route.Protocol {
-		na.AddSuspicion(model2.SuspicionLevelFatal,
+		na.AddSuspicion(model.SuspicionLevelFatal,
 			fmt.Sprintf("invalid route %q for packet {src=%s, dst=%s}, expected: %q",
 				route, packet.Src, packet.Dst, expected))
 		return nil
@@ -321,9 +321,9 @@ func (na *NetstackAssertion) AssertRoute(expected RouteAssertion, packet model2.
 }
 
 func (na *NetstackAssertion) AssertVxlanVtep(vtep, dstHost net.IP, vxlanInterface string) error {
-	iface, ok := lo.Find(na.netns.Interfaces, func(i netstack2.Interface) bool { return i.Name == vxlanInterface })
+	iface, ok := lo.Find(na.netns.Interfaces, func(i netstack.Interface) bool { return i.Name == vxlanInterface })
 	if !ok {
-		na.AddSuspicion(model2.SuspicionLevelFatal, fmt.Sprintf("invalid vxlan interface %s", vxlanInterface))
+		na.AddSuspicion(model.SuspicionLevelFatal, fmt.Sprintf("invalid vxlan interface %s", vxlanInterface))
 		return nil
 	}
 
@@ -333,19 +333,19 @@ func (na *NetstackAssertion) AssertVxlanVtep(vtep, dstHost net.IP, vxlanInterfac
 	}
 
 	if neighResult == nil {
-		na.AddSuspicion(model2.SuspicionLevelCritical,
+		na.AddSuspicion(model.SuspicionLevelCritical,
 			fmt.Sprintf("no neigh for next node hop: %s on %s", vtep, vxlanInterface))
 		return nil
 	}
 
 	if neighResult.DST == nil || neighResult.DST.IsUnspecified() {
-		na.AddSuspicion(model2.SuspicionLevelCritical,
+		na.AddSuspicion(model.SuspicionLevelCritical,
 			fmt.Sprintf("no fdb table for %s", vxlanInterface))
 		return nil
 	}
 
 	if !neighResult.DST.Equal(dstHost) {
-		na.AddSuspicion(model2.SuspicionLevelCritical,
+		na.AddSuspicion(model.SuspicionLevelCritical,
 			fmt.Sprintf("fdb table for %q not equal to expect vtep %q", vtep, dstHost))
 	}
 
@@ -353,17 +353,17 @@ func (na *NetstackAssertion) AssertVxlanVtep(vtep, dstHost net.IP, vxlanInterfac
 }
 
 func (na *NetstackAssertion) AssertDefaultIPIPTunnel(ifName string) {
-	dev, ok := lo.Find(na.netns.Interfaces, func(i netstack2.Interface) bool { return i.Name == ifName })
+	dev, ok := lo.Find(na.netns.Interfaces, func(i netstack.Interface) bool { return i.Name == ifName })
 	if !ok {
 		na.AddSuspicion(
-			model2.SuspicionLevelFatal,
+			model.SuspicionLevelFatal,
 			fmt.Sprintf("interface %q does not exist", ifName))
 		return
 	}
 
-	if dev.Driver != netstack2.LinkDriverIPIP {
-		na.AddSuspicion(model2.SuspicionLevelFatal,
-			fmt.Sprintf("driver of interface %q is %q, not %q", ifName, dev.Driver, netstack2.LinkDriverIPIP))
+	if dev.Driver != netstack.LinkDriverIPIP {
+		na.AddSuspicion(model.SuspicionLevelFatal,
+			fmt.Sprintf("driver of interface %q is %q, not %q", ifName, dev.Driver, netstack.LinkDriverIPIP))
 		return
 	}
 
@@ -375,34 +375,34 @@ func (na *NetstackAssertion) AssertDefaultIPIPTunnel(ifName string) {
 // AssertNoIPTables assertion no iptables rules
 func (na *NetstackAssertion) AssertNoIPTables() {
 	if err := na.netns.IPTables.Empty(); err != nil {
-		na.AddSuspicion(model2.SuspicionLevelFatal,
+		na.AddSuspicion(model.SuspicionLevelFatal,
 			fmt.Sprintf("iptables: %s", err))
 	}
 }
 
 func (na *NetstackAssertion) AssertDefaultAccept() {
 	if err := na.netns.IPTables.DefaultAccept(); err != nil {
-		na.AddSuspicion(model2.SuspicionLevelFatal,
+		na.AddSuspicion(model.SuspicionLevelFatal,
 			fmt.Sprintf("iptables: %s", err))
 	}
 }
 
-func (na *NetstackAssertion) checkNetfilterResult(verdict netstack2.Verdict, err error) bool {
+func (na *NetstackAssertion) checkNetfilterResult(verdict netstack.Verdict, err error) bool {
 	if err != nil {
-		if err == netstack2.ErrIPTablesUnsupported {
-			na.AddSuspicion(model2.SuspicionLevelWarning,
+		if err == netstack.ErrIPTablesUnsupported {
+			na.AddSuspicion(model.SuspicionLevelWarning,
 				"iptables contains unsupported rules, which is not expected")
 			return false
 		}
 
-		if e, ok := err.(*netstack2.IPTablesRuleError); ok {
-			na.AddSuspicion(model2.SuspicionLevelWarning,
+		if e, ok := err.(*netstack.IPTablesRuleError); ok {
+			na.AddSuspicion(model.SuspicionLevelWarning,
 				fmt.Sprintf("iptables contains unsupported rule: %v", e))
 			return false
 		}
 
-		if e, ok := err.(*netstack2.IPTableDropError); ok {
-			na.AddSuspicion(model2.SuspicionLevelWarning,
+		if e, ok := err.(*netstack.IPTableDropError); ok {
+			na.AddSuspicion(model.SuspicionLevelWarning,
 				fmt.Sprintf("packet drop by iptables, trace: %v", e.Trace))
 			return false
 		}
@@ -411,13 +411,13 @@ func (na *NetstackAssertion) checkNetfilterResult(verdict netstack2.Verdict, err
 	return true
 }
 
-func (na *NetstackAssertion) AssertNetfilterSend(pktIn model2.Packet, pktOut []model2.Packet, iif string) {
-	verdict, _, err := na.netns.Netfilter.Hook(netstack2.NFHookOutput, pktIn, iif, "")
+func (na *NetstackAssertion) AssertNetfilterSend(pktIn model.Packet, pktOut []model.Packet, iif string) {
+	verdict, _, err := na.netns.Netfilter.Hook(netstack.NFHookOutput, pktIn, iif, "")
 	if !na.checkNetfilterResult(verdict, err) {
 		return
 	}
 	for _, pkt := range pktOut {
-		verdict, _, err := na.netns.Netfilter.Hook(netstack2.NFHookPostRouting, pkt, iif, "")
+		verdict, _, err := na.netns.Netfilter.Hook(netstack.NFHookPostRouting, pkt, iif, "")
 		if !na.checkNetfilterResult(verdict, err) {
 			continue
 		}
@@ -426,42 +426,42 @@ func (na *NetstackAssertion) AssertNetfilterSend(pktIn model2.Packet, pktOut []m
 	}
 }
 
-func (na *NetstackAssertion) AssertNetfilterForward(pktIn model2.Packet, pktOut []model2.Packet, iif string) {
-	verdict, filteredPkt, err := na.netns.Netfilter.Hook(netstack2.NFHookPreRouting, pktIn, iif, "")
+func (na *NetstackAssertion) AssertNetfilterForward(pktIn model.Packet, pktOut []model.Packet, iif string) {
+	verdict, filteredPkt, err := na.netns.Netfilter.Hook(netstack.NFHookPreRouting, pktIn, iif, "")
 	if !na.checkNetfilterResult(verdict, err) {
 		return
 	}
 
 	if len(pktOut) == 0 {
-		pktOut = []model2.Packet{pktIn}
+		pktOut = []model.Packet{pktIn}
 	}
 
 	pktCopy := pktIn
 	for _, pkt := range pktOut {
 		pktCopy.Dst = pkt.Dst
-		verdict, filteredPkt, err = na.netns.Netfilter.Hook(netstack2.NFHookForward, pktCopy, iif, "")
+		verdict, filteredPkt, err = na.netns.Netfilter.Hook(netstack.NFHookForward, pktCopy, iif, "")
 		na.checkNetfilterResult(verdict, err)
-		verdict, filteredPkt, err = na.netns.Netfilter.Hook(netstack2.NFHookPostRouting, filteredPkt, iif, "")
+		verdict, filteredPkt, err = na.netns.Netfilter.Hook(netstack.NFHookPostRouting, filteredPkt, iif, "")
 		na.checkNetfilterResult(verdict, err)
 
 		if !pktCopy.Src.Equal(filteredPkt.Src) {
-			na.AddSuspicion(model2.SuspicionLevelFatal,
+			na.AddSuspicion(model.SuspicionLevelFatal,
 				fmt.Sprintf("pkt %v is SNATed to %v, which is not expected", pktIn, filteredPkt))
 		}
 	}
 }
 
-func (na *NetstackAssertion) AssertNetfilterServe(pktIn model2.Packet, iif string) {
-	verdict, filteredPkt, err := na.netns.Netfilter.Hook(netstack2.NFHookPreRouting, pktIn, iif, "")
+func (na *NetstackAssertion) AssertNetfilterServe(pktIn model.Packet, iif string) {
+	verdict, filteredPkt, err := na.netns.Netfilter.Hook(netstack.NFHookPreRouting, pktIn, iif, "")
 	if !na.checkNetfilterResult(verdict, err) {
 		return
 	}
 
-	verdict, _, err = na.netns.Netfilter.Hook(netstack2.NFHookInput, filteredPkt, iif, "")
+	verdict, _, err = na.netns.Netfilter.Hook(netstack.NFHookInput, filteredPkt, iif, "")
 	na.checkNetfilterResult(verdict, err)
 }
 
-func (na *NetstackAssertion) AssertIPVSServerExists(service string, servicePort uint16, protocol model2.Protocol,
+func (na *NetstackAssertion) AssertIPVSServerExists(service string, servicePort uint16, protocol model.Protocol,
 	backend string, backendPort uint16) {
 	key := fmt.Sprintf("%s:%s:%d", protocol, service, servicePort)
 	_, ok := lo.Find(na.netns.NetNSInfo.IPVSInfo, func(i string) bool { return i == key })
@@ -471,14 +471,14 @@ func (na *NetstackAssertion) AssertIPVSServerExists(service string, servicePort 
 
 	svc := na.netns.IPVS.GetService(protocol, service, servicePort)
 	if svc == nil || svc.RS == nil {
-		na.AddSuspicion(model2.SuspicionLevelFatal,
+		na.AddSuspicion(model.SuspicionLevelFatal,
 			fmt.Sprintf("ipvs has no service %s or service has no rs info", key))
 	}
 
-	found := lo.ContainsBy(svc.RS, func(rs netstack2.RealServer) bool {
+	found := lo.ContainsBy(svc.RS, func(rs netstack.RealServer) bool {
 		return rs.IP == backend && rs.Port == backendPort
 	})
 
-	AssertTrue(na, found, model2.SuspicionLevelWarning,
+	AssertTrue(na, found, model.SuspicionLevelWarning,
 		fmt.Sprintf("ipvs service %s has no endpoint %s:%d", service, backend, backendPort))
 }

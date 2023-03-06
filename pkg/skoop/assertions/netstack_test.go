@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/alibaba/kubeskoop/pkg/skoop/model"
-	netstack2 "github.com/alibaba/kubeskoop/pkg/skoop/netstack"
+	"github.com/alibaba/kubeskoop/pkg/skoop/netstack"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -22,7 +22,7 @@ func (s *suspicionList) AddSuspicion(level model.SuspicionLevel, message string)
 
 func TestAssertNetDevice(t *testing.T) {
 	list := &suspicionList{}
-	netAss := NewNetstackAssertion(list, &netstack2.NetNS{Interfaces: []netstack2.Interface{
+	netAss := NewNetstackAssertion(list, &netstack.NetNS{Interfaces: []netstack.Interface{
 		{
 			Name:   "eth0",
 			MTU:    1450,
@@ -30,7 +30,7 @@ func TestAssertNetDevice(t *testing.T) {
 		},
 	}})
 
-	netAss.AssertNetDevice("eth0", netstack2.Interface{
+	netAss.AssertNetDevice("eth0", netstack.Interface{
 		Driver: "ipvlan",
 		MTU:    1450,
 	})

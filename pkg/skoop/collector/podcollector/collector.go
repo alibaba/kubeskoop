@@ -18,7 +18,7 @@ import (
 	"github.com/alibaba/kubeskoop/pkg/skoop/collector"
 	"github.com/alibaba/kubeskoop/pkg/skoop/k8s"
 	"github.com/alibaba/kubeskoop/pkg/skoop/model"
-	netstack2 "github.com/alibaba/kubeskoop/pkg/skoop/netstack"
+	"github.com/alibaba/kubeskoop/pkg/skoop/netstack"
 
 	"github.com/bastjan/netstat"
 	"github.com/containerd/containerd/pkg/cri/server"
@@ -140,8 +140,8 @@ func (a *podCollector) PodList() ([]k8s.PodNetInfo, error) {
 	return pods, nil
 }
 
-func (a *podCollector) SandboxInfos(pods []k8s.PodNetInfo) ([]netstack2.NetNSInfo, error) {
-	var sandboxInfos []netstack2.NetNSInfo
+func (a *podCollector) SandboxInfos(pods []k8s.PodNetInfo) ([]netstack.NetNSInfo, error) {
+	var sandboxInfos []netstack.NetNSInfo
 	hostNsInfo, err := a.SandboxInfo("/proc/1/ns/net", "", 1)
 	if err != nil {
 		return nil, err
@@ -159,8 +159,8 @@ func (a *podCollector) SandboxInfos(pods []k8s.PodNetInfo) ([]netstack2.NetNSInf
 	return sandboxInfos, nil
 }
 
-func (a *podCollector) SandboxInfo(path, key string, pid uint32) (netstack2.NetNSInfo, error) {
-	sandboxInfo := netstack2.NetNSInfo{
+func (a *podCollector) SandboxInfo(path, key string, pid uint32) (netstack.NetNSInfo, error) {
+	sandboxInfo := netstack.NetNSInfo{
 		Netns: path,
 		Key:   key,
 		PID:   pid,
@@ -170,7 +170,7 @@ func (a *podCollector) SandboxInfo(path, key string, pid uint32) (netstack2.NetN
 	if err != nil {
 		return sandboxInfo, err
 	}
-	for _, infoCollector := range []func(*netstack2.NetNSInfo) error{
+	for _, infoCollector := range []func(*netstack.NetNSInfo) error{
 		interfaceCollector,
 		sysctlCollector,
 		routeCollector,
@@ -188,7 +188,7 @@ func (a *podCollector) SandboxInfo(path, key string, pid uint32) (netstack2.NetN
 	return sandboxInfo, nil
 }
 
-func nsDo(path string, sandboxInfo *netstack2.NetNSInfo, f func(sandboxInfo *netstack2.NetNSInfo) error) error {
+func nsDo(path string, sandboxInfo *netstack.NetNSInfo, f func(sandboxInfo *netstack.NetNSInfo) error) error {
 	currentHandler, err := netns.Get()
 	if err != nil {
 		return err
@@ -238,34 +238,34 @@ func parseSysctls(sysctlsStr string) map[string]string {
 	return sysctls
 }
 
-func interfaceCollector(sandboxInfo *netstack2.NetNSInfo) error {
+func interfaceCollector(sandboxInfo *netstack.NetNSInfo) error {
 	links, err := netlink.LinkList()
 	if err != nil {
 		return err
 	}
 	for _, l := range links {
-		attr := netstack2.Interface{
+		attr := netstack.Interface{
 			Name:        l.Attrs().Name,
 			Index:       l.Attrs().Index,
 			MTU:         l.Attrs().MTU,
 			Driver:      l.Type(),
-			Addrs:       []netstack2.Addr{},
-			NeighInfo:   []netstack2.Neigh{},
-			FdbInfo:     []netstack2.Neigh{},
+			Addrs:       []netstack.Addr{},
+			NeighInfo:   []netstack.Neigh{},
+			FdbInfo:     []netstack.Neigh{},
 			MasterIndex: l.Attrs().MasterIndex,
 			PeerIndex:   l.Attrs().ParentIndex,
 		}
 
 		switch l.Attrs().OperState {
 		case netlink.OperUp:
-			attr.State = netstack2.LinkUP
+			attr.State = netstack.LinkUP
 		case netlink.OperDown:
-			attr.State = netstack2.LinkDown
+			attr.State = netstack.LinkDown
 		default:
 			if l.Attrs().Flags&net.FlagUp != 0 {
-				attr.State = netstack2.LinkUP
+				attr.State = netstack.LinkUP
 			} else {
-				attr.State = netstack2.LinkUnknown
+				attr.State = netstack.LinkUnknown
 			}
 		}
 
@@ -274,7 +274,7 @@ func interfaceCollector(sandboxInfo *netstack2.NetNSInfo) error {
 			return err
 		}
 		for _, addr := range addrs {
-			attr.Addrs = append(attr.Addrs, netstack2.Addr{
+			attr.Addrs = append(attr.Addrs, netstack.Addr{
 				IPNet: addr.IPNet,
 			})
 		}
@@ -288,7 +288,7 @@ func interfaceCollector(sandboxInfo *netstack2.NetNSInfo) error {
 			return err
 		}
 		for _, fdb := range fdbs {
-			attr.FdbInfo = append(attr.FdbInfo, netstack2.Neigh{
+			attr.FdbInfo = append(attr.FdbInfo, netstack.Neigh{
 				Family:       syscall.AF_BRIDGE,
 				LinkIndex:    l.Attrs().Index,
 				State:        fdb.State,
@@ -304,7 +304,7 @@ func interfaceCollector(sandboxInfo *netstack2.NetNSInfo) error {
 			return err
 		}
 		for _, neigh := range neighs {
-			attr.NeighInfo = append(attr.NeighInfo, netstack2.Neigh{
+			attr.NeighInfo = append(attr.NeighInfo, netstack.Neigh{
 				Family:       netlink.FAMILY_V4,
 				LinkIndex:    l.Attrs().Index,
 				State:        neigh.State,
@@ -319,7 +319,7 @@ func interfaceCollector(sandboxInfo *netstack2.NetNSInfo) error {
 	return nil
 }
 
-func sysctlCollector(sandboxInfo *netstack2.NetNSInfo) error {
+func sysctlCollector(sandboxInfo *netstack.NetNSInfo) error {
 	sysctlsStr, err := namespaceCmd(sandboxInfo.PID, "sysctl -a || true")
 	if err != nil {
 		return err
@@ -328,7 +328,7 @@ func sysctlCollector(sandboxInfo *netstack2.NetNSInfo) error {
 	return nil
 }
 
-func routeCollector(sandboxInfo *netstack2.NetNSInfo) error {
+func routeCollector(sandboxInfo *netstack.NetNSInfo) error {
 	rules, err := netlink.RuleList(netlink.FAMILY_V4)
 	if err != nil {
 		return fmt.Errorf("error collector rule list: %v", err)
@@ -360,9 +360,9 @@ func routeCollector(sandboxInfo *netstack2.NetNSInfo) error {
 				}
 			}
 
-			routeInfo := netstack2.Route{
+			routeInfo := netstack.Route{
 				Family:   netlink.FAMILY_V4,
-				Scope:    netstack2.Scope(route.Scope),
+				Scope:    netstack.Scope(route.Scope),
 				Dst:      route.Dst,
 				Src:      route.Src,
 				Gw:       route.Gw,
@@ -392,14 +392,14 @@ func routeCollector(sandboxInfo *netstack2.NetNSInfo) error {
 	return nil
 }
 
-func ruleCollector(sandboxInfo *netstack2.NetNSInfo) error {
+func ruleCollector(sandboxInfo *netstack.NetNSInfo) error {
 	v4Rule, err := netlink.RuleList(netlink.FAMILY_V4)
 	if err != nil {
 		return err
 	}
-	sandboxInfo.RuleInfo = []netstack2.Rule{}
+	sandboxInfo.RuleInfo = []netstack.Rule{}
 	for _, rule := range v4Rule {
-		sandboxInfo.RuleInfo = append(sandboxInfo.RuleInfo, netstack2.Rule{
+		sandboxInfo.RuleInfo = append(sandboxInfo.RuleInfo, netstack.Rule{
 			Priority: rule.Priority,
 			Family:   rule.Family,
 			Table:    rule.Table,
@@ -418,7 +418,7 @@ func ruleCollector(sandboxInfo *netstack2.NetNSInfo) error {
 	return nil
 }
 
-func iptablesCollector(sandboxInfo *netstack2.NetNSInfo) error {
+func iptablesCollector(sandboxInfo *netstack.NetNSInfo) error {
 	iptableDump, err := namespaceCmd(sandboxInfo.PID, "iptables-save|iptables-xml")
 	if err != nil {
 		return err
@@ -427,13 +427,13 @@ func iptablesCollector(sandboxInfo *netstack2.NetNSInfo) error {
 	return nil
 }
 
-func ipsetCollector(sandboxInfo *netstack2.NetNSInfo) error {
+func ipsetCollector(sandboxInfo *netstack.NetNSInfo) error {
 	var err error
 	sandboxInfo.IpsetInfo, err = namespaceCmd(sandboxInfo.PID, "ipset list -o xml")
 	return err
 }
 
-func ipvsCollector(sandboxInfo *netstack2.NetNSInfo) error {
+func ipvsCollector(sandboxInfo *netstack.NetNSInfo) error {
 	ipvsStr, err := namespaceCmd(sandboxInfo.PID, "ipvsadm-save -n")
 	if err != nil {
 		return err
@@ -442,7 +442,7 @@ func ipvsCollector(sandboxInfo *netstack2.NetNSInfo) error {
 	return nil
 }
 
-func sockCollector(sandboxInfo *netstack2.NetNSInfo) error {
+func sockCollector(sandboxInfo *netstack.NetNSInfo) error {
 	tcpConns, err := netstat.TCP.Connections()
 	if err != nil {
 		return fmt.Errorf("error get tcp connections: %v", err)
@@ -462,36 +462,36 @@ func sockCollector(sandboxInfo *netstack2.NetNSInfo) error {
 	}
 	udpConns = append(udpConns, udp6Conns...)
 	for _, tc := range tcpConns {
-		conn := netstack2.ConnStat{
+		conn := netstack.ConnStat{
 			LocalIP:    tc.IP.String(),
 			LocalPort:  uint16(tc.Port),
 			RemoteIP:   tc.RemoteIP.String(),
 			RemotePort: uint16(tc.RemotePort),
 			Protocol:   model.TCP,
 		}
-		conn.State = netstack2.SockStatUnknown
+		conn.State = netstack.SockStatUnknown
 		if tc.State == netstat.TCPEstablished {
-			conn.State = netstack2.SockStatEstablish
+			conn.State = netstack.SockStatEstablish
 		}
 		if tc.State == netstat.TCPListen {
-			conn.State = netstack2.SockStatListen
+			conn.State = netstack.SockStatListen
 		}
 		sandboxInfo.ConnStats = append(sandboxInfo.ConnStats, conn)
 	}
 	for _, tc := range udpConns {
-		conn := netstack2.ConnStat{
+		conn := netstack.ConnStat{
 			LocalIP:    tc.IP.String(),
 			LocalPort:  uint16(tc.Port),
 			RemoteIP:   tc.RemoteIP.String(),
 			RemotePort: uint16(tc.RemotePort),
 			Protocol:   model.UDP,
 		}
-		conn.State = netstack2.SockStatUnknown
+		conn.State = netstack.SockStatUnknown
 		if tc.State == netstat.TCPEstablished {
-			conn.State = netstack2.SockStatEstablish
+			conn.State = netstack.SockStatEstablish
 		}
 		if slices.Contains([]string{"0.0.0.0", "::"}, tc.RemoteIP.String()) {
-			conn.State = netstack2.SockStatListen
+			conn.State = netstack.SockStatListen
 		}
 		sandboxInfo.ConnStats = append(sandboxInfo.ConnStats, conn)
 	}

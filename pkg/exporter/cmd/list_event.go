@@ -6,7 +6,7 @@ package cmd
 import (
 	"context"
 
-	probe2 "github.com/alibaba/kubeskoop/pkg/exporter/probe"
+	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slog"
@@ -19,10 +19,10 @@ var eventCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := slog.NewContext(context.Background(), slog.Default())
 		if len(listprobe) == 0 {
-			listprobe = probe2.ListMetricProbes(ctx, true)
+			listprobe = probe.ListMetricProbes(ctx, true)
 		}
 
-		events := probe2.ListEvents()
+		events := probe.ListEvents()
 		pterm.Print(events)
 	},
 }

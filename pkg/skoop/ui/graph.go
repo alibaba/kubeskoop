@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"strings"
 
-	model2 "github.com/alibaba/kubeskoop/pkg/skoop/model"
+	"github.com/alibaba/kubeskoop/pkg/skoop/model"
 
 	graphviz "github.com/goccy/go-graphviz"
 	"github.com/goccy/go-graphviz/cgraph"
@@ -20,7 +20,7 @@ type Graphviz struct {
 	graph *cgraph.Graph
 }
 
-func NewGraphviz(p *model2.PacketPath) (*Graphviz, error) {
+func NewGraphviz(p *model.PacketPath) (*Graphviz, error) {
 	g := &Graphviz{
 		g: graphviz.New(),
 	}
@@ -40,13 +40,13 @@ func trimID(id string) string {
 	return ids[len(ids)-1]
 }
 
-func (g *Graphviz) buildGraph(p *model2.PacketPath) (*cgraph.Graph, error) {
+func (g *Graphviz) buildGraph(p *model.PacketPath) (*cgraph.Graph, error) {
 	graph, err := g.g.Graph()
 	if err != nil {
 		return nil, err
 	}
 
-	getNode := func(netNode *model2.NetNode) (*cgraph.Node, error) {
+	getNode := func(netNode *model.NetNode) (*cgraph.Node, error) {
 		id := netNode.GetID()
 		n, err := graph.Node(id)
 		if err != nil {
@@ -96,7 +96,7 @@ func (g *Graphviz) buildGraph(p *model2.PacketPath) (*cgraph.Graph, error) {
 		label := p.GetLinkLabel(l, action)
 		edge.Set("linklabels", label)
 
-		if action.Type == model2.ActionTypeServe {
+		if action.Type == model.ActionTypeServe {
 			edge.SetArrowHead(cgraph.DotArrow)
 		}
 	}

@@ -1,7 +1,7 @@
 package framework
 
 import (
-	model2 "github.com/alibaba/kubeskoop/pkg/skoop/model"
+	"github.com/alibaba/kubeskoop/pkg/skoop/model"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -23,7 +23,7 @@ type NodeSpec struct {
 	RecoverCommands []string // todo: recreate node
 	PodSpecs        []*PodSpec
 	Listen          uint16
-	ListenProtocol  model2.Protocol
+	ListenProtocol  model.Protocol
 	ExtraInfo       map[string]string
 	node            *v1.Node
 	skoopID         string
@@ -33,7 +33,7 @@ type PodSpec struct {
 	ID             string
 	Commands       []string
 	Listen         uint16
-	ListenProtocol model2.Protocol
+	ListenProtocol model.Protocol
 	Annotations    map[string]string
 	ExtraInfo      map[string]string
 	pod            *v1.Pod
@@ -53,7 +53,7 @@ type Assertion struct {
 
 type AssertionSuspicion struct {
 	On       string
-	Level    model2.SuspicionLevel
+	Level    model.SuspicionLevel
 	Contains string
 }
 
@@ -70,14 +70,14 @@ type AssertionPacket struct {
 
 type AssertionAction struct {
 	On   string
-	Type model2.ActionType
+	Type model.ActionType
 }
 
 type DiagnoseSpec struct {
 	From     string
 	To       string
 	Port     uint16
-	Protocol model2.Protocol
+	Protocol model.Protocol
 }
 
 type ServiceSpec struct {
@@ -86,13 +86,13 @@ type ServiceSpec struct {
 	Port           uint16
 	TargetPort     uint16
 	TargetPortName string
-	Protocol       model2.Protocol
+	Protocol       model.Protocol
 	service        *v1.Service
 }
 
 type NetworkPolicySpec struct {
 }
 
-func NewDiagnoseSpec(from, to string, port uint16, protocol model2.Protocol) DiagnoseSpec {
+func NewDiagnoseSpec(from, to string, port uint16, protocol model.Protocol) DiagnoseSpec {
 	return DiagnoseSpec{From: from, To: to, Port: port, Protocol: protocol}
 }

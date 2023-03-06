@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	nettop2 "github.com/alibaba/kubeskoop/pkg/exporter/nettop"
+	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 
 	"github.com/prometheus/procfs"
 	"golang.org/x/exp/slog"
@@ -64,7 +64,7 @@ func (s *ProcSock) GetMetricNames() []string {
 }
 
 func (s *ProcSock) Collect(ctx context.Context) (map[string]map[uint32]uint64, error) {
-	ets := nettop2.GetAllEntity()
+	ets := nettop.GetAllEntity()
 	if len(ets) == 0 {
 		slog.Ctx(ctx).Info("collect", "mod", MODULE_NAME, "ignore", "no entity found")
 	}
@@ -86,7 +86,7 @@ type tcpsockstat struct {
 	Mem    int
 }
 
-func collect(ctx context.Context, nslist []*nettop2.Entity) (resMap map[string]map[uint32]uint64, err error) {
+func collect(ctx context.Context, nslist []*nettop.Entity) (resMap map[string]map[uint32]uint64, err error) {
 	resMap = make(map[string]map[uint32]uint64)
 	for _, stat := range TCPSockStatMetrics {
 		resMap[metricUniqueID("sock", stat)] = map[uint32]uint64{}

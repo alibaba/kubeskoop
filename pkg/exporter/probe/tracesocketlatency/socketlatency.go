@@ -11,7 +11,7 @@ import (
 	"sync"
 	"unsafe"
 
-	bpfutil2 "github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
+	"github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
 	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
 
 	"github.com/cilium/ebpf"
@@ -136,7 +136,7 @@ func (p *SocketLatencyProbe) Collect(ctx context.Context) (map[string]map[uint32
 		res[mtr] = map[uint32]uint64{}
 	}
 	// 从map中获取数据
-	m, err := bpfutil2.MustLoadPin(MODULE_NAME)
+	m, err := bpfutil.MustLoadPin(MODULE_NAME)
 	if err != nil {
 		return nil, err
 	}
@@ -217,8 +217,8 @@ func (p *SocketLatencyProbe) startEventPoll(ctx context.Context) {
 			rawevt.EventType = SOCKETLAT_SENDSLOW
 		}
 
-		tuple := fmt.Sprintf("protocol=%s saddr=%s sport=%d daddr=%s dport=%d ", bpfutil2.GetProtoStr(event.Tuple.L4Proto), bpfutil2.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Saddr))), bits.ReverseBytes16(event.Tuple.Sport), bpfutil2.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Daddr))), bits.ReverseBytes16(event.Tuple.Dport))
-		rawevt.EventBody = fmt.Sprintf("%s latency=%s", tuple, bpfutil2.GetHumanTimes(event.Latency))
+		tuple := fmt.Sprintf("protocol=%s saddr=%s sport=%d daddr=%s dport=%d ", bpfutil.GetProtoStr(event.Tuple.L4Proto), bpfutil.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Saddr))), bits.ReverseBytes16(event.Tuple.Sport), bpfutil.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Daddr))), bits.ReverseBytes16(event.Tuple.Dport))
+		rawevt.EventBody = fmt.Sprintf("%s latency=%s", tuple, bpfutil.GetHumanTimes(event.Latency))
 		if p.sub != nil {
 			slog.Ctx(ctx).Debug("broadcast event", "module", MODULE_NAME)
 			p.sub <- rawevt
@@ -236,7 +236,7 @@ func loadSync() error {
 	opts := ebpf.CollectionOptions{}
 
 	opts.Programs = ebpf.ProgramOptions{
-		KernelTypes: bpfutil2.LoadBTFSpecOrNil(),
+		KernelTypes: bpfutil.LoadBTFSpecOrNil(),
 	}
 
 	// Load pre-compiled programs and maps into the kernel.
@@ -280,7 +280,7 @@ func loadSync() error {
 	}
 	links = append(links, linkdestroy)
 
-	err = bpfutil2.MustPin(objs.InspSklatMetric, MODULE_NAME)
+	err = bpfutil.MustPin(objs.InspSklatMetric, MODULE_NAME)
 	if err != nil {
 		return fmt.Errorf("pin map %s failed: %s", MODULE_NAME, err.Error())
 	}

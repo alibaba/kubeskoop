@@ -9,8 +9,8 @@ import (
 
 	"github.com/alibaba/kubeskoop/pkg/skoop/collector"
 	ctx "github.com/alibaba/kubeskoop/pkg/skoop/context"
-	k8s2 "github.com/alibaba/kubeskoop/pkg/skoop/k8s"
-	netstack2 "github.com/alibaba/kubeskoop/pkg/skoop/netstack"
+	"github.com/alibaba/kubeskoop/pkg/skoop/k8s"
+	"github.com/alibaba/kubeskoop/pkg/skoop/netstack"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -46,10 +46,10 @@ type simplePodCollectorManager struct {
 	namespace    string
 	client       *kubernetes.Clientset
 	restConfig   *rest.Config
-	ipCache      *k8s2.IPCache
-	cache        map[string]*k8s2.NodeNetworkStackDump
-	nodeCache    map[string]*k8s2.NodeInfo
-	podCache     map[string]*k8s2.Pod
+	ipCache      *k8s.IPCache
+	cache        map[string]*k8s.NodeNetworkStackDump
+	nodeCache    map[string]*k8s.NodeInfo
+	podCache     map[string]*k8s.Pod
 	waitInterval time.Duration
 	waitTimeout  time.Duration
 }
@@ -77,15 +77,15 @@ func NewSimplePodCollectorManager(ctx *ctx.Context) (collector.Manager, error) {
 		client:       ctx.KubernetesClient(),
 		restConfig:   ctx.KubernetesRestClient(),
 		ipCache:      ctx.ClusterConfig().IPCache,
-		cache:        map[string]*k8s2.NodeNetworkStackDump{},
-		nodeCache:    map[string]*k8s2.NodeInfo{},
-		podCache:     map[string]*k8s2.Pod{},
+		cache:        map[string]*k8s.NodeNetworkStackDump{},
+		nodeCache:    map[string]*k8s.NodeInfo{},
+		podCache:     map[string]*k8s.Pod{},
 		waitInterval: Config.SimplePodCollectorConfig.WaitInterval,
 		waitTimeout:  Config.SimplePodCollectorConfig.WaitTimeout,
 	}, nil
 }
 
-func (m *simplePodCollectorManager) CollectNode(nodename string) (*k8s2.NodeInfo, error) {
+func (m *simplePodCollectorManager) CollectNode(nodename string) (*k8s.NodeInfo, error) {
 	if node, ok := m.nodeCache[nodename]; ok {
 		return node, nil
 	}
@@ -104,7 +104,7 @@ func (m *simplePodCollectorManager) CollectNode(nodename string) (*k8s2.NodeInfo
 	return nodeInfo, nil
 }
 
-func (m *simplePodCollectorManager) CollectPod(namespace, name string) (*k8s2.Pod, error) {
+func (m *simplePodCollectorManager) CollectPod(namespace, name string) (*k8s.Pod, error) {
 	podKey := fmt.Sprintf("%s/%s", namespace, name)
 	if pod, ok := m.podCache[podKey]; ok {
 		return pod, nil
@@ -140,7 +140,7 @@ func (m *simplePodCollectorManager) buildCache(nodeName string) error {
 		return err
 	}
 
-	netnsMap := map[string]netstack2.NetNSInfo{}
+	netnsMap := map[string]netstack.NetNSInfo{}
 
 	for _, netns := range dump.Netns {
 		netnsMap[netns.Netns] = netns
@@ -151,27 +151,27 @@ func (m *simplePodCollectorManager) buildCache(nodeName string) error {
 	}
 
 	hostNetNS := netnsMap[hostnsKey]
-	nodeInfo := &k8s2.NodeInfo{
+	nodeInfo := &k8s.NodeInfo{
 		SubNetNSInfo: dump.Netns,
-		NetNS:        netstack2.NetNS{NetNSInfo: &hostNetNS},
-		NodeMeta: k8s2.NodeMeta{
+		NetNS:        netstack.NetNS{NetNSInfo: &hostNetNS},
+		NodeMeta: k8s.NodeMeta{
 			NodeName: nodeName,
 		},
 	}
 
-	nodeInfo.Router = netstack2.NewSimulateRouter(nodeInfo.NetNSInfo.RuleInfo, nodeInfo.NetNSInfo.RouteInfo, nodeInfo.NetNSInfo.Interfaces)
-	nodeInfo.IPVS, err = netstack2.ParseIPVS(nodeInfo.NetNSInfo.IPVSInfo)
-	nodeInfo.IPTables = netstack2.ParseIPTables(nodeInfo.NetNSInfo.IptablesInfo)
+	nodeInfo.Router = netstack.NewSimulateRouter(nodeInfo.NetNSInfo.RuleInfo, nodeInfo.NetNSInfo.RouteInfo, nodeInfo.NetNSInfo.Interfaces)
+	nodeInfo.IPVS, err = netstack.ParseIPVS(nodeInfo.NetNSInfo.IPVSInfo)
+	nodeInfo.IPTables = netstack.ParseIPTables(nodeInfo.NetNSInfo.IptablesInfo)
 	if err != nil {
 		return err
 	}
-	nodeInfo.IPSetManager, err = netstack2.ParseIPSet(nodeInfo.NetNSInfo.IpsetInfo)
+	nodeInfo.IPSetManager, err = netstack.ParseIPSet(nodeInfo.NetNSInfo.IpsetInfo)
 	if err != nil {
 		return err
 	}
 	nodeInfo.Interfaces = nodeInfo.NetNSInfo.Interfaces
-	nodeInfo.Neighbour = netstack2.NewNeigh(nodeInfo.NetNSInfo.Interfaces)
-	nodeInfo.Netfilter = netstack2.NewSimulateNetfilter(netstack2.SimulateNetfilterContext{
+	nodeInfo.Neighbour = netstack.NewNeigh(nodeInfo.NetNSInfo.Interfaces)
+	nodeInfo.Netfilter = netstack.NewSimulateNetfilter(netstack.SimulateNetfilterContext{
 		IPTables: nodeInfo.IPTables,
 		IPSet:    nodeInfo.IPSetManager,
 		Router:   nodeInfo.Router,
@@ -181,8 +181,8 @@ func (m *simplePodCollectorManager) buildCache(nodeName string) error {
 	m.nodeCache[nodeName] = nodeInfo
 
 	for _, p := range dump.Pods {
-		podInfo := &k8s2.Pod{
-			PodMeta: k8s2.PodMeta{
+		podInfo := &k8s.Pod{
+			PodMeta: k8s.PodMeta{
 				Namespace:   p.PodNamespace,
 				PodName:     p.PodName,
 				HostNetwork: p.NetworkMode == "host",
@@ -200,20 +200,20 @@ func (m *simplePodCollectorManager) buildCache(nodeName string) error {
 			podInfo.NetNSInfo = &podNetNS
 		}
 
-		podInfo.IPVS, err = netstack2.ParseIPVS(podInfo.NetNSInfo.IPVSInfo)
-		podInfo.IPTables = netstack2.ParseIPTables(podInfo.NetNSInfo.IptablesInfo)
+		podInfo.IPVS, err = netstack.ParseIPVS(podInfo.NetNSInfo.IPVSInfo)
+		podInfo.IPTables = netstack.ParseIPTables(podInfo.NetNSInfo.IptablesInfo)
 		if err != nil {
 			return err
 		}
-		podInfo.IPSetManager, err = netstack2.ParseIPSet(podInfo.NetNSInfo.IpsetInfo)
+		podInfo.IPSetManager, err = netstack.ParseIPSet(podInfo.NetNSInfo.IpsetInfo)
 		if err != nil {
 			return err
 		}
 
-		podInfo.Router = netstack2.NewSimulateRouter(podInfo.NetNSInfo.RuleInfo, podInfo.NetNSInfo.RouteInfo, podInfo.NetNSInfo.Interfaces)
+		podInfo.Router = netstack.NewSimulateRouter(podInfo.NetNSInfo.RuleInfo, podInfo.NetNSInfo.RouteInfo, podInfo.NetNSInfo.Interfaces)
 		podInfo.Interfaces = podInfo.NetNSInfo.Interfaces
-		podInfo.Neighbour = netstack2.NewNeigh(podInfo.NetNSInfo.Interfaces)
-		podInfo.Netfilter = netstack2.NewSimulateNetfilter(netstack2.SimulateNetfilterContext{
+		podInfo.Neighbour = netstack.NewNeigh(podInfo.NetNSInfo.Interfaces)
+		podInfo.Netfilter = netstack.NewSimulateNetfilter(netstack.SimulateNetfilterContext{
 			IPTables: podInfo.IPTables,
 			IPSet:    podInfo.IPSetManager,
 			Router:   podInfo.Router,
@@ -228,7 +228,7 @@ func (m *simplePodCollectorManager) buildCache(nodeName string) error {
 	return nil
 }
 
-func (m *simplePodCollectorManager) collectNodeStackDump(nodeName string) (*k8s2.NodeNetworkStackDump, error) {
+func (m *simplePodCollectorManager) collectNodeStackDump(nodeName string) (*k8s.NodeNetworkStackDump, error) {
 	if dump, ok := m.cache[nodeName]; ok {
 		return dump, nil
 	}
@@ -465,7 +465,7 @@ func (m *simplePodCollectorManager) getCollectorPodTailLog(pod *v1.Pod) string {
 	return string(log)
 }
 
-func (m *simplePodCollectorManager) readCollectorData(pod *v1.Pod) (*k8s2.NodeNetworkStackDump, error) {
+func (m *simplePodCollectorManager) readCollectorData(pod *v1.Pod) (*k8s.NodeNetworkStackDump, error) {
 	req := m.client.CoreV1().RESTClient().Post().Resource("pods").
 		Namespace(pod.Namespace).
 		Name(pod.Name).
@@ -499,7 +499,7 @@ func (m *simplePodCollectorManager) readCollectorData(pod *v1.Pod) (*k8s2.NodeNe
 		return nil, err
 	}
 
-	var dump = &k8s2.NodeNetworkStackDump{}
+	var dump = &k8s.NodeNetworkStackDump{}
 	output, err := base64.StdEncoding.DecodeString(outBuffer.String())
 	if err != nil {
 		return nil, fmt.Errorf("%s, stderr: %s", err, errBuffer.String())

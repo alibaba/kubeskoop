@@ -11,7 +11,7 @@ import (
 	"sync"
 	"unsafe"
 
-	bpfutil2 "github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
+	"github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
 	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
 
 	"github.com/cilium/ebpf"
@@ -156,7 +156,7 @@ func (p *PacketLossProbe) Collect(ctx context.Context) (map[string]map[uint32]ui
 			res[PACKETLOSS_TOTAL][key.Netns] += value
 		}
 
-		sym, err := bpfutil2.GetSymPtFromBpfLocation(key.Location)
+		sym, err := bpfutil.GetSymPtFromBpfLocation(key.Location)
 		if err != nil {
 			slog.Ctx(ctx).Warn("get sym failed", "err", err, "module", MODULE_NAME, "location", key.Location)
 			continue
@@ -225,9 +225,9 @@ func (p *PacketLossProbe) Start(ctx context.Context) {
 			EventType: PACKETLOSS,
 		}
 
-		tuple := fmt.Sprintf("protocol=%s saddr=%s sport=%d daddr=%s dport=%d ", bpfutil2.GetProtoStr(event.Tuple.L4Proto), bpfutil2.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Saddr))), bits.ReverseBytes16(event.Tuple.Sport), bpfutil2.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Daddr))), bits.ReverseBytes16(event.Tuple.Dport))
+		tuple := fmt.Sprintf("protocol=%s saddr=%s sport=%d daddr=%s dport=%d ", bpfutil.GetProtoStr(event.Tuple.L4Proto), bpfutil.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Saddr))), bits.ReverseBytes16(event.Tuple.Sport), bpfutil.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Daddr))), bits.ReverseBytes16(event.Tuple.Dport))
 
-		stacks, err := bpfutil2.GetSymsByStack(uint32(event.StackId), objs.InspPlStack)
+		stacks, err := bpfutil.GetSymsByStack(uint32(event.StackId), objs.InspPlStack)
 		if err != nil {
 			slog.Ctx(ctx).Warn("get sym by stack with", "module", MODULE_NAME, "err", err)
 			continue
@@ -262,7 +262,7 @@ func loadSync() error {
 	opts := ebpf.CollectionOptions{}
 
 	opts.Programs = ebpf.ProgramOptions{
-		KernelTypes: bpfutil2.LoadBTFSpecOrNil(),
+		KernelTypes: bpfutil.LoadBTFSpecOrNil(),
 	}
 
 	// Load pre-compiled programs and maps into the kernel.

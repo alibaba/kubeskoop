@@ -7,7 +7,7 @@ import (
 	"context"
 	"fmt"
 
-	proto2 "github.com/alibaba/kubeskoop/pkg/exporter/proto"
+	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slog"
 	"google.golang.org/grpc"
@@ -43,8 +43,8 @@ func watchInspEvents(ctx context.Context, ep string) {
 		return
 	}
 
-	cli := proto2.NewInspectorClient(conn)
-	stream, err := cli.WatchEvent(ctx, &proto2.WatchRequest{})
+	cli := proto.NewInspectorClient(conn)
+	stream, err := cli.WatchEvent(ctx, &proto.WatchRequest{})
 	if err != nil {
 		slog.Ctx(ctx).Warn("stream watch", "err", err, "endpoint", ep)
 		return

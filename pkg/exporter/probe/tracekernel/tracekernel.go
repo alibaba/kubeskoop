@@ -11,7 +11,7 @@ import (
 	"sync"
 	"unsafe"
 
-	bpfutil2 "github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
+	"github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
 	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
 
 	"github.com/cilium/ebpf"
@@ -171,30 +171,30 @@ func (p *KernelLatencyProbe) startRX(ctx context.Context) {
 		   #define RX_KLATENCY 1
 		   #define TX_KLATENCY 2
 		*/
-		tuple := fmt.Sprintf("protocol=%s saddr=%s sport=%d daddr=%s dport=%d ", bpfutil2.GetProtoStr(event.Tuple.L4Proto), bpfutil2.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Saddr))), bits.ReverseBytes16(event.Tuple.Sport), bpfutil2.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Daddr))), bits.ReverseBytes16(event.Tuple.Dport))
+		tuple := fmt.Sprintf("protocol=%s saddr=%s sport=%d daddr=%s dport=%d ", bpfutil.GetProtoStr(event.Tuple.L4Proto), bpfutil.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Saddr))), bits.ReverseBytes16(event.Tuple.Sport), bpfutil.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Daddr))), bits.ReverseBytes16(event.Tuple.Dport))
 		switch event.Direction {
 		case 1:
 			rawevt.EventType = RXKERNEL_SLOW
-			latency := []string{fmt.Sprintf("latency:%s", bpfutil2.GetHumanTimes(event.Latency))}
+			latency := []string{fmt.Sprintf("latency:%s", bpfutil.GetHumanTimes(event.Latency))}
 			if event.Point2 > event.Point1 {
-				latency = append(latency, fmt.Sprintf("PREROUTING:%s", bpfutil2.GetHumanTimes(event.Point2-event.Point1)))
+				latency = append(latency, fmt.Sprintf("PREROUTING:%s", bpfutil.GetHumanTimes(event.Point2-event.Point1)))
 			}
 			if event.Point3 > event.Point2 && event.Point2 != 0 {
-				latency = append(latency, fmt.Sprintf("ROUTE:%s", bpfutil2.GetHumanTimes(event.Point3-event.Point2)))
+				latency = append(latency, fmt.Sprintf("ROUTE:%s", bpfutil.GetHumanTimes(event.Point3-event.Point2)))
 			}
 			if event.Point4 > event.Point3 && event.Point3 != 0 {
-				latency = append(latency, fmt.Sprintf("LOCAL_IN:%s", bpfutil2.GetHumanTimes(event.Point4-event.Point3)))
+				latency = append(latency, fmt.Sprintf("LOCAL_IN:%s", bpfutil.GetHumanTimes(event.Point4-event.Point3)))
 			}
 			rawevt.EventBody = fmt.Sprintf("%s %s", tuple, strings.Join(latency, " "))
 			p.updateMetrics(rawevt.Netns, RXKERNEL_SLOW_METRIC)
 		case 2:
 			rawevt.EventType = TXKERNEL_SLOW
-			latency := []string{fmt.Sprintf("latency=%s", bpfutil2.GetHumanTimes(event.Latency))}
+			latency := []string{fmt.Sprintf("latency=%s", bpfutil.GetHumanTimes(event.Latency))}
 			if event.Point3 > event.Point1 && event.Point1 != 0 {
-				latency = append(latency, fmt.Sprintf("LOCAL_OUT=%s", bpfutil2.GetHumanTimes(event.Point3-event.Point1)))
+				latency = append(latency, fmt.Sprintf("LOCAL_OUT=%s", bpfutil.GetHumanTimes(event.Point3-event.Point1)))
 			}
 			if event.Point4 > event.Point3 && event.Point3 != 0 {
-				latency = append(latency, fmt.Sprintf("POSTROUTING=%s", bpfutil2.GetHumanTimes(event.Point4-event.Point3)))
+				latency = append(latency, fmt.Sprintf("POSTROUTING=%s", bpfutil.GetHumanTimes(event.Point4-event.Point3)))
 			}
 			rawevt.EventBody = fmt.Sprintf("%s %s", tuple, strings.Join(latency, " "))
 			p.updateMetrics(rawevt.Netns, TXKERNEL_SLOW_METRIC)
@@ -219,7 +219,7 @@ func loadSync() error {
 	opts := ebpf.CollectionOptions{}
 	// 获取btf信息
 	opts.Programs = ebpf.ProgramOptions{
-		KernelTypes: bpfutil2.LoadBTFSpecOrNil(),
+		KernelTypes: bpfutil.LoadBTFSpecOrNil(),
 	}
 
 	// 获取Loaded的程序/map的fd信息

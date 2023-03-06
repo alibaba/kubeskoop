@@ -1,13 +1,13 @@
 package service
 
 import (
-	goctx "context"
+	"context"
 	"fmt"
 	"net"
 	"strings"
 
-	"github.com/alibaba/kubeskoop/pkg/skoop/context"
-	model2 "github.com/alibaba/kubeskoop/pkg/skoop/model"
+	ctx "github.com/alibaba/kubeskoop/pkg/skoop/context"
+	"github.com/alibaba/kubeskoop/pkg/skoop/model"
 	"github.com/alibaba/kubeskoop/pkg/skoop/netstack"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog/v2"
@@ -28,10 +28,10 @@ type Backend struct {
 
 type Processor interface {
 	//验证backends是否符合预期
-	Validate(packet model2.Packet, backends []Backend, netns netstack.NetNS) error
+	Validate(packet model.Packet, backends []Backend, netns netstack.NetNS) error
 
 	//根据packet和svc，返回正确的backends
-	Process(packet model2.Packet, svc *v1.Service) []Backend
+	Process(packet model.Packet, svc *v1.Service) []Backend
 }
 
 type KubeProxyServiceProcessor struct {
@@ -40,7 +40,7 @@ type KubeProxyServiceProcessor struct {
 	client      *kubernetes.Clientset
 }
 
-func (k *KubeProxyServiceProcessor) Validate(packet model2.Packet, backends []Backend, netns netstack.NetNS) error {
+func (k *KubeProxyServiceProcessor) Validate(packet model.Packet, backends []Backend, netns netstack.NetNS) error {
 	if k.mode != "ipvs" {
 		return nil
 	}
@@ -80,7 +80,7 @@ func (k *KubeProxyServiceProcessor) Validate(packet model2.Packet, backends []Ba
 	return nil
 }
 
-func serviceTargetPort(svc *v1.Service, dport uint16, protocol model2.Protocol) uint16 {
+func serviceTargetPort(svc *v1.Service, dport uint16, protocol model.Protocol) uint16 {
 	for _, port := range svc.Spec.Ports {
 		if port.Port == int32(dport) && strings.EqualFold(string(port.Protocol), string(protocol)) {
 			//TODO 处理named port
@@ -93,7 +93,7 @@ func serviceTargetPort(svc *v1.Service, dport uint16, protocol model2.Protocol) 
 	return 0
 }
 
-func serviceTargetPortByNodePort(svc *v1.Service, nodePort uint16, protocol model2.Protocol) uint16 {
+func serviceTargetPortByNodePort(svc *v1.Service, nodePort uint16, protocol model.Protocol) uint16 {
 	for _, port := range svc.Spec.Ports {
 		if strings.EqualFold(string(port.Protocol), string(protocol)) && port.NodePort == int32(nodePort) {
 			return uint16(port.NodePort)
@@ -119,7 +119,7 @@ func isTrafficLocalService(svc *v1.Service) bool {
 	return svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal
 }
 
-func (k *KubeProxyServiceProcessor) shouldMasquerade(packet model2.Packet, svc *v1.Service) (bool, uint16) {
+func (k *KubeProxyServiceProcessor) shouldMasquerade(packet model.Packet, svc *v1.Service) (bool, uint16) {
 	masquerade := false
 	targetPort := serviceTargetPort(svc, packet.Dport, packet.Protocol)
 	dst := packet.Dst.String()
@@ -139,9 +139,9 @@ func (k *KubeProxyServiceProcessor) shouldMasquerade(packet model2.Packet, svc *
 	return masquerade, targetPort
 }
 
-func (k *KubeProxyServiceProcessor) Process(packet model2.Packet, svc *v1.Service) []Backend {
+func (k *KubeProxyServiceProcessor) Process(packet model.Packet, svc *v1.Service) []Backend {
 	masquerade, targetPort := k.shouldMasquerade(packet, svc)
-	ep, err := k.client.CoreV1().Endpoints(svc.Namespace).Get(goctx.TODO(), svc.Name, metav1.GetOptions{})
+	ep, err := k.client.CoreV1().Endpoints(svc.Namespace).Get(context.TODO(), svc.Name, metav1.GetOptions{})
 	if err != nil {
 		log.Errorf("error list endponts for service")
 		return nil
@@ -163,7 +163,7 @@ func (k *KubeProxyServiceProcessor) Process(packet model2.Packet, svc *v1.Servic
 	return ret
 }
 
-func NewKubeProxyServiceProcessor(ctx *context.Context) *KubeProxyServiceProcessor {
+func NewKubeProxyServiceProcessor(ctx *ctx.Context) *KubeProxyServiceProcessor {
 	return &KubeProxyServiceProcessor{
 		mode:        ctx.ClusterConfig().ProxyMode,
 		clusterCIDR: ctx.ClusterConfig().ClusterCIDR,

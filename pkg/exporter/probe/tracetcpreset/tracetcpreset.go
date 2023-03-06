@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"unsafe"
 
-	bpfutil2 "github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
+	"github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
 	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
 
 	"github.com/cilium/ebpf"
@@ -149,8 +149,8 @@ func (p *TCPResetProbe) Start(ctx context.Context) {
 			slog.Ctx(ctx).Debug("ignore event of ipv6 proto")
 			continue
 		}
-		tuple := fmt.Sprintf("protocol=%s saddr=%s sport=%d daddr=%s dport=%d ", bpfutil2.GetProtoStr(event.Tuple.L4Proto), bpfutil2.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Saddr))), bits.ReverseBytes16(event.Tuple.Sport), bpfutil2.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Daddr))), bits.ReverseBytes16(event.Tuple.Dport))
-		stateStr := bpfutil2.GetSkcStateStr(event.State)
+		tuple := fmt.Sprintf("protocol=%s saddr=%s sport=%d daddr=%s dport=%d ", bpfutil.GetProtoStr(event.Tuple.L4Proto), bpfutil.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Saddr))), bits.ReverseBytes16(event.Tuple.Sport), bpfutil.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Daddr))), bits.ReverseBytes16(event.Tuple.Dport))
+		stateStr := bpfutil.GetSkcStateStr(event.State)
 		rawevt.EventBody = fmt.Sprintf("%s state:%s ", tuple, stateStr)
 		if p.sub != nil {
 			slog.Ctx(ctx).Debug("broadcast event", "module", MODULE_NAME)
@@ -168,7 +168,7 @@ func loadSync() error {
 	opts := ebpf.CollectionOptions{}
 	// 获取btf信息
 	opts.Programs = ebpf.ProgramOptions{
-		KernelTypes: bpfutil2.LoadBTFSpecOrNil(),
+		KernelTypes: bpfutil.LoadBTFSpecOrNil(),
 	}
 
 	// 获取Loaded的程序/map的fd信息

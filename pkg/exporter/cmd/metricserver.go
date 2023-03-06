@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	nettop2 "github.com/alibaba/kubeskoop/pkg/exporter/nettop"
+	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
 	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
 	"github.com/patrickmn/go-cache"
@@ -105,16 +105,16 @@ func (s *MServer) Collect(ch chan<- prometheus.Metric) {
 		}
 		slog.Ctx(s.ctx).Debug("metric server collect", "metric", mname, "value", data)
 		for nsinum, value := range data {
-			et, err := nettop2.GetEntityByNetns(int(nsinum))
+			et, err := nettop.GetEntityByNetns(int(nsinum))
 			if err != nil || et == nil {
 				slog.Ctx(s.ctx).Info("collect metric get entity error or nil", "err", err)
 				continue
 			}
 			slog.Ctx(s.ctx).Debug("collect metric", "pod", et.GetPodName(), "netns", nsinum, "metric", mname, "value", value)
 			if s.config.Verbose {
-				ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(value), nettop2.GetNodeName(), et.GetPodNamespace(), et.GetPodName(), fmt.Sprintf("ns%d", nsinum), et.GetIP(), et.GetAppLabel())
+				ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(value), nettop.GetNodeName(), et.GetPodNamespace(), et.GetPodName(), fmt.Sprintf("ns%d", nsinum), et.GetIP(), et.GetAppLabel())
 			} else {
-				ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(value), nettop2.GetNodeName(), et.GetPodNamespace(), et.GetPodName())
+				ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(value), nettop.GetNodeName(), et.GetPodNamespace(), et.GetPodName())
 			}
 		}
 	}
@@ -193,7 +193,7 @@ func (s *MServer) collectWorkerSerial(ctx context.Context) error {
 			}
 			slog.Ctx(ctx).Debug("collect worker finish", "probe", pn)
 
-			CollectLatency.With(prometheus.Labels{"node": nettop2.GetNodeName(), "probe": pn}).Set(float64(time.Since(start).Seconds()))
+			CollectLatency.With(prometheus.Labels{"node": nettop.GetNodeName(), "probe": pn}).Set(float64(time.Since(start).Seconds()))
 		}
 
 		done <- struct{}{}

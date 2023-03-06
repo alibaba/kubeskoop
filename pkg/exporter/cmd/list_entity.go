@@ -6,7 +6,7 @@ package cmd
 import (
 	"fmt"
 
-	nettop2 "github.com/alibaba/kubeskoop/pkg/exporter/nettop"
+	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slog"
@@ -28,13 +28,13 @@ func init() {
 }
 
 func listEntities() {
-	err := nettop2.SyncNetTopology()
+	err := nettop.SyncNetTopology()
 	if err != nil {
 		slog.Warn("sync nettop", "err", err)
 		return
 	}
 
-	ets := nettop2.GetAllEntity()
+	ets := nettop.GetAllEntity()
 	if verbose {
 		texts := pterm.TableData{
 			{"POD", "APP", "IP", "NAMESPACE", "NETNS", "PID", "SANDBOX", "NSINUM"},

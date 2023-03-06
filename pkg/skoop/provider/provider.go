@@ -2,6 +2,9 @@ package provider
 
 import (
 	"fmt"
+	"strings"
+
+	"github.com/samber/lo"
 
 	ctx "github.com/alibaba/kubeskoop/pkg/skoop/context"
 	"github.com/alibaba/kubeskoop/pkg/skoop/network"
@@ -24,7 +27,9 @@ var providers = map[string]Provider{
 func GetProvider(name string) (Provider, error) {
 	provider, ok := providers[name]
 	if !ok {
-		return nil, fmt.Errorf("service provider %q not found", name)
+		supoortedProviders := lo.MapToSlice(providers, func(k string, _ Provider) string { return k })
+		return nil, fmt.Errorf("service provider %q not found, supported providers: %s",
+			name, strings.Join(supoortedProviders, ","))
 	}
 
 	return provider, nil

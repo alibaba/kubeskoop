@@ -4,33 +4,33 @@ import (
 	"fmt"
 	"net"
 
-	assertions2 "github.com/alibaba/kubeskoop/pkg/skoop/assertions"
-	k8s2 "github.com/alibaba/kubeskoop/pkg/skoop/k8s"
-	model2 "github.com/alibaba/kubeskoop/pkg/skoop/model"
-	netstack2 "github.com/alibaba/kubeskoop/pkg/skoop/netstack"
+	"github.com/alibaba/kubeskoop/pkg/skoop/assertions"
+	"github.com/alibaba/kubeskoop/pkg/skoop/k8s"
+	"github.com/alibaba/kubeskoop/pkg/skoop/model"
+	"github.com/alibaba/kubeskoop/pkg/skoop/netstack"
 	"github.com/alibaba/kubeskoop/pkg/skoop/utils"
 	"github.com/samber/lo"
 )
 
 type simpleVEthPod struct {
-	netNode *model2.NetNode
-	podInfo *k8s2.Pod
-	net     *assertions2.NetstackAssertion
-	k8s     *assertions2.KubernetesAssertion
+	netNode *model.NetNode
+	podInfo *k8s.Pod
+	net     *assertions.NetstackAssertion
+	k8s     *assertions.KubernetesAssertion
 	mtu     int
 	iface   string
-	ipCache *k8s2.IPCache
+	ipCache *k8s.IPCache
 }
 
-func newSimpleVEthPod(pod *k8s2.Pod, ipCache *k8s2.IPCache, mtu int, iface string) (*simpleVEthPod, error) {
-	netNode := model2.NewNetNode(fmt.Sprintf("%s/%s", pod.Namespace, pod.PodName), model2.NetNodeTypePod)
+func newSimpleVEthPod(pod *k8s.Pod, ipCache *k8s.IPCache, mtu int, iface string) (*simpleVEthPod, error) {
+	netNode := model.NewNetNode(fmt.Sprintf("%s/%s", pod.Namespace, pod.PodName), model.NetNodeTypePod)
 	return &simpleVEthPod{
 		netNode: netNode,
 		podInfo: pod,
 		mtu:     mtu,
 		iface:   iface,
-		net:     assertions2.NewNetstackAssertion(netNode, &pod.NetNS),
-		k8s:     assertions2.NewKubernetesAssertion(netNode),
+		net:     assertions.NewNetstackAssertion(netNode, &pod.NetNS),
+		k8s:     assertions.NewKubernetesAssertion(netNode),
 		ipCache: ipCache,
 	}, nil
 }
@@ -45,23 +45,23 @@ func (p *simpleVEthPod) assert() error {
 	p.net.AssertNoPolicyRoute()
 	p.net.AssertNoIPTables()
 	p.net.AssertDefaultAccept()
-	p.net.AssertNetDevice("eth0", netstack2.Interface{
+	p.net.AssertNetDevice("eth0", netstack.Interface{
 		MTU:   p.mtu,
-		State: netstack2.LinkUP,
+		State: netstack.LinkUP,
 	})
-	p.net.AssertNetDevice("lo", netstack2.Interface{
-		State: netstack2.LinkUP,
+	p.net.AssertNetDevice("lo", netstack.Interface{
+		State: netstack.LinkUP,
 	})
 	return nil
 }
 
-func (p *simpleVEthPod) Send(dst model2.Endpoint, protocol model2.Protocol) ([]model2.Transmission, error) {
+func (p *simpleVEthPod) Send(dst model.Endpoint, protocol model.Protocol) ([]model.Transmission, error) {
 	err := p.assert()
 	if err != nil {
 		return nil, err
 	}
 
-	pkt := &model2.Packet{
+	pkt := &model.Packet{
 		Dst:      net.ParseIP(dst.IP),
 		Dport:    dst.Port,
 		Protocol: protocol,
@@ -69,39 +69,39 @@ func (p *simpleVEthPod) Send(dst model2.Endpoint, protocol model2.Protocol) ([]m
 
 	addr, _, err := p.podInfo.NetNS.Router.RouteSrc(pkt, "", "")
 	if err != nil {
-		if err == netstack2.ErrNoRouteToHost {
-			p.netNode.AddSuspicion(model2.SuspicionLevelFatal, fmt.Sprintf("no route to host: %v", dst))
+		if err == netstack.ErrNoRouteToHost {
+			p.netNode.AddSuspicion(model.SuspicionLevelFatal, fmt.Sprintf("no route to host: %v", dst))
 		}
-		return nil, &assertions2.CannotBuildTransmissionError{
+		return nil, &assertions.CannotBuildTransmissionError{
 			SrcNode: p.netNode,
 			Err:     fmt.Errorf("no route to host: %v", err)}
 	}
 	pkt.Src = net.ParseIP(addr)
 
-	iface, _ := lo.Find(p.podInfo.NetNS.Interfaces, func(i netstack2.Interface) bool { return i.Name == "eth0" })
-	link := &model2.Link{
-		Type:   model2.LinkVeth,
+	iface, _ := lo.Find(p.podInfo.NetNS.Interfaces, func(i netstack.Interface) bool { return i.Name == "eth0" })
+	link := &model.Link{
+		Type:   model.LinkVeth,
 		Source: p.netNode,
 		Packet: pkt,
-		SourceAttribute: model2.VEthLinkAttribute{
-			SimpleLinkAttribute: model2.SimpleLinkAttribute{
+		SourceAttribute: model.VEthLinkAttribute{
+			SimpleLinkAttribute: model.SimpleLinkAttribute{
 				Interface: "eth0",
 				IP:        addr,
 			},
 			PeerIndex: iface.PeerIndex,
 		},
 	}
-	err = p.net.AssertRoute(assertions2.RouteAssertion{Dev: utils.ToPointer("eth0")}, *pkt, "", "")
+	err = p.net.AssertRoute(assertions.RouteAssertion{Dev: utils.ToPointer("eth0")}, *pkt, "", "")
 	if err != nil {
 		return nil, err
 	}
 
-	p.netNode.DoAction(model2.ActionSend([]*model2.Link{link}))
+	p.netNode.DoAction(model.ActionSend([]*model.Link{link}))
 
-	return []model2.Transmission{
+	return []model.Transmission{
 		{
-			NextHop: model2.Hop{
-				Type: model2.NetNodeTypeNode,
+			NextHop: model.Hop{
+				Type: model.NetNodeTypeNode,
 				ID:   p.podInfo.NodeName,
 			},
 			Link: link,
@@ -109,12 +109,12 @@ func (p *simpleVEthPod) Send(dst model2.Endpoint, protocol model2.Protocol) ([]m
 	}, nil
 }
 
-func (p *simpleVEthPod) Receive(upstream *model2.Link) ([]model2.Transmission, error) {
-	if upstream.Type != model2.LinkVeth {
+func (p *simpleVEthPod) Receive(upstream *model.Link) ([]model.Transmission, error) {
+	if upstream.Type != model.LinkVeth {
 		return nil, fmt.Errorf("unexpect upstream type to receive, expect veth, but: %v", upstream.Type)
 	}
 	upstream.Destination = p.netNode
-	upstream.DestinationAttribute = model2.SimpleLinkAttribute{
+	upstream.DestinationAttribute = model.SimpleLinkAttribute{
 		Interface: "eth0",
 	}
 	pkt := upstream.Packet
@@ -122,12 +122,12 @@ func (p *simpleVEthPod) Receive(upstream *model2.Link) ([]model2.Transmission, e
 	if err != nil {
 		return nil, err
 	}
-	err = p.net.AssertRoute(assertions2.RouteAssertion{Dev: utils.ToPointer("eth0")}, *ack(pkt), "", "")
+	err = p.net.AssertRoute(assertions.RouteAssertion{Dev: utils.ToPointer("eth0")}, *ack(pkt), "", "")
 	if err != nil {
 		return nil, err
 	}
 
 	p.net.AssertListen(pkt.Dst, pkt.Dport, pkt.Protocol)
-	p.netNode.DoAction(model2.ActionServe(upstream))
-	return []model2.Transmission{}, nil
+	p.netNode.DoAction(model.ActionServe(upstream))
+	return []model.Transmission{}, nil
 }
