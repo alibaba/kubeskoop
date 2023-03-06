@@ -13,7 +13,7 @@ require (
 	github.com/bastjan/netstat v1.0.0
 	github.com/beevik/etree v1.1.0
 	github.com/cilium/ebpf v0.9.3
-	github.com/containerd/containerd v1.6.15
+	github.com/containerd/containerd v1.6.19
 	github.com/docker/docker v20.10.22+incompatible
 	github.com/goccy/go-graphviz v0.1.0
 	github.com/golang/protobuf v1.5.2
@@ -57,7 +57,7 @@ require (
 	atomicgo.dev/keyboard v0.2.9 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/Microsoft/go-winio v0.5.2 // indirect
-	github.com/Microsoft/hcsshim v0.9.6 // indirect
+	github.com/Microsoft/hcsshim v0.9.7 // indirect
 	github.com/alibabacloud-go/alibabacloud-gateway-spi v0.0.4 // indirect
 	github.com/alibabacloud-go/debug v0.0.0-20190504072949-9472017b5c68 // indirect
 	github.com/alibabacloud-go/endpoint-util v1.1.0 // indirect
