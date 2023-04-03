@@ -443,6 +443,7 @@ func ipvsCollector(sandboxInfo *netstack.NetNSInfo) error {
 }
 
 func sockCollector(sandboxInfo *netstack.NetNSInfo) error {
+	netstat.ProcRoot = fmt.Sprintf("/proc/%d/", sandboxInfo.PID)
 	tcpConns, err := netstat.TCP.Connections()
 	if err != nil {
 		return fmt.Errorf("error get tcp connections: %v", err)

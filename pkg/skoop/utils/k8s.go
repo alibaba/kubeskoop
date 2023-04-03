@@ -131,3 +131,11 @@ func DetectClusterCIDR(k8sCli *kubernetes.Clientset) (string, error) {
 	}
 	return cfg.ClusterCIDR, nil
 }
+
+func GetOSFromNode(node *v1.Node) string {
+	if os, ok := node.Labels["kubernetes.io/os"]; ok {
+		return os
+	}
+
+	return node.Labels["beta.kubernetes.io/os"]
+}

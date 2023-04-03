@@ -63,7 +63,7 @@ func (g *Graphviz) buildGraph(p *model.PacketPath) (*cgraph.Graph, error) {
 		}
 
 		n.SetID(id).SetLabel(trimID(id))
-		n.SetHeight(1.8).SetWidth(1.8).SetShape(cgraph.CircleShape).SetFixedSize(true)
+		n.SetHeight(1.8).SetWidth(1.8).SetShape(cgraph.CircleShape)
 		n.SetFontSize(11)
 
 		return n, nil
