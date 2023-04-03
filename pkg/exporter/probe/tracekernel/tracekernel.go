@@ -107,7 +107,7 @@ func (p *KernelLatencyProbe) GetMetricNames() []string {
 	return metrics
 }
 
-func (p *KernelLatencyProbe) Collect(ctx context.Context) (map[string]map[uint32]uint64, error) {
+func (p *KernelLatencyProbe) Collect(_ context.Context) (map[string]map[uint32]uint64, error) {
 	return metricsMap, nil
 }
 

@@ -130,7 +130,7 @@ func (p *SocketLatencyProbe) Start(ctx context.Context) {
 	p.startEventPoll(ctx)
 }
 
-func (p *SocketLatencyProbe) Collect(ctx context.Context) (map[string]map[uint32]uint64, error) {
+func (p *SocketLatencyProbe) Collect(_ context.Context) (map[string]map[uint32]uint64, error) {
 	res := map[string]map[uint32]uint64{}
 	for _, mtr := range socketlatencyMetrics {
 		res[mtr] = map[uint32]uint64{}

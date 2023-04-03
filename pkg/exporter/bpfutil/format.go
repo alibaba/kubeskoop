@@ -85,7 +85,7 @@ func GetCommString(comm [20]int8) string {
 	return strings.TrimSpace(string(buf))
 }
 
-func GetTCPState(no uint8) string {
+func GetTCPState(_ uint8) string {
 
 	return "UNKNOW"
 }

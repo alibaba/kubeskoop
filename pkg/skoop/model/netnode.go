@@ -83,7 +83,7 @@ type GenericNetNode struct {
 	NetNode *NetNode
 }
 
-func (n *GenericNetNode) Send(dst Endpoint, protocol Protocol) ([]Transmission, error) {
+func (n *GenericNetNode) Send(_ Endpoint, _ Protocol) ([]Transmission, error) {
 	return nil, fmt.Errorf("non pod/node address as source is not supported")
 }
 

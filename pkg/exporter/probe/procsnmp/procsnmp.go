@@ -152,14 +152,14 @@ func collect(ctx context.Context, entitys []*nettop.Entity) (map[string]map[uint
 				for k, v := range stat {
 					mkey := metricUniqueID(proto, k)
 					slog.Ctx(ctx).Debug("store metric", "metric", mkey, "pid", pid, "nsinum", nsinum, "value", v)
-					if data, err := strconv.ParseInt(v, 10, 64); err != nil {
+					data, err := strconv.ParseInt(v, 10, 64)
+					if err != nil {
 						slog.Ctx(ctx).Debug("parse netstat value", "metric", mkey, "pid", pid, "nsinum", nsinum, "value", v, "err", err)
 						continue
-					} else {
-						// ignore unaware metric
-						if _, ok := res[mkey]; ok {
-							res[mkey][uint32(nsinum)] = uint64(data)
-						}
+					}
+					// ignore unaware metric
+					if _, ok := res[mkey]; ok {
+						res[mkey][uint32(nsinum)] = uint64(data)
 					}
 				}
 			}
