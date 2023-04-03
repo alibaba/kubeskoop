@@ -25,7 +25,7 @@ KubeSkoop是一个Kubernetes网络诊断工具。针对不同的网络插件和I
 - 覆盖完整的Linux协议栈的配置错误场景: Socket,Bridge,Veth,Netfilter,sysctls…
 
 - 支持诊断多种云供应商的IaaS层网络错误配置
-  
+
 #### 深度网络监控
 
 - 通过eBPF实现无侵入的Kernel Montor
@@ -33,7 +33,7 @@ KubeSkoop是一个Kubernetes网络诊断工具。针对不同的网络插件和I
 - 通过BTF在各种版本的Kernel上直接运行
 
 - 通过标准的Prometheus接口暴露深度监控Metrics
-  
+
 #### 网络异常事件识别
 
 - 数十种网络异常场景的自动分析识别
@@ -54,10 +54,23 @@ KubeSkoop是一个Kubernetes网络诊断工具。针对不同的网络插件和I
 go install github.com/alibaba/kubeskoop/cmd/skoop@latest
 ```
 
+也可以使用`docker run` 执行`skoop`命令
+
+```shell
+docker run -v ~/.kube:/root/.kube --rm kubeskoop/kubeskoop:latest skoop
+```
+
 #### 一键诊断
 
 ```shell
 $ skoop -s 172.18.0.4 -d 10.96.0.10 -p 53 --http # 执行诊断命令，通过src,dst指定源地址和目的地址，使用--http通过本地web服务展示诊断结果
+I0118 11:43:23.383446    6280 web.go:97] http server listening on http://127.0.0.1:8080 # 在诊断完成后，将会显示用于查看诊断结果的链接
+```
+
+或者通过`docker run`命令执行
+
+```shell
+$ docker run -p 8080:8080 -v ~/.kube:/root/.kube kubeskoop/kubeskoop:latest skoop -s 172.18.0.4 -d 10.96.0.10 -p 53 --http # 执行诊断命令，通过src,dst指定源地址和目的地址，使用--http通过本地web服务展示诊断结果
 I0118 11:43:23.383446    6280 web.go:97] http server listening on http://127.0.0.1:8080 # 在诊断完成后，将会显示用于查看诊断结果的链接
 ```
 
