@@ -45,7 +45,7 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v2.5.2
         with:
-          version: v1.50.1
+          version: v1.52.2
           args: --timeout 300s --skip-dirs test/skoop/e2e --skip-dirs-use-default -v -E goconst -E gofmt -E ineffassign -E goimports -E revive -E misspell -E vet -E deadcode
 
   shellcheck:
