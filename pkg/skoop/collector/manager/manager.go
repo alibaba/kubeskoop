@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/alibaba/kubeskoop/pkg/skoop/utils"
+
 	"github.com/alibaba/kubeskoop/pkg/skoop/collector"
 	ctx "github.com/alibaba/kubeskoop/pkg/skoop/context"
 	"github.com/alibaba/kubeskoop/pkg/skoop/k8s"
@@ -90,7 +92,17 @@ func (m *simplePodCollectorManager) CollectNode(nodename string) (*k8s.NodeInfo,
 		return node, nil
 	}
 
-	err := m.buildCache(nodename)
+	node, err := m.ipCache.GetNodeFromName(nodename)
+	if err != nil {
+		return nil, err
+	}
+
+	os := utils.GetOSFromNode(node)
+	if os != "linux" {
+		return nil, fmt.Errorf("collector not supported for os type %q", os)
+	}
+
+	err = m.buildCache(nodename)
 	if err != nil {
 		return nil, err
 	}
