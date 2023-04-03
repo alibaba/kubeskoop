@@ -51,10 +51,23 @@ Through `go install` to install KubeSkoop cli：
 go install github.com/alibaba/kubeskoop/cmd/skoop@latest
 ```
 
+You can also run `skoop` command via `docker run`:
+
+```shell
+docker run -v ~/.kube:/root/.kube --rm kubeskoop/kubeskoop:latest skoop
+```
+
 #### One-Shot Diagnose
 
 ```shell
 $ skoop -s 172.18.0.4 -d 10.96.0.10 -p 53 --http # Execute the diagnostic command, specify the src,dst, and use --http to provide the diagnostic result through the local web service
+I0118 11:43:23.383446    6280 web.go:97] http server listening on http://127.0.0.1:8080 # After the diagnosis is completed, a link to the diagnosis result will be output
+```
+
+or via `docker run`:
+
+```shell
+$ docker run -p 8080:8080 -v ~/.kube:/root/.kube kubeskoop/kubeskoop:latest skoop -s 172.18.0.4 -d 10.96.0.10 -p 53 --http # Execute the diagnostic command, specify the src,dst, and use --http to provide the diagnostic result through the local web service
 I0118 11:43:23.383446    6280 web.go:97] http server listening on http://127.0.0.1:8080 # After the diagnosis is completed, a link to the diagnosis result will be output
 ```
 
