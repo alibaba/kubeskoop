@@ -387,7 +387,7 @@ func (na *NetstackAssertion) AssertDefaultAccept() {
 	}
 }
 
-func (na *NetstackAssertion) checkNetfilterResult(verdict netstack.Verdict, err error) bool {
+func (na *NetstackAssertion) checkNetfilterResult(_ netstack.Verdict, err error) bool {
 	if err != nil {
 		if err == netstack.ErrIPTablesUnsupported {
 			na.AddSuspicion(model.SuspicionLevelWarning,

@@ -77,7 +77,7 @@ func metricUniqueID(subject string, m string) string {
 	return fmt.Sprintf("%s%s", subject, strings.ToLower(m))
 }
 
-func collect(ctx context.Context, nslist []*nettop.Entity) (map[string]map[uint32]uint64, error) {
+func collect(_ context.Context, nslist []*nettop.Entity) (map[string]map[uint32]uint64, error) {
 	resMap := make(map[string]map[uint32]uint64)
 
 	for idx := range SoftnetMetrics {

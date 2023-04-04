@@ -155,12 +155,12 @@ func collect(ctx context.Context, nslist []*nettop.Entity) (map[string]map[uint3
 		extstats := stats[ProtocolTCPExt]
 		for _, stat := range TCPExtMetrics {
 			if _, ok := extstats[stat]; ok {
-				if data, err := strconv.ParseUint(extstats[stat], 10, 64); err != nil {
+				data, err := strconv.ParseUint(extstats[stat], 10, 64)
+				if err != nil {
 					slog.Ctx(ctx).Warn("collect", "mod", MODULE_NAME, "ignore", stat, "err", err)
 					continue
-				} else {
-					resMap[metricUniqueID("tcpext", stat)][uint32(et.GetNetns())] += data
 				}
+				resMap[metricUniqueID("tcpext", stat)][uint32(et.GetNetns())] += data
 			}
 		}
 	}

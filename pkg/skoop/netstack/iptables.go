@@ -75,32 +75,32 @@ type SNATTarget struct {
 	Persistent  bool   `ipt:"--persistent"`
 }
 
-func (s *SNATTarget) Do(ctx context.Context, packet *model.Packet, iif, oif string) (XTablesVerdict, error) {
+func (s *SNATTarget) Do(_ context.Context, _ *model.Packet, _, _ string) (XTablesVerdict, error) {
 	return XTablesVerdictAccept, nil
 }
 
-func (t *DNATTarget) Do(ctx context.Context, packet *model.Packet, iif, oif string) (XTablesVerdict, error) {
+func (t *DNATTarget) Do(_ context.Context, _ *model.Packet, _, _ string) (XTablesVerdict, error) {
 	return XTablesVerdictAccept, nil
 }
 
 type MarkTarget struct {
 }
 
-func (t *MarkTarget) Do(ctx context.Context, packet *model.Packet, iif, oif string) (XTablesVerdict, error) {
+func (t *MarkTarget) Do(_ context.Context, _ *model.Packet, _, _ string) (XTablesVerdict, error) {
 	return XTablesVerdictAccept, nil
 }
 
 type NoTrackTarget struct {
 }
 
-func (t *NoTrackTarget) Do(ctx context.Context, packet *model.Packet, iif, oif string) (XTablesVerdict, error) {
+func (t *NoTrackTarget) Do(_ context.Context, _ *model.Packet, _, _ string) (XTablesVerdict, error) {
 	return XTablesVerdictAccept, nil
 }
 
 type TPProxyTarget struct {
 }
 
-func (t *TPProxyTarget) Do(ctx context.Context, packet *model.Packet, iif, oif string) (XTablesVerdict, error) {
+func (t *TPProxyTarget) Do(_ context.Context, _ *model.Packet, _, _ string) (XTablesVerdict, error) {
 	return XTablesVerdictAccept, nil
 }
 
@@ -113,7 +113,7 @@ type TCP struct {
 	Value  uint16
 }
 
-func (t *TCP) Match(ctx context.Context, packet *model.Packet, iif, oif string) (bool, error) {
+func (t *TCP) Match(_ context.Context, packet *model.Packet, _, _ string) (bool, error) {
 	if packet.Protocol != model.TCP {
 		return false, nil
 	}
@@ -136,7 +136,7 @@ type IP struct {
 	Value  string
 }
 
-func (ip *IP) Match(ctx context.Context, packet *model.Packet, iif, oif string) (bool, error) {
+func (ip *IP) Match(_ context.Context, packet *model.Packet, iif, oif string) (bool, error) {
 	switch ip.Option {
 	case "i":
 		return ip.Value == iif, nil
@@ -162,7 +162,7 @@ type UDP struct {
 	Value  uint16
 }
 
-func (udp *UDP) Match(ctx context.Context, packet *model.Packet, iif, oif string) (bool, error) {
+func (udp *UDP) Match(_ context.Context, packet *model.Packet, _, _ string) (bool, error) {
 	if packet.Protocol != model.UDP {
 		return false, nil
 	}
@@ -186,7 +186,7 @@ type Conntrack struct {
 	Value  string
 }
 
-func (conntrack *Conntrack) Match(ctx context.Context, packet *model.Packet, iif, oif string) (bool, error) {
+func (conntrack *Conntrack) Match(_ context.Context, _ *model.Packet, _, _ string) (bool, error) {
 	return true, nil
 }
 func (conntrack *Conntrack) String() string {
@@ -207,7 +207,7 @@ func (set *Set) parseSetArgument() (string, string, error) {
 	return arr[0], arr[1], nil
 }
 
-func (set *Set) Match(ctx context.Context, packet *model.Packet, iif, oif string) (bool, error) {
+func (set *Set) Match(ctx context.Context, packet *model.Packet, _, _ string) (bool, error) {
 	setName, flags, err := set.parseSetArgument()
 	if err != nil {
 		return false, err
@@ -284,7 +284,7 @@ type Comment struct {
 	Value  string
 }
 
-func (c *Comment) Match(ctx context.Context, packet *model.Packet, iif, oif string) (bool, error) {
+func (c *Comment) Match(_ context.Context, _ *model.Packet, _, _ string) (bool, error) {
 	return true, nil
 }
 
@@ -317,7 +317,7 @@ func (mp *MultiPort) matchPort(port uint16) (bool, error) {
 	return false, nil
 }
 
-func (mp *MultiPort) Match(ctx context.Context, packet *model.Packet, iif, oif string) (bool, error) {
+func (mp *MultiPort) Match(_ context.Context, packet *model.Packet, _, _ string) (bool, error) {
 	switch mp.Option {
 	case "dports":
 		return mp.matchPort(packet.Dport)
@@ -361,7 +361,7 @@ type Mark struct {
 	Value  string
 }
 
-func (m *Mark) Match(ctx context.Context, packet *model.Packet, iif, oif string) (bool, error) {
+func (m *Mark) Match(_ context.Context, packet *model.Packet, _, _ string) (bool, error) {
 	mark, mask := parseMarkValue(m.Value)
 	return mark == packet.Mark&mask, nil
 }
@@ -458,7 +458,7 @@ type Statistic struct {
 	Value  string
 }
 
-func (s *Statistic) Match(ctx context.Context, packet *model.Packet, iif, oif string) (bool, error) {
+func (s *Statistic) Match(_ context.Context, _ *model.Packet, _, _ string) (bool, error) {
 	return true, nil
 }
 
@@ -471,7 +471,7 @@ type Physdev struct {
 	Value  string
 }
 
-func (physdev *Physdev) Match(ctx context.Context, packet *model.Packet, iif, oif string) (bool, error) {
+func (physdev *Physdev) Match(_ context.Context, _ *model.Packet, _, _ string) (bool, error) {
 	//FIXME 这里有问题
 	return true, nil
 }
@@ -485,7 +485,7 @@ type Socket struct {
 	Value  string
 }
 
-func (s *Socket) Socket(ctx context.Context, packet *model.Packet, iif, oif string) (bool, error) {
+func (s *Socket) Socket(_ context.Context, _ *model.Packet, _, _ string) (bool, error) {
 	//FIXME 这里有问题
 	return true, nil
 }
@@ -699,7 +699,7 @@ type emptyIPTables struct {
 	xTables map[string]*xTable
 }
 
-func (ipt *emptyIPTables) TracePacket(ctx context.Context, hook NFHook, table string, packet *model.Packet, iif, oif string) (Verdict, Trace, error) {
+func (ipt *emptyIPTables) TracePacket(_ context.Context, _ NFHook, _ string, _ *model.Packet, _, _ string) (Verdict, Trace, error) {
 	return VerdictAccept, nil, nil
 }
 

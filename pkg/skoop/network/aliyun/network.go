@@ -195,7 +195,7 @@ func (n *calicoNetwork) Diagnose(ctx *ctx.Context, src model.Endpoint, dst model
 	return n.diagnostor.Diagnose(src, dst, model.Protocol(ctx.TaskConfig().Protocol))
 }
 
-func (n *terwayNetwork) Diagnose(ctx *ctx.Context, src model.Endpoint, dst model.Endpoint) ([]model.Suspicion, *model.PacketPath, error) {
+func (n *terwayNetwork) Diagnose(_ *ctx.Context, _ model.Endpoint, _ model.Endpoint) ([]model.Suspicion, *model.PacketPath, error) {
 	// todo: implement me
 	panic("implement me!")
 }

@@ -74,7 +74,7 @@ func (p *NetSoftirqProbe) GetMetricNames() []string {
 	return metrics
 }
 
-func (p *NetSoftirqProbe) Collect(ctx context.Context) (map[string]map[uint32]uint64, error) {
+func (p *NetSoftirqProbe) Collect(_ context.Context) (map[string]map[uint32]uint64, error) {
 
 	return metricsMap, nil
 }

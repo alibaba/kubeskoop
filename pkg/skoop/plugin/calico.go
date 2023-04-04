@@ -329,6 +329,7 @@ func newCalicoHost(ipCache *k8s.IPCache, nodeInfo *k8s.NodeInfo, infraShim netwo
 		ipPools:          options.IPPools,
 		net:              assertion,
 		k8s:              k8sAssertion,
+		infraShim:        infraShim,
 	}
 
 	err := host.initRoute()
@@ -408,7 +409,7 @@ func (h *calicoHost) transmissionToPod(pkt *model.Packet, pod *v1.Pod, iif strin
 	return h.transmissionToNode(pkt, node, iif)
 }
 
-func (h *calicoHost) transmissionToNode(pkt *model.Packet, node *v1.Node, iif string) (model.Transmission, error) {
+func (h *calicoHost) transmissionToNode(pkt *model.Packet, node *v1.Node, _ string) (model.Transmission, error) {
 	err := h.checkRoute(pkt)
 	if err != nil {
 		return model.Transmission{}, err
@@ -463,7 +464,7 @@ func (h *calicoHost) transmissionToNode(pkt *model.Packet, node *v1.Node, iif st
 	}, nil
 }
 
-func (h *calicoHost) transmissionToExternal(pkt *model.Packet, iif string) (model.Transmission, error) {
+func (h *calicoHost) transmissionToExternal(pkt *model.Packet, _ string) (model.Transmission, error) {
 	err := h.checkRoute(pkt)
 	if err != nil {
 		return model.Transmission{}, err

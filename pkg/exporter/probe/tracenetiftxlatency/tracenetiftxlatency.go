@@ -175,7 +175,7 @@ func (p *NetifTxlatencyProbe) GetMetricNames() []string {
 	return metrics
 }
 
-func (p *NetifTxlatencyProbe) Collect(ctx context.Context) (map[string]map[uint32]uint64, error) {
+func (p *NetifTxlatencyProbe) Collect(_ context.Context) (map[string]map[uint32]uint64, error) {
 	ets := nettop.GetAllEntity()
 	resMap := map[string]map[uint32]uint64{}
 

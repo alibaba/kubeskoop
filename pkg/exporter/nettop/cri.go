@@ -2,7 +2,7 @@ package nettop
 
 import (
 	"context"
-	fmt "fmt"
+	"fmt"
 	"net"
 	"net/url"
 	"os"
@@ -168,93 +168,93 @@ func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration) (
 }
 
 // Attach prepares a streaming endpoint to attach to a running container, and returns the address.
-func (r *remoteRuntimeService) Attach(req *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error) {
+func (r *remoteRuntimeService) Attach(_ *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error) {
 	return nil, nil
 }
 
 // CheckpointContainer triggers a checkpoint of the given CheckpointContainerRequest
-func (r *remoteRuntimeService) CheckpointContainer(options *runtimeapi.CheckpointContainerRequest) error {
+func (r *remoteRuntimeService) CheckpointContainer(_ *runtimeapi.CheckpointContainerRequest) error {
 	return nil
 }
 
 // ContainerStats returns the stats of the container.
-func (r *remoteRuntimeService) ContainerStats(containerID string) (*runtimeapi.ContainerStats, error) {
+func (r *remoteRuntimeService) ContainerStats(_ string) (*runtimeapi.ContainerStats, error) {
 	return nil, nil
 }
 
 // CreateContainer creates a new container in the specified PodSandbox.
-func (r *remoteRuntimeService) CreateContainer(podSandBoxID string, config *runtimeapi.ContainerConfig, sandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (r *remoteRuntimeService) CreateContainer(_ string, _ *runtimeapi.ContainerConfig, _ *runtimeapi.PodSandboxConfig) (string, error) {
 	return "", nil
 }
 
 // Exec prepares a streaming endpoint to execute a command in the container, and returns the address.
-func (r *remoteRuntimeService) Exec(req *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error) {
+func (r *remoteRuntimeService) Exec(_ *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error) {
 	return nil, nil
 }
 
 // ExecSync executes a command in the container, and returns the stdout output.
 // If command exits with a non-zero exit code, an error is returned.
-func (r *remoteRuntimeService) ExecSync(containerID string, cmd []string, timeout time.Duration) (stdout []byte, stderr []byte, err error) {
+func (r *remoteRuntimeService) ExecSync(_ string, _ []string, _ time.Duration) (stdout []byte, stderr []byte, err error) {
 	return nil, nil, nil
 }
 
-func (r *remoteRuntimeService) GetContainerEvents(containerEventsCh chan *runtimeapi.ContainerEventResponse) error {
+func (r *remoteRuntimeService) GetContainerEvents(_ chan *runtimeapi.ContainerEventResponse) error {
 	return nil
 }
 
 // PortForward prepares a streaming endpoint to forward ports from a PodSandbox, and returns the address.
-func (r *remoteRuntimeService) PortForward(req *runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error) {
+func (r *remoteRuntimeService) PortForward(_ *runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error) {
 	return nil, nil
 }
 
 // RemoveContainer removes the container. If the container is running, the container
 // should be forced to removal.
-func (r *remoteRuntimeService) RemoveContainer(containerID string) (err error) {
+func (r *remoteRuntimeService) RemoveContainer(_ string) (err error) {
 	return nil
 }
 
 // RemovePodSandbox removes the sandbox. If there are any containers in the
 // sandbox, they should be forcibly removed.
-func (r *remoteRuntimeService) RemovePodSandbox(podSandBoxID string) (err error) {
+func (r *remoteRuntimeService) RemovePodSandbox(_ string) (err error) {
 	return nil
 }
 
 // ReopenContainerLog reopens the container log file.
-func (r *remoteRuntimeService) ReopenContainerLog(containerID string) (err error) {
+func (r *remoteRuntimeService) ReopenContainerLog(_ string) (err error) {
 	return nil
 }
 
 // RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
 // the sandbox is in ready state.
-func (r *remoteRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig, runtimeHandler string) (string, error) {
+func (r *remoteRuntimeService) RunPodSandbox(_ *runtimeapi.PodSandboxConfig, _ string) (string, error) {
 	return "", nil
 }
 
 // StartContainer starts the container.
-func (r *remoteRuntimeService) StartContainer(containerID string) (err error) {
+func (r *remoteRuntimeService) StartContainer(_ string) (err error) {
 	return nil
 }
 
 // StopContainer stops a running container with a grace period (i.e., timeout).
-func (r *remoteRuntimeService) StopContainer(containerID string, timeout int64) (err error) {
+func (r *remoteRuntimeService) StopContainer(_ string, _ int64) (err error) {
 	return nil
 }
 
 // StopPodSandbox stops the sandbox. If there are any running containers in the
 // sandbox, they should be forced to termination.
-func (r *remoteRuntimeService) StopPodSandbox(podSandBoxID string) (err error) {
+func (r *remoteRuntimeService) StopPodSandbox(_ string) (err error) {
 	return nil
 }
 
 // UpdateContainerResources updates a containers resource config
-func (r *remoteRuntimeService) UpdateContainerResources(containerID string, resources *runtimeapi.ContainerResources) (err error) {
+func (r *remoteRuntimeService) UpdateContainerResources(_ string, _ *runtimeapi.ContainerResources) (err error) {
 	return nil
 }
 
 // UpdateRuntimeConfig updates the config of a runtime service. The only
 // update payload currently supported is the pod CIDR assigned to a node,
 // and the runtime service just proxies it down to the network plugin.
-func (r *remoteRuntimeService) UpdateRuntimeConfig(runtimeConfig *runtimeapi.RuntimeConfig) (err error) {
+func (r *remoteRuntimeService) UpdateRuntimeConfig(_ *runtimeapi.RuntimeConfig) (err error) {
 	return nil
 }
 

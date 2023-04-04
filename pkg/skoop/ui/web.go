@@ -99,7 +99,7 @@ func (u *WebUI) Serve() error {
 	return http.ListenAndServe(u.address, nil)
 }
 
-func (u *WebUI) handleUI(w http.ResponseWriter, req *http.Request) {
+func (u *WebUI) handleUI(w http.ResponseWriter, _ *http.Request) {
 	args := uiArgs{
 		DiagnoseInfo: fmt.Sprintf("%s -> %s", u.ctx.TaskConfig().SourceEndpoint, u.ctx.TaskConfig().DstEndpoint),
 	}

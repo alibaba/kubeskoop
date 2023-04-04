@@ -4,5 +4,5 @@ import (
 	"testing"
 )
 
-func TestFindNsInum(t *testing.T) {
+func TestFindNsInum(_ *testing.T) {
 }

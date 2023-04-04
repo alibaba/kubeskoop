@@ -86,7 +86,7 @@ type tcpsockstat struct {
 	Mem    int
 }
 
-func collect(ctx context.Context, nslist []*nettop.Entity) (resMap map[string]map[uint32]uint64, err error) {
+func collect(_ context.Context, nslist []*nettop.Entity) (resMap map[string]map[uint32]uint64, err error) {
 	resMap = make(map[string]map[uint32]uint64)
 	for _, stat := range TCPSockStatMetrics {
 		resMap[metricUniqueID("sock", stat)] = map[uint32]uint64{}

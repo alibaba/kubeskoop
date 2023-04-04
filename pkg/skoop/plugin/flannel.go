@@ -515,7 +515,7 @@ func (h *flannelHost) transmissionToPod(pkt *model.Packet, pod *v1.Pod, iif stri
 	return h.transmissionToNode(pkt, node, iif)
 }
 
-func (h *flannelHost) transmissionToNode(pkt *model.Packet, node *v1.Node, iif string) (model.Transmission, error) {
+func (h *flannelHost) transmissionToNode(pkt *model.Packet, node *v1.Node, _ string) (model.Transmission, error) {
 	pktOut := pkt.DeepCopy()
 
 	err := h.masquerade(pktOut)
@@ -568,7 +568,7 @@ func (h *flannelHost) transmissionToNode(pkt *model.Packet, node *v1.Node, iif s
 	}, nil
 }
 
-func (h *flannelHost) transmissionToExternal(pkt *model.Packet, iif string) (model.Transmission, error) {
+func (h *flannelHost) transmissionToExternal(pkt *model.Packet, _ string) (model.Transmission, error) {
 	pktOut := pkt.DeepCopy()
 	err := h.masquerade(pktOut)
 	if err != nil {

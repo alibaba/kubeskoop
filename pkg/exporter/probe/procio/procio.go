@@ -66,7 +66,7 @@ func (s *ProcIO) Collect(ctx context.Context) (map[string]map[uint32]uint64, err
 	return collect(ctx, ets)
 }
 
-func collect(ctx context.Context, nslist []*nettop.Entity) (map[string]map[uint32]uint64, error) {
+func collect(_ context.Context, _ []*nettop.Entity) (map[string]map[uint32]uint64, error) {
 	resMap := make(map[string]map[uint32]uint64)
 	for _, stat := range IOMetrics {
 		resMap[metricUniqueID("io", stat)] = map[uint32]uint64{}

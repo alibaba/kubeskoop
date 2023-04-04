@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestParseIPTables(t *testing.T) {
+func TestParseIPTables(_ *testing.T) {
 	ipt := ParseIPTables(iptablesDump)
 	fmt.Println(ipt)
 }

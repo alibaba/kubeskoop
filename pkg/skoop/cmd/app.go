@@ -27,10 +27,7 @@ func NewSkoopCmd() *cobra.Command {
 			if err := context.SkoopContext.BuildCluster(); err != nil {
 				return err
 			}
-			if err := context.SkoopContext.BuildTask(); err != nil {
-				return err
-			}
-			return nil
+			return context.SkoopContext.BuildTask()
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			prvd, err := provider.GetProvider(context.SkoopContext.ClusterConfig().CloudProvider)

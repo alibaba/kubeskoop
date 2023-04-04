@@ -88,7 +88,7 @@ func (p *VirtcmdLatencyProbe) Close() error {
 	return nil
 }
 
-func (p *VirtcmdLatencyProbe) Collect(ctx context.Context) (map[string]map[uint32]uint64, error) {
+func (p *VirtcmdLatencyProbe) Collect(_ context.Context) (map[string]map[uint32]uint64, error) {
 	return metricsMap, nil
 }
 

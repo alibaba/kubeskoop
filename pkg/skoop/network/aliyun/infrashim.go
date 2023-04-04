@@ -30,7 +30,7 @@ func NewInfraShim(cloudManager *aliyun.CloudManager) (network.InfraShim, error) 
 	}, nil
 }
 
-func (s *aliyunInfraShim) NodeToNode(src *v1.Node, oif string, dst *v1.Node, packet *model.Packet) ([]model.Suspicion, error) {
+func (s *aliyunInfraShim) NodeToNode(src *v1.Node, _ string, dst *v1.Node, packet *model.Packet) ([]model.Suspicion, error) {
 	klog.V(3).Infof("Node to node packet %+v", packet)
 	srcID, err := s.getECSFromNode(src)
 	if err != nil {
@@ -60,7 +60,7 @@ func (s *aliyunInfraShim) NodeToNode(src *v1.Node, oif string, dst *v1.Node, pac
 	return suspicions, nil
 }
 
-func (s *aliyunInfraShim) NodeToExternal(src *v1.Node, oif string, packet *model.Packet) ([]model.Suspicion, error) {
+func (s *aliyunInfraShim) NodeToExternal(src *v1.Node, _ string, packet *model.Packet) ([]model.Suspicion, error) {
 	srcID, err := s.getECSFromNode(src)
 	if err != nil {
 		return nil, err
