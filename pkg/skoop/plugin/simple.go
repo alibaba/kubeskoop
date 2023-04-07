@@ -131,3 +131,21 @@ func (p *simpleVEthPod) Receive(upstream *model.Link) ([]model.Transmission, err
 	p.netNode.DoAction(model.ActionServe(upstream))
 	return []model.Transmission{}, nil
 }
+
+type GenericNetNode struct {
+	NetNode *model.NetNode
+}
+
+func (n *GenericNetNode) Send(_ model.Endpoint, _ model.Protocol) ([]model.Transmission, error) {
+	n.NetNode.AddSuspicion(model.SuspicionLevelFatal, "non pod/node address as source is not supported")
+	return nil, &assertions.CannotBuildTransmissionError{
+		SrcNode: n.NetNode,
+		Err:     fmt.Errorf("non pod/node address as source is not supported"),
+	}
+}
+
+func (n *GenericNetNode) Receive(upstream *model.Link) ([]model.Transmission, error) {
+	upstream.Destination = n.NetNode
+	n.NetNode.DoAction(model.ActionServe(upstream))
+	return nil, nil
+}

@@ -1,8 +1,6 @@
 package model
 
 import (
-	"fmt"
-
 	"github.com/samber/lo"
 )
 
@@ -21,6 +19,11 @@ type NetNode struct {
 	Actions    map[*Link]*Action
 	Suspicions []Suspicion
 	initiative *Action
+}
+
+type NetNodeAction interface {
+	Send(dst Endpoint, protocol Protocol) ([]Transmission, error)
+	Receive(upstream *Link) ([]Transmission, error)
 }
 
 func NewNetNode(id string, nodeType NetNodeType) *NetNode {
@@ -72,23 +75,4 @@ func (n *NetNode) MaxSuspicionLevel() SuspicionLevel {
 	}
 	levels := lo.Map(n.Suspicions, func(s Suspicion, _ int) SuspicionLevel { return s.Level })
 	return lo.Max(levels)
-}
-
-type NetNodeAction interface {
-	Send(dst Endpoint, protocol Protocol) ([]Transmission, error)
-	Receive(upstream *Link) ([]Transmission, error)
-}
-
-type GenericNetNode struct {
-	NetNode *NetNode
-}
-
-func (n *GenericNetNode) Send(_ Endpoint, _ Protocol) ([]Transmission, error) {
-	return nil, fmt.Errorf("non pod/node address as source is not supported")
-}
-
-func (n *GenericNetNode) Receive(upstream *Link) ([]Transmission, error) {
-	upstream.Destination = n.NetNode
-	n.NetNode.DoAction(ActionServe(upstream))
-	return nil, nil
 }

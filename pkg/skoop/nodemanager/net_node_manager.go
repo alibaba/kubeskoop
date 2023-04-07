@@ -70,7 +70,7 @@ func (m *defaultNetNodeManager) GetNetNodeFromID(nodeType model.NetNodeType, id 
 			return m.parent.GetNetNodeFromID(nodeType, id)
 		}
 
-		return &model.GenericNetNode{
+		return &plugin.GenericNetNode{
 			NetNode: &model.NetNode{
 				Type:    model.NetNodeTypeGeneric,
 				ID:      id,
