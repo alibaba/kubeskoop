@@ -20,7 +20,7 @@ import (
 	"golang.org/x/exp/slog"
 )
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -cflags $BPF_CFLAGS -type insp_virtcmdlat_event_t  bpf ../../../bpf/virtcmdlatency.c -- -I../../../bpf/headers -D__TARGET_ARCH_x86
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -cflags $BPF_CFLAGS -type insp_virtcmdlat_event_t  bpf ../../../../bpf/virtcmdlatency.c -- -I../../../../bpf/headers -D__TARGET_ARCH_x86
 
 const (
 	MODULE_NAME = "insp_virtcmdlatency" // nolint

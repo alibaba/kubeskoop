@@ -11,7 +11,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-//go:generate protoc  --gofast_out=plugins=grpc:. ./libnettop.proto
+//go:generate protoc  --go-grpc_out=. ./libnettop.proto
 
 var (
 	logger *slog.Logger

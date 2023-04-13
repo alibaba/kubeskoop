@@ -39,7 +39,7 @@ spec:
               name: boot
           command: [btfhack, discover,-p ,/etc/net-exporter/btf/]
       containers:
-      - image: "registry.cn-hangzhou.aliyuncs.com/acs/inspector:v0.1.0-16-gc8eeb09-aliyun"
+      - image: "registry.cn-hangzhou.aliyuncs.com/acs/inspector:v0.2.0-5-gc619fc9-aliyun"
         name: inspector
         env:
         - name: INSPECTOR_NODENAME

@@ -22,7 +22,7 @@ import (
 	"golang.org/x/exp/slog"
 )
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -cflags $BPF_CFLAGS -type insp_tcpreset_event_t bpf ../../../bpf/tcpreset.c -- -I../../../bpf/headers -D__TARGET_ARCH_x86
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -cflags $BPF_CFLAGS -type insp_tcpreset_event_t bpf ../../../../bpf/tcpreset.c -- -I../../../../bpf/headers -D__TARGET_ARCH_x86
 
 // nolint
 const (
