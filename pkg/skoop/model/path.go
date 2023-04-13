@@ -143,21 +143,25 @@ func (p *PacketPath) Paths() string {
 	links := p.Links()
 	if len(links) == 0 {
 		for _, n := range p.Nodes() {
-			buf.WriteString(n.GetID())
+			buf.WriteString(fmt.Sprintf("\"%v\"", n.GetID()))
 		}
 		return buf.String()
 	}
 
 	for _, l := range links {
 		action := l.Destination.ActionOf(l)
-		label := p.GetLinkLabel(l, action)
 
-		attr := map[string]string{
-			"label": label,
+		attr := map[string]string{}
+
+		if action != nil {
+			label := p.GetLinkLabel(l, action)
+			attr["label"] = label
+
+			if action.Type == ActionTypeServe {
+				attr["arrowhead"] = "dot"
+			}
 		}
-		if action.Type == ActionTypeServe {
-			attr["arrowhead"] = "dot"
-		}
+
 		attrString := strings.Join(
 			lo.MapToSlice(attr, func(k, v string) string { return fmt.Sprintf("%s=%q", k, v) }), ",")
 

@@ -652,6 +652,7 @@ func (h *flannelHost) ToService(upstream *model.Link, dst model.Endpoint, protoc
 			Level:   model.SuspicionLevelFatal,
 			Message: fmt.Sprintf("service %s/%s has no valid endpoint", service.Namespace, service.Name),
 		})
+		h.netNode.DoAction(model.ActionService(upstream, []*model.Link{}))
 		return nil, &assertions.CannotBuildTransmissionError{
 			SrcNode: h.netNode,
 			Err:     fmt.Errorf("service %s/%s has no valid endpoint", service.Namespace, service.Name),
