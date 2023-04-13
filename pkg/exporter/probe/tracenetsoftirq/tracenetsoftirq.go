@@ -20,7 +20,7 @@ import (
 	"golang.org/x/exp/slog"
 )
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -cflags $BPF_CFLAGS -type insp_softirq_event_t bpf ../../../bpf/net_softirq.c -- -I../../../bpf/headers -D__TARGET_ARCH_x86
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -cflags $BPF_CFLAGS -type insp_softirq_event_t bpf ../../../../bpf/net_softirq.c -- -I../../../../bpf/headers -D__TARGET_ARCH_x86
 const (
 	NETSOFTIRQ_SCHED_SLOW   = "net_softirq_schedslow"       //nolint
 	NETSOFTIRQ_SCHED_100MS  = "net_softirq_schedslow100ms"  //nolint

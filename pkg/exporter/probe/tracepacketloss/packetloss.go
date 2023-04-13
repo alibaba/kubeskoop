@@ -22,7 +22,7 @@ import (
 	"golang.org/x/exp/slog"
 )
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -cflags $BPF_CFLAGS -type insp_pl_event_t -type insp_pl_metric_t bpf ../../../bpf/packetloss.c -- -I../../../bpf/headers -D__TARGET_ARCH_x86
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -cflags $BPF_CFLAGS -type insp_pl_event_t -type insp_pl_metric_t bpf ../../../../bpf/packetloss.c -- -I../../../../bpf/headers -D__TARGET_ARCH_x86
 
 // nolint
 const (

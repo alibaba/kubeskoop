@@ -31,13 +31,15 @@ spec:
       hostIPC: true
       initContainers:
         - name: inspector-prepare
-          image: registry.cn-hangzhou.aliyuncs.com/acs/btfhack:4.19
+          image: registry.cn-hangzhou.aliyuncs.com/acs/btfhack:latest
           volumeMounts:
             - name: btf-rawdata
               mountPath: /etc/net-exporter/btf
-          command: [btfhack, cp, -s, /etc/btf/, -d ,/etc/net-exporter/btf/]
+            - mountPath: /boot/
+              name: boot
+          command: [btfhack, discover,-p ,/etc/net-exporter/btf/]
       containers:
-      - image: "registry.cn-hangzhou.aliyuncs.com/acs/inspector:v0.1.0-10-gf754515-aliyun"
+      - image: "registry.cn-hangzhou.aliyuncs.com/acs/inspector:v0.2.0-5-gc619fc9-aliyun"
         name: inspector
         env:
         - name: INSPECTOR_NODENAME

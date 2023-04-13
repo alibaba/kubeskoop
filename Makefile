@@ -18,6 +18,9 @@ fmt:
 vet: ## Run go vet against code.
 	go vet ./...
 
+build-exporter:
+	go build -o inspector ./cmd/exporter/
+
 build: ## build kubeskoop image
 	docker build -t $(SKOOP_REPO):$(TAG) .
 

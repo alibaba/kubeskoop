@@ -3,3 +3,4 @@ cmd/exporter/exporter
 
 .idea
 .vscode
+pkg/exporter/proto/github.com/alibaba/kubeskoop/proto/inspector_grpc.pb.go
