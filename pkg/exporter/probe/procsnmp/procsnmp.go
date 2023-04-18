@@ -58,7 +58,7 @@ const (
 	IPInNoRoutes      = "InNoRoutes"
 	IPInTruncatedPkts = "InTruncatedPkts"
 
-	MODULE_NAME = "procsnmp" // nolint
+	ModuleName = "procsnmp" // nolint
 )
 
 var (
@@ -96,7 +96,7 @@ func (s *ProcSNMP) Ready() bool {
 }
 
 func (s *ProcSNMP) Name() string {
-	return MODULE_NAME
+	return ModuleName
 }
 
 func (s *ProcSNMP) GetMetricNames() []string {
@@ -116,7 +116,7 @@ func (s *ProcSNMP) GetMetricNames() []string {
 func (s *ProcSNMP) Collect(ctx context.Context) (map[string]map[uint32]uint64, error) {
 	ets := nettop.GetAllEntity()
 	if len(ets) == 0 {
-		slog.Ctx(ctx).Info("collect", "mod", MODULE_NAME, "ignore", "no entity found")
+		slog.Ctx(ctx).Info("collect", "mod", ModuleName, "ignore", "no entity found")
 	}
 	return collect(ctx, ets)
 }

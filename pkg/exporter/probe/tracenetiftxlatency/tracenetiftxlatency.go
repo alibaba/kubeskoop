@@ -32,7 +32,7 @@ const (
 )
 
 var (
-	MODULE_NAME = "insp_netiftxlat" // nolint
+	ModuleName = "insp_netiftxlat" // nolint
 
 	probe      = &NetifTxlatencyProbe{once: sync.Once{}}
 	links      = []link.Link{}
@@ -61,7 +61,7 @@ type NetifTxlatencyProbe struct {
 }
 
 func (p *NetifTxlatencyProbe) Name() string {
-	return MODULE_NAME
+	return ModuleName
 }
 
 func (p *NetifTxlatencyProbe) Start(ctx context.Context) {
@@ -69,15 +69,20 @@ func (p *NetifTxlatencyProbe) Start(ctx context.Context) {
 	p.once.Do(func() {
 		err := start()
 		if err != nil {
-			slog.Ctx(ctx).Warn("start", "module", MODULE_NAME, "err", err)
+			slog.Ctx(ctx).Warn("start", "module", ModuleName, "err", err)
 			return
 		}
 		p.enable = true
 	})
 
-	slog.Debug("start probe", "module", MODULE_NAME)
+	if !p.enable {
+		// if load failed, do nat start process
+		return
+	}
+
+	slog.Debug("start probe", "module", ModuleName)
 	if perfReader == nil {
-		slog.Ctx(ctx).Warn("start", "module", MODULE_NAME, "err", "perf reader not ready")
+		slog.Ctx(ctx).Warn("start", "module", ModuleName, "err", "perf reader not ready")
 		return
 	}
 	// 开始针对perf事件进行读取
@@ -85,15 +90,15 @@ func (p *NetifTxlatencyProbe) Start(ctx context.Context) {
 		record, err := perfReader.Read()
 		if err != nil {
 			if errors.Is(err, ringbuf.ErrClosed) {
-				slog.Ctx(ctx).Info("received signal, exiting..", "module", MODULE_NAME)
+				slog.Ctx(ctx).Info("received signal, exiting..", "module", ModuleName)
 				return
 			}
-			slog.Ctx(ctx).Info("reading from reader", "module", MODULE_NAME, "err", err)
+			slog.Ctx(ctx).Info("reading from reader", "module", ModuleName, "err", err)
 			continue
 		}
 
 		if record.LostSamples != 0 {
-			slog.Ctx(ctx).Info("Perf event ring buffer full", "module", MODULE_NAME, "drop samples", record.LostSamples)
+			slog.Ctx(ctx).Info("Perf event ring buffer full", "module", ModuleName, "drop samples", record.LostSamples)
 			continue
 		}
 
@@ -101,7 +106,7 @@ func (p *NetifTxlatencyProbe) Start(ctx context.Context) {
 		var event bpfInspNftxlatEventT
 		// Parse the ringbuf event entry into a bpfEvent structure.
 		if err := binary.Read(bytes.NewBuffer(record.RawSample), binary.LittleEndian, &event); err != nil {
-			slog.Ctx(ctx).Info("parsing event", "module", MODULE_NAME, "err", err)
+			slog.Ctx(ctx).Info("parsing event", "module", ModuleName, "err", err)
 			continue
 		}
 
@@ -124,7 +129,7 @@ func (p *NetifTxlatencyProbe) Start(ctx context.Context) {
 
 		// 分发给注册的dispatcher，其余逻辑由框架完成
 		if p.sub != nil {
-			slog.Ctx(ctx).Debug("broadcast event", "module", MODULE_NAME)
+			slog.Ctx(ctx).Debug("broadcast event", "module", ModuleName)
 			p.sub <- rawevt
 		}
 	}

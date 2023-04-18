@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+
 	"sync"
 	"time"
 
@@ -60,12 +61,12 @@ func NewEServer(ctx context.Context, config EventConfig) *EServer {
 	// handle grafana loki ingester preparation
 	if config.LokiEnable && config.LokiAddress != "" {
 		datach := make(chan proto.RawEvent)
-		ingester, err := lokiwrapper.NewIngester(config.LokiAddress, nettop.GetNodeName(), datach)
+		ingester, err := lokiwrapper.NewLokiIngester(ctx, config.LokiAddress, nettop.GetNodeName())
 		if err != nil {
 			slog.Ctx(ctx).Info("new loki ingester", "err", err, "client", ingester.Name())
 		} else {
 			es.subscribe(ingester.Name(), datach)
-			go ingester.Watch(ctx)
+			go ingester.Watch(ctx, datach)
 		}
 
 	}
@@ -161,6 +162,10 @@ func (e *EServer) broadcast(evt proto.RawEvent) error {
 
 		done <- struct{}{}
 	}(workdone)
+
+	if e.config.InfoToLog {
+		slog.Ctx(e.ctx).Warn("broadcast event", "type", evt.EventType, "body", evt.EventBody, "netns", evt.Netns)
+	}
 
 	select {
 	case <-ctx.Done():

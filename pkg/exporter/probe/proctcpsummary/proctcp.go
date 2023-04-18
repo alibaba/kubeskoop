@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+
 	"io"
 	"net"
 	"os"
@@ -17,22 +18,24 @@ import (
 )
 
 const (
-	MODULE_NAME = "proctcpsummary" // nolint
+	ModuleName = "proctcpsummary"
 
 	TCPEstablishedConn = "tcpsummarytcpestablishedconn"
 	TCPTimewaitConn    = "tcpsummarytcptimewaitconn"
 	TCPTXQueue         = "tcpsummarytcptxqueue"
 	TCPRXQueue         = "tcpsummarytcprxqueue"
+	TCPListenBacklog   = "tcpsummarytcplistenbacklog"
 
 	// st mapping of tcp state
-	/*TCP_ESTABLISHED:1   TCP_SYN_SENT:2
+	/*TCPEstablished:1   TCP_SYN_SENT:2
 	TCP_SYN_RECV:3      TCP_FIN_WAIT1:4
-	TCP_FIN_WAIT2:5     TCP_TIME_WAIT:6
+	TCP_FIN_WAIT2:5     TCPTimewait:6
 	TCP_CLOSE:7         TCP_CLOSE_WAIT:8
-	TCP_LAST_ACL:9      TCP_LISTEN:10
+	TCP_LAST_ACL:9      TCPListen:10
 	TCP_CLOSING:11*/
-	TCP_ESTABLISHED = uint64(1) // nolint
-	TCP_TIME_WAIT   = uint64(6) // nolint
+	TCPEstablished = uint64(1)
+	TCPTimewait    = uint64(6)
+	TCPListen      = uint64(10)
 
 	readLimit = 4294967296 // Byte -> 4 GiB
 )
@@ -92,7 +95,7 @@ func (s *ProcTCP) Ready() bool {
 }
 
 func (s *ProcTCP) Name() string {
-	return MODULE_NAME
+	return ModuleName
 }
 
 func (s *ProcTCP) GetMetricNames() []string {
@@ -102,7 +105,7 @@ func (s *ProcTCP) GetMetricNames() []string {
 func (s *ProcTCP) Collect(ctx context.Context) (map[string]map[uint32]uint64, error) {
 	ets := nettop.GetAllEntity()
 	if len(ets) == 0 {
-		slog.Ctx(ctx).Info("collect", "mod", MODULE_NAME, "ignore", "no entity found")
+		slog.Ctx(ctx).Info("collect", "mod", ModuleName, "ignore", "no entity found")
 	}
 	return collect(ctx, ets), nil
 }
@@ -117,12 +120,12 @@ func collect(ctx context.Context, pidlist []*nettop.Entity) map[string]map[uint3
 	for idx := range pidlist {
 		summary, err := newNetTCP(fmt.Sprintf("/proc/%d/net/tcp", pidlist[idx].GetPid()))
 		if err != nil {
-			slog.Ctx(ctx).Warn("collect tcp", "mod", MODULE_NAME, "err", err, "pid", pidlist[idx])
+			slog.Ctx(ctx).Warn("collect tcp", "mod", ModuleName, "err", err, "pid", pidlist[idx])
 			continue
 		}
 		summary6, err := newNetTCP(fmt.Sprintf("/proc/%d/net/tcp6", pidlist[idx].GetPid()))
 		if err != nil {
-			slog.Ctx(ctx).Warn("collect tcp6", "mod", MODULE_NAME, "err", err, "pid", pidlist[idx])
+			slog.Ctx(ctx).Warn("collect tcp6", "mod", ModuleName, "err", err, "pid", pidlist[idx])
 			continue
 		}
 		est, tw := summary.getEstTwCount()
@@ -141,9 +144,9 @@ func collect(ctx context.Context, pidlist []*nettop.Entity) map[string]map[uint3
 
 func (n NetTCP) getEstTwCount() (est uint64, tw uint64) {
 	for idx := range n {
-		if n[idx].St == TCP_ESTABLISHED {
+		if n[idx].St == TCPEstablished {
 			est++
-		} else if n[idx].St == TCP_TIME_WAIT {
+		} else if n[idx].St == TCPTimewait {
 			tw++
 		}
 	}
@@ -152,8 +155,10 @@ func (n NetTCP) getEstTwCount() (est uint64, tw uint64) {
 
 func (n NetTCP) getTxRxQueueLength() (tx uint64, rx uint64) {
 	for idx := range n {
-		tx += n[idx].TxQueue
-		rx += n[idx].RxQueue
+		if n[idx].St != TCPListen {
+			tx += n[idx].TxQueue
+			rx += n[idx].RxQueue
+		}
 	}
 	return tx, rx
 }

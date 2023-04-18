@@ -677,16 +677,16 @@ func (f *Framework) listE2EService() ([]v1.Service, error) {
 	return svc.Items, nil
 }
 
-func (f *Framework) getPodFromID(id string) *v1.Pod {
-	for _, n := range f.spec.NodeSpecs {
-		for _, p := range n.PodSpecs {
-			if p.ID == id {
-				return p.pod
-			}
-		}
-	}
-	return nil
-}
+// func (f *Framework) getPodFromID(id string) *v1.Pod {
+// 	for _, n := range f.spec.NodeSpecs {
+// 		for _, p := range n.PodSpecs {
+// 			if p.ID == id {
+// 				return p.pod
+// 			}
+// 		}
+// 	}
+// 	return nil
+// }
 
 func (f *Framework) createPodTemplateFromPodSpec(spec *PodSpec, nodeName string) (*v1.Pod, error) {
 	aliveCommand := "sleep 30d"
@@ -760,7 +760,7 @@ func (f *Framework) RestConfig() *rest.Config {
 }
 
 func createPodTemplateFromNodeSpec(spec *NodeSpec) (*v1.Pod, error) {
-	aliveCommand := "sleep 30d"
+	var aliveCommand string
 	switch spec.ListenProtocol {
 	default:
 		aliveCommand = fmt.Sprintf("nc -l %d", spec.Listen)

@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+
 	"math/bits"
 	"sync"
 	"syscall"
@@ -33,10 +34,10 @@ const (
 )
 
 var (
-	MODULE_NAME = "insp_tcpreset" // nolint
-	objs        = bpfObjects{}
-	probe       = &TCPResetProbe{once: sync.Once{}, mtx: sync.Mutex{}}
-	links       = []link.Link{}
+	ModuleName = "insp_tcpreset" // nolint
+	objs       = bpfObjects{}
+	probe      = &TCPResetProbe{once: sync.Once{}, mtx: sync.Mutex{}}
+	links      = []link.Link{}
 
 	events = []string{TCPRESET_NOSOCK, TCPRESET_ACTIVE, TCPRESET_PROCESS, TCPRESET_RECEIVE}
 )
@@ -53,7 +54,7 @@ type TCPResetProbe struct {
 }
 
 func (p *TCPResetProbe) Name() string {
-	return MODULE_NAME
+	return ModuleName
 }
 
 func (p *TCPResetProbe) Ready() bool {
@@ -87,15 +88,20 @@ func (p *TCPResetProbe) Start(ctx context.Context) {
 	p.once.Do(func() {
 		err := loadSync()
 		if err != nil {
-			slog.Ctx(ctx).Warn("start", "module", MODULE_NAME, "err", err)
+			slog.Ctx(ctx).Warn("start", "module", ModuleName, "err", err)
 			return
 		}
 		p.enable = true
 	})
 
+	if !p.enable {
+		// if load failed, do not start process
+		return
+	}
+
 	reader, err := perf.NewReader(objs.bpfMaps.InspTcpresetEvents, int(unsafe.Sizeof(bpfInspTcpresetEventT{})))
 	if err != nil {
-		slog.Ctx(ctx).Warn("start new perf reader", "module", MODULE_NAME, "err", err)
+		slog.Ctx(ctx).Warn("start new perf reader", "module", ModuleName, "err", err)
 		return
 	}
 
@@ -103,21 +109,21 @@ func (p *TCPResetProbe) Start(ctx context.Context) {
 		record, err := reader.Read()
 		if err != nil {
 			if errors.Is(err, ringbuf.ErrClosed) {
-				slog.Ctx(ctx).Info("received signal, exiting..", "module", MODULE_NAME)
+				slog.Ctx(ctx).Info("received signal, exiting..", "module", ModuleName)
 				return
 			}
-			slog.Ctx(ctx).Info("reading from reader", "module", MODULE_NAME, "err", err)
+			slog.Ctx(ctx).Info("reading from reader", "module", ModuleName, "err", err)
 			continue
 		}
 
 		if record.LostSamples != 0 {
-			slog.Ctx(ctx).Info("Perf event ring buffer full", "module", MODULE_NAME, "drop samples", record.LostSamples)
+			slog.Ctx(ctx).Info("Perf event ring buffer full", "module", ModuleName, "drop samples", record.LostSamples)
 			continue
 		}
 
 		var event bpfInspTcpresetEventT
 		if err := binary.Read(bytes.NewBuffer(record.RawSample), binary.LittleEndian, &event); err != nil {
-			slog.Ctx(ctx).Info("parsing event", "module", MODULE_NAME, "err", err)
+			slog.Ctx(ctx).Info("parsing event", "module", ModuleName, "err", err)
 			continue
 		}
 
@@ -141,7 +147,7 @@ func (p *TCPResetProbe) Start(ctx context.Context) {
 		case 8:
 			rawevt.EventType = TCPRESET_RECEIVE
 		default:
-			slog.Ctx(ctx).Info("parsing event", "module", MODULE_NAME, "ignore", event)
+			slog.Ctx(ctx).Info("parsing event", "module", ModuleName, "ignore", event)
 		}
 
 		rawevt.Netns = event.SkbMeta.Netns
@@ -153,7 +159,7 @@ func (p *TCPResetProbe) Start(ctx context.Context) {
 		stateStr := bpfutil.GetSkcStateStr(event.State)
 		rawevt.EventBody = fmt.Sprintf("%s state:%s ", tuple, stateStr)
 		if p.sub != nil {
-			slog.Ctx(ctx).Debug("broadcast event", "module", MODULE_NAME)
+			slog.Ctx(ctx).Debug("broadcast event", "module", ModuleName)
 			p.sub <- rawevt
 		}
 	}

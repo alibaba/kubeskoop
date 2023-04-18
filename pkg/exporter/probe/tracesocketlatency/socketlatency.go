@@ -26,7 +26,7 @@ import (
 
 // nolint
 const (
-	MODULE_NAME = "insp_socketlatency" // nolint
+	ModuleName = "insp_socketlatency" // nolint
 
 	SOCKETLAT_READSLOW = "SOCKETLAT_READSLOW"
 	SOCKETLAT_SENDSLOW = "SOCKETLAT_SENDSLOW"
@@ -75,7 +75,7 @@ type SocketLatencyProbe struct {
 }
 
 func (p *SocketLatencyProbe) Name() string {
-	return MODULE_NAME
+	return ModuleName
 }
 
 func (p *SocketLatencyProbe) Ready() bool {
@@ -121,11 +121,16 @@ func (p *SocketLatencyProbe) Start(ctx context.Context) {
 	p.once.Do(func() {
 		err := loadSync()
 		if err != nil {
-			slog.Ctx(ctx).Warn("start", "module", MODULE_NAME, "err", err)
+			slog.Ctx(ctx).Warn("start", "module", ModuleName, "err", err)
 			return
 		}
 		p.enable = true
 	})
+
+	if !p.enable {
+		// if load failed, do nat start process
+		return
+	}
 
 	p.startEventPoll(ctx)
 }
@@ -136,7 +141,7 @@ func (p *SocketLatencyProbe) Collect(_ context.Context) (map[string]map[uint32]u
 		res[mtr] = map[uint32]uint64{}
 	}
 	// 从map中获取数据
-	m, err := bpfutil.MustLoadPin(MODULE_NAME)
+	m, err := bpfutil.MustLoadPin(ModuleName)
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +180,7 @@ func (p *SocketLatencyProbe) Collect(_ context.Context) (map[string]map[uint32]u
 func (p *SocketLatencyProbe) startEventPoll(ctx context.Context) {
 	reader, err := perf.NewReader(objs.bpfMaps.InspSklatEvents, int(unsafe.Sizeof(bpfInspSklatEventT{})))
 	if err != nil {
-		slog.Ctx(ctx).Warn("start new perf reader", "module", MODULE_NAME, "err", err)
+		slog.Ctx(ctx).Warn("start new perf reader", "module", ModuleName, "err", err)
 		return
 	}
 
@@ -183,21 +188,21 @@ func (p *SocketLatencyProbe) startEventPoll(ctx context.Context) {
 		record, err := reader.Read()
 		if err != nil {
 			if errors.Is(err, ringbuf.ErrClosed) {
-				slog.Ctx(ctx).Info("received signal, exiting..", "module", MODULE_NAME)
+				slog.Ctx(ctx).Info("received signal, exiting..", "module", ModuleName)
 				return
 			}
-			slog.Ctx(ctx).Info("reading from reader", "module", MODULE_NAME, "err", err)
+			slog.Ctx(ctx).Info("reading from reader", "module", ModuleName, "err", err)
 			continue
 		}
 
 		if record.LostSamples != 0 {
-			slog.Ctx(ctx).Info("Perf event ring buffer full", "module", MODULE_NAME, "drop samples", record.LostSamples)
+			slog.Ctx(ctx).Info("Perf event ring buffer full", "module", ModuleName, "drop samples", record.LostSamples)
 			continue
 		}
 
 		var event bpfInspSklatEventT
 		if err := binary.Read(bytes.NewBuffer(record.RawSample), binary.LittleEndian, &event); err != nil {
-			slog.Ctx(ctx).Info("parsing event", "module", MODULE_NAME, "err", err)
+			slog.Ctx(ctx).Info("parsing event", "module", ModuleName, "err", err)
 			continue
 		}
 		// filter netlink/unixsock/tproxy packet
@@ -220,7 +225,7 @@ func (p *SocketLatencyProbe) startEventPoll(ctx context.Context) {
 		tuple := fmt.Sprintf("protocol=%s saddr=%s sport=%d daddr=%s dport=%d ", bpfutil.GetProtoStr(event.Tuple.L4Proto), bpfutil.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Saddr))), bits.ReverseBytes16(event.Tuple.Sport), bpfutil.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Daddr))), bits.ReverseBytes16(event.Tuple.Dport))
 		rawevt.EventBody = fmt.Sprintf("%s latency=%s", tuple, bpfutil.GetHumanTimes(event.Latency))
 		if p.sub != nil {
-			slog.Ctx(ctx).Debug("broadcast event", "module", MODULE_NAME)
+			slog.Ctx(ctx).Debug("broadcast event", "module", ModuleName)
 			p.sub <- rawevt
 		}
 	}
@@ -280,9 +285,9 @@ func loadSync() error {
 	}
 	links = append(links, linkdestroy)
 
-	err = bpfutil.MustPin(objs.InspSklatMetric, MODULE_NAME)
+	err = bpfutil.MustPin(objs.InspSklatMetric, ModuleName)
 	if err != nil {
-		return fmt.Errorf("pin map %s failed: %s", MODULE_NAME, err.Error())
+		return fmt.Errorf("pin map %s failed: %s", ModuleName, err.Error())
 	}
 
 	return nil

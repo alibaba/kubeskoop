@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+
 	"io"
 	"os"
 	"strconv"
@@ -19,7 +20,7 @@ const (
 	SNProcessed = "Processed"
 	SNDropped   = "Dropped"
 
-	MODULE_NAME = "procsoftnet" // nolint
+	ModuleName = "procsoftnet"
 )
 
 var (
@@ -46,15 +47,14 @@ func (s *ProcSoftnet) Start(_ context.Context) {
 }
 
 func (s *ProcSoftnet) Ready() bool {
-	// determine by if default snmp file was ready
-	if _, err := os.Stat("/proc/net/snmp"); os.IsNotExist(err) {
+	if _, err := os.Stat("/proc/net/softnet"); os.IsNotExist(err) {
 		return false
 	}
 	return true
 }
 
 func (s *ProcSoftnet) Name() string {
-	return MODULE_NAME
+	return ModuleName
 }
 
 func (s *ProcSoftnet) GetMetricNames() []string {
@@ -68,7 +68,7 @@ func (s *ProcSoftnet) GetMetricNames() []string {
 func (s *ProcSoftnet) Collect(ctx context.Context) (map[string]map[uint32]uint64, error) {
 	ets := nettop.GetAllEntity()
 	if len(ets) == 0 {
-		slog.Ctx(ctx).Info("collect", "mod", MODULE_NAME, "ignore", "no entity found")
+		slog.Ctx(ctx).Info("collect", "mod", ModuleName, "ignore", "no entity found")
 	}
 	return collect(ctx, ets)
 }

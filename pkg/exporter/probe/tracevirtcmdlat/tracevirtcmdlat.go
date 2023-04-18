@@ -23,7 +23,7 @@ import (
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -cflags $BPF_CFLAGS -type insp_virtcmdlat_event_t  bpf ../../../../bpf/virtcmdlatency.c -- -I../../../../bpf/headers -D__TARGET_ARCH_x86
 
 const (
-	MODULE_NAME = "insp_virtcmdlatency" // nolint
+	ModuleName = "insp_virtcmdlatency" // nolint
 
 	VIRTCMD100MS  = "virtcmdlatency100ms"
 	VIRTCMD       = "virtcmdlatency"
@@ -62,7 +62,7 @@ type VirtcmdLatencyProbe struct {
 }
 
 func (p *VirtcmdLatencyProbe) Name() string {
-	return MODULE_NAME
+	return ModuleName
 }
 
 func (p *VirtcmdLatencyProbe) Ready() bool {
@@ -108,15 +108,20 @@ func (p *VirtcmdLatencyProbe) Start(ctx context.Context) {
 	p.once.Do(func() {
 		err := loadSync()
 		if err != nil {
-			slog.Ctx(ctx).Warn("start", "module", MODULE_NAME, "err", err)
+			slog.Ctx(ctx).Warn("start", "module", ModuleName, "err", err)
 			return
 		}
 		p.enable = true
 	})
 
+	if !p.enable {
+		// if load failed, do nat start process
+		return
+	}
+
 	reader, err := perf.NewReader(objs.bpfMaps.InspVirtcmdlatEvents, int(unsafe.Sizeof(bpfInspVirtcmdlatEventT{})))
 	if err != nil {
-		slog.Ctx(ctx).Warn("start new perf reader", "module", MODULE_NAME, "err", err)
+		slog.Ctx(ctx).Warn("start new perf reader", "module", ModuleName, "err", err)
 		return
 	}
 
@@ -124,21 +129,21 @@ func (p *VirtcmdLatencyProbe) Start(ctx context.Context) {
 		record, err := reader.Read()
 		if err != nil {
 			if errors.Is(err, ringbuf.ErrClosed) {
-				slog.Ctx(ctx).Info("received signal, exiting..", "module", MODULE_NAME)
+				slog.Ctx(ctx).Info("received signal, exiting..", "module", ModuleName)
 				return
 			}
-			slog.Ctx(ctx).Info("reading from reader", "module", MODULE_NAME, "err", err)
+			slog.Ctx(ctx).Info("reading from reader", "module", ModuleName, "err", err)
 			continue
 		}
 
 		if record.LostSamples != 0 {
-			slog.Ctx(ctx).Info("Perf event ring buffer full", "module", MODULE_NAME, "drop samples", record.LostSamples)
+			slog.Ctx(ctx).Info("Perf event ring buffer full", "module", ModuleName, "drop samples", record.LostSamples)
 			continue
 		}
 
 		var event bpfInspVirtcmdlatEventT
 		if err := binary.Read(bytes.NewBuffer(record.RawSample), binary.LittleEndian, &event); err != nil {
-			slog.Ctx(ctx).Info("parsing event", "module", MODULE_NAME, "err", err)
+			slog.Ctx(ctx).Info("parsing event", "module", ModuleName, "err", err)
 			continue
 		}
 
@@ -155,7 +160,7 @@ func (p *VirtcmdLatencyProbe) Start(ctx context.Context) {
 
 		rawevt.EventBody = fmt.Sprintf("cpu=%d  pid=%d  latency=%s", event.Cpu, event.Pid, bpfutil.GetHumanTimes(event.Latency))
 		if p.sub != nil {
-			slog.Ctx(ctx).Debug("broadcast event", "module", MODULE_NAME)
+			slog.Ctx(ctx).Debug("broadcast event", "module", ModuleName)
 			p.sub <- rawevt
 		}
 	}

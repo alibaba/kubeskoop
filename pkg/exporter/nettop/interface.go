@@ -1,6 +1,10 @@
 package nettop
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/vishvananda/netns"
+)
 
 var (
 	InitNetns = 0
@@ -21,6 +25,15 @@ func GetEntityByNetns(nsinum int) (*Entity, error) {
 
 func GetHostnetworlEntity() (*Entity, error) {
 	return GetEntityByPid(1)
+}
+
+func GetHostnetworkNetnsFd() (int, error) {
+	nsh, err := netns.GetFromPid(1)
+	if err != nil {
+		return 0, err
+	}
+
+	return int(nsh), nil
 }
 
 func GetEntityByPod(sandbox string) (*Entity, error) {
@@ -44,7 +57,12 @@ func GetAllEntity() []*Entity {
 
 	res := []*Entity{}
 	for _, item := range v {
-		res = append(res, item.Object.(*Entity))
+		et := item.Object.(*Entity)
+		// filter unknow netns, such as extra test netns created by cni-plugin, cilium/calico etc..
+		if et == nil || et.GetPodName() == "unknow" {
+			continue
+		}
+		res = append(res, et)
 	}
 
 	return res

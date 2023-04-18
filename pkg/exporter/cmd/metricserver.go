@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+
 	"strings"
 	"time"
 
@@ -10,9 +11,13 @@ import (
 	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
 	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
 	"github.com/patrickmn/go-cache"
-
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/exp/slog"
+)
+
+const (
+	MetricLabelMeta  = "meta"
+	MetricLabelLabel = "label"
 )
 
 var (
@@ -51,6 +56,9 @@ func NewMServer(ctx context.Context, config MetricConfig) *MServer {
 		slog.Ctx(ctx).Debug("new mserver add subject", "subject", p)
 	}
 
+	ms.additionalLabels = validateExposeLabels(ms.config.ExposeLabels)
+	slog.Default().Debug("metric config", "config", ms.additionalLabels)
+
 	for sub, mp := range ms.probes {
 		mnames := mp.GetMetricNames()
 		for _, mname := range mnames {
@@ -59,7 +67,7 @@ func NewMServer(ctx context.Context, config MetricConfig) *MServer {
 			}
 			slog.Ctx(ctx).Debug("new mserver add desc", "probe", mp.Name(), "subject", sub, "metric", mname)
 			if ms.config.Verbose {
-				ms.descs[mname] = getDescOfMetricVerbose(sub, mname)
+				ms.descs[mname] = getDescOfMetricVerbose(sub, mname, ms.additionalLabels)
 			} else {
 				ms.descs[mname] = getDescOfMetric(sub, mname)
 			}
@@ -76,12 +84,13 @@ func NewMServer(ctx context.Context, config MetricConfig) *MServer {
 }
 
 type MServer struct {
-	ctx         context.Context
-	descs       map[string]*prometheus.Desc
-	config      MetricConfig
-	metricCache *cache.Cache
-	probes      map[string]proto.MetricProbe
-	loopctrl    chan struct{}
+	ctx              context.Context
+	descs            map[string]*prometheus.Desc
+	config           MetricConfig
+	metricCache      *cache.Cache
+	probes           map[string]proto.MetricProbe
+	loopctrl         chan struct{}
+	additionalLabels []ExposeLabel
 }
 
 // Close if cache process loop exited, close the metric server will be stuck, check is first
@@ -111,11 +120,36 @@ func (s *MServer) Collect(ch chan<- prometheus.Metric) {
 				continue
 			}
 			slog.Ctx(s.ctx).Debug("collect metric", "pod", et.GetPodName(), "netns", nsinum, "metric", mname, "value", value)
+			labelValues := []string{nettop.GetNodeName(), et.GetPodNamespace(), et.GetPodName()}
 			if s.config.Verbose {
-				ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(value), nettop.GetNodeName(), et.GetPodNamespace(), et.GetPodName(), fmt.Sprintf("ns%d", nsinum), et.GetIP(), et.GetAppLabel())
-			} else {
-				ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(value), nettop.GetNodeName(), et.GetPodNamespace(), et.GetPodName())
+				if len(s.additionalLabels) > 0 {
+					for _, label := range s.additionalLabels {
+						switch label.LabelType {
+						case "label":
+							if value, ok := et.GetLabel(label.Source); ok {
+								labelValues = append(labelValues, value)
+							} else {
+								labelValues = append(labelValues, "")
+							}
+						case "meta":
+							// support ip/netns now
+							value, err := et.GetMeta(label.Source)
+							if err != nil {
+								slog.Default().Info("get meta failed", "meta", label.Source)
+								labelValues = append(labelValues, "")
+							} else {
+								labelValues = append(labelValues, value)
+							}
+						default:
+							// unsupported exposed label will be empty string
+							slog.Default().Info("empty label set", "label", label.Source)
+							labelValues = append(labelValues, "")
+						}
+					}
+					slog.Default().Info("label values", "label", labelValues)
+				}
 			}
+			ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(value), labelValues...)
 		}
 	}
 }
@@ -219,11 +253,39 @@ func getDescOfMetric(mp, mname string) *prometheus.Desc {
 	)
 }
 
-func getDescOfMetricVerbose(mp, mname string) *prometheus.Desc {
+func getDescOfMetricVerbose(mp, mname string, additionalLabels []ExposeLabel) *prometheus.Desc {
+	labels := []string{"node", "namespace", "pod"}
+	if len(additionalLabels) > 0 {
+		for _, label := range additionalLabels {
+			slog.Info("build metric description", "additional label", label)
+			labels = append(labels, label.Replace)
+		}
+	}
 	return prometheus.NewDesc(
 		prometheus.BuildFQName("inspector", "pod", mname),
 		fmt.Sprintf("%s %s count in netns/pod", mp, mname),
-		[]string{"node", "namespace", "pod", "netns", "ip", "app"},
+		labels,
 		nil,
 	)
+}
+
+func validateExposeLabels(labels []ExposeLabel) []ExposeLabel {
+	res := []ExposeLabel{}
+	for _, label := range labels {
+		if label.LabelType != MetricLabelLabel && label.LabelType != MetricLabelMeta {
+			continue
+		}
+
+		if label.Source == "" {
+			continue
+		}
+
+		if label.Replace == "" {
+			label.Replace = label.Source
+		}
+
+		res = append(res, label)
+	}
+
+	return res
 }

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"io"
 	"os"
 	"strconv"
@@ -14,7 +15,6 @@ import (
 	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 
 	"github.com/prometheus/procfs"
-	"golang.org/x/exp/slog"
 )
 
 const (
@@ -24,7 +24,7 @@ const (
 	TCPSockeAlloc   = "Alloc"
 	TCPSockeMem     = "Mem"
 
-	MODULE_NAME = "procsock" // nolint
+	ModuleName = "procsock"
 )
 
 var (
@@ -52,7 +52,7 @@ func (s *ProcSock) Ready() bool {
 }
 
 func (s *ProcSock) Name() string {
-	return MODULE_NAME
+	return ModuleName
 }
 
 func (s *ProcSock) GetMetricNames() []string {
@@ -64,11 +64,7 @@ func (s *ProcSock) GetMetricNames() []string {
 }
 
 func (s *ProcSock) Collect(ctx context.Context) (map[string]map[uint32]uint64, error) {
-	ets := nettop.GetAllEntity()
-	if len(ets) == 0 {
-		slog.Ctx(ctx).Info("collect", "mod", MODULE_NAME, "ignore", "no entity found")
-	}
-	return collect(ctx, ets)
+	return collect(ctx)
 }
 
 func metricUniqueID(subject string, m string) string {
@@ -86,31 +82,86 @@ type tcpsockstat struct {
 	Mem    int
 }
 
-func collect(_ context.Context, nslist []*nettop.Entity) (resMap map[string]map[uint32]uint64, err error) {
+func collect(_ context.Context) (resMap map[string]map[uint32]uint64, err error) {
 	resMap = make(map[string]map[uint32]uint64)
 	for _, stat := range TCPSockStatMetrics {
 		resMap[metricUniqueID("sock", stat)] = map[uint32]uint64{}
 	}
 
-	for _, nslogic := range nslist {
-		skstat, err := getTcpSockstatByPid(uint32(nslogic.GetPid()))
-		if err != nil {
-			continue
-		}
-		nsinum := uint32(nslogic.GetNetns())
-		resMap[metricUniqueID("sock", TCPSockInuse)][nsinum] = uint64(skstat.InUse)
-		resMap[metricUniqueID("sock", TCPSockOrphan)][nsinum] = uint64(skstat.Orphan)
-		resMap[metricUniqueID("sock", TCPSockTimewait)][nsinum] = uint64(skstat.TW)
-		resMap[metricUniqueID("sock", TCPSockeAlloc)][nsinum] = uint64(skstat.Alloc)
-		resMap[metricUniqueID("sock", TCPSockeMem)][nsinum] = uint64(skstat.Mem)
+	// for _, nslogic := range nslist {
+	// 	skstat, err := getTcpSockstatByPid(uint32(nslogic.GetPid()))
+	// 	if err != nil {
+	// 		continue
+	// 	}
+	// 	nsinum := uint32(nslogic.GetNetns())
+	// 	resMap[metricUniqueID("sock", TCPSockInuse)][nsinum] = uint64(skstat.InUse)
+	// 	resMap[metricUniqueID("sock", TCPSockOrphan)][nsinum] = uint64(skstat.Orphan)
+	// 	resMap[metricUniqueID("sock", TCPSockTimewait)][nsinum] = uint64(skstat.TW)
+	// 	resMap[metricUniqueID("sock", TCPSockeAlloc)][nsinum] = uint64(skstat.Alloc)
+	// 	resMap[metricUniqueID("sock", TCPSockeMem)][nsinum] = uint64(skstat.Mem)
+	// }
+	skstat, err := getHostTCPSockstat()
+	if err != nil {
+		return resMap, err
 	}
+	nsinum := uint32(nettop.InitNetns)
+	resMap[metricUniqueID("sock", TCPSockInuse)][nsinum] = uint64(skstat.InUse)
+	resMap[metricUniqueID("sock", TCPSockOrphan)][nsinum] = uint64(skstat.Orphan)
+	resMap[metricUniqueID("sock", TCPSockTimewait)][nsinum] = uint64(skstat.TW)
+	resMap[metricUniqueID("sock", TCPSockeAlloc)][nsinum] = uint64(skstat.Alloc)
+	resMap[metricUniqueID("sock", TCPSockeMem)][nsinum] = uint64(skstat.Mem)
+
 	return
 }
 
 // getProcessTcpSockstat only fetch a process in an netns, just want tcp info
-func getTcpSockstatByPid(pid uint32) (tcpsockstat, error) { // nolint
+// func getTcpSockstatByPid(pid uint32) (tcpsockstat, error) {
+// 	res := tcpsockstat{}
+// 	data, err := ReadFileNoStat(fmt.Sprintf("/proc/%d/net/sockstat", pid))
+// 	if err != nil {
+// 		return res, err
+// 	}
+
+// 	stat, err := parseSockstat(bytes.NewReader(data))
+// 	if err != nil {
+// 		return res, err
+// 	}
+
+// 	for idx := range stat.Protocols {
+// 		if strings.Compare(stat.Protocols[idx].Protocol, "TCP") == 0 {
+// 			res.InUse = stat.Protocols[idx].InUse
+// 			res.Orphan = *stat.Protocols[idx].Orphan
+// 			res.Alloc = *stat.Protocols[idx].Alloc
+// 			res.TW = *stat.Protocols[idx].TW
+// 			res.Mem = *stat.Protocols[idx].Mem
+// 		}
+// 	}
+// 	data6, err := ReadFileNoStat(fmt.Sprintf("/proc/%d/net/sockstat6", pid))
+// 	if err != nil {
+// 		// if ipv6 stat not available, use ipv4 data directly
+// 		return res, nil
+// 	}
+
+// 	stat6, err := parseSockstat(bytes.NewReader(data6))
+// 	if err != nil {
+// 		return res, nil
+// 	}
+// 	for idx := range stat6.Protocols {
+// 		if strings.Compare(stat.Protocols[idx].Protocol, "TCP") == 0 {
+// 			res.InUse += stat.Protocols[idx].InUse
+// 			res.Orphan += *stat.Protocols[idx].Orphan
+// 			res.Alloc += *stat.Protocols[idx].Alloc
+// 			res.TW += *stat.Protocols[idx].TW
+// 			res.Mem += *stat.Protocols[idx].Mem
+// 		}
+// 	}
+
+// 	return res, nil
+// }
+
+func getHostTCPSockstat() (tcpsockstat, error) {
 	res := tcpsockstat{}
-	data, err := ReadFileNoStat(fmt.Sprintf("/proc/%d/net/sockstat", pid))
+	data, err := ReadFileNoStat("/proc/net/sockstat")
 	if err != nil {
 		return res, err
 	}
@@ -129,7 +180,7 @@ func getTcpSockstatByPid(pid uint32) (tcpsockstat, error) { // nolint
 			res.Mem = *stat.Protocols[idx].Mem
 		}
 	}
-	data6, err := ReadFileNoStat(fmt.Sprintf("/proc/%d/net/sockstat6", pid))
+	data6, err := ReadFileNoStat("/proc/net/sockstat6")
 	if err != nil {
 		// if ipv6 stat not available, use ipv4 data directly
 		return res, nil
