@@ -61,6 +61,7 @@ var (
 				insp.ctx = slog.NewContext(context.Background(), slog.New(opts.NewJSONHandler(os.Stderr)))
 			}
 
+			// nolint
 			go nettop.StartCache(insp.ctx)
 			defer nettop.StopCache()
 
@@ -210,6 +211,7 @@ func WaitSignals(ctx context.Context, sgs ...os.Signal) {
 }
 
 func defaulPage(w http.ResponseWriter, _ *http.Request) {
+	// nolint
 	w.Write([]byte(`<html>
 		<head><title>Net Exporter</title></head>
 		<body>
@@ -223,7 +225,7 @@ func (i *inspServer) configPage(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	rawText, _ := json.MarshalIndent(i.config, " ", "    ")
 	w.WriteHeader(http.StatusOK)
-	w.Write(rawText)
+	w.Write(rawText) // nolint
 }
 
 func status(w http.ResponseWriter, _ *http.Request) {
@@ -235,5 +237,5 @@ func status(w http.ResponseWriter, _ *http.Request) {
 		res[p.Name()] = p.Ready()
 	}
 	rawText, _ := json.Marshal(res)
-	w.Write(rawText)
+	w.Write(rawText) // nolint
 }

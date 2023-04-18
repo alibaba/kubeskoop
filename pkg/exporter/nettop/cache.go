@@ -27,15 +27,14 @@ type netnsMeta struct {
 }
 
 type podMeta struct {
-	name       string
-	namespace  string
-	sandbox    string
-	pid        int
-	nspath     string
-	app        string // app label from cri response
-	ip         string // ip addr from cri response
-	labels     map[string]string
-	containers map[string]string
+	name      string
+	namespace string
+	sandbox   string
+	pid       int
+	nspath    string
+	app       string // app label from cri response
+	ip        string // ip addr from cri response
+	labels    map[string]string
 }
 
 type Entity struct {

@@ -18,7 +18,10 @@ func MustPin(m *ebpf.Map, name string) error {
 
 	_, err := os.Stat(inspMapPath)
 	if os.IsNotExist(err) {
-		os.Mkdir(inspMapPath, 0755)
+		err = os.Mkdir(inspMapPath, 0755)
+		if err != nil {
+			return fmt.Errorf("create pin path failed with %s", err)
+		}
 	}
 
 	path := fmt.Sprintf("%s%s", inspMapPath, name)

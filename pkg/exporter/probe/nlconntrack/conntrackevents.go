@@ -160,26 +160,26 @@ func (p *NlConntrackProbe) startCtListen(ctx context.Context, ctrch <-chan struc
 	}
 }
 
-func getEventCh(ctx context.Context, nsinum int) (evCh chan conntrack.Event, errCh chan error, err error) {
-	c, err := conntrack.Dial(&netlink.Config{
-		NetNS: nsinum,
-	})
+// func getEventCh(ctx context.Context, nsinum int) (evCh chan conntrack.Event, errCh chan error, err error) {
+// 	c, err := conntrack.Dial(&netlink.Config{
+// 		NetNS: nsinum,
+// 	})
 
-	if err != nil {
-		slog.Ctx(ctx).Info("start conntrack dial", "err", err, "module", MODULE_NAME)
-		return
-	}
+// 	if err != nil {
+// 		slog.Ctx(ctx).Info("start conntrack dial", "err", err, "module", MODULE_NAME)
+// 		return
+// 	}
 
-	slog.Ctx(ctx).Info("start conntrack listen", "netns", nsinum, "module", MODULE_NAME)
-	evCh = make(chan conntrack.Event, 1024)
-	errCh, err = c.Listen(evCh, 4, append(netfilter.GroupsCT, netfilter.GroupsCTExp...))
-	if err != nil {
-		slog.Ctx(ctx).Info("start conntrack listen", "err", err, "module", MODULE_NAME)
-		return
-	}
+// 	slog.Ctx(ctx).Info("start conntrack listen", "netns", nsinum, "module", MODULE_NAME)
+// 	evCh = make(chan conntrack.Event, 1024)
+// 	errCh, err = c.Listen(evCh, 4, append(netfilter.GroupsCT, netfilter.GroupsCTExp...))
+// 	if err != nil {
+// 		slog.Ctx(ctx).Info("start conntrack listen", "err", err, "module", MODULE_NAME)
+// 		return
+// 	}
 
-	return
-}
+// 	return
+// }
 
 // Register register sub chan to get perf events
 func (p *NlConntrackProbe) Register(receiver chan<- proto.RawEvent) error {

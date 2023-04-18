@@ -105,11 +105,6 @@ type Ingester struct {
 	client    httpClient
 }
 
-func (i *Ingester) stopLoop() {
-	close(i.quit)
-	i.waitGroup.Wait()
-}
-
 func (i *Ingester) startLoop(ctx context.Context) {
 	var batch []*logproto.Entry
 	batchSize := 0

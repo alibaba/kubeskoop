@@ -81,6 +81,7 @@ func listEntities(slct ...selector) {
 			})
 		}
 	}
+	// nolint
 	pterm.DefaultTable.WithHasHeader().WithData(texts).Render()
 
 }
