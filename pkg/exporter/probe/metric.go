@@ -50,7 +50,7 @@ func init() {
 	availmprobes["qdisc"] = nlqdisc.GetProbe()
 }
 
-func ListMetricProbes(ctx context.Context, avail bool) (probelist []string) {
+func ListMetricProbes(_ context.Context, _ bool) (probelist []string) {
 	for k := range availmprobes {
 		probelist = append(probelist, k)
 	}

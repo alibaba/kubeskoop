@@ -24,7 +24,7 @@ const (
 	TCPSockeAlloc   = "Alloc"
 	TCPSockeMem     = "Mem"
 
-	MODULE_NAME = "procsock"
+	ModuleName = "procsock"
 )
 
 var (
@@ -52,13 +52,13 @@ func (s *ProcSock) Ready() bool {
 }
 
 func (s *ProcSock) Name() string {
-	return MODULE_NAME
+	return ModuleName
 }
 
 func (s *ProcSock) GetMetricNames() []string {
 	res := []string{}
 	for _, m := range TCPSockStatMetrics {
-		res = append(res, metricUniqueId("sock", m))
+		res = append(res, metricUniqueID("sock", m))
 	}
 	return res
 }
@@ -67,7 +67,7 @@ func (s *ProcSock) Collect(ctx context.Context) (map[string]map[uint32]uint64, e
 	return collect(ctx)
 }
 
-func metricUniqueId(subject string, m string) string {
+func metricUniqueID(subject string, m string) string {
 	return fmt.Sprintf("%s%s", subject, strings.ToLower(m))
 }
 
@@ -82,10 +82,10 @@ type tcpsockstat struct {
 	Mem    int
 }
 
-func collect(ctx context.Context) (resMap map[string]map[uint32]uint64, err error) {
+func collect(_ context.Context) (resMap map[string]map[uint32]uint64, err error) {
 	resMap = make(map[string]map[uint32]uint64)
 	for _, stat := range TCPSockStatMetrics {
-		resMap[metricUniqueId("sock", stat)] = map[uint32]uint64{}
+		resMap[metricUniqueID("sock", stat)] = map[uint32]uint64{}
 	}
 
 	// for _, nslogic := range nslist {
@@ -94,22 +94,22 @@ func collect(ctx context.Context) (resMap map[string]map[uint32]uint64, err erro
 	// 		continue
 	// 	}
 	// 	nsinum := uint32(nslogic.GetNetns())
-	// 	resMap[metricUniqueId("sock", TCPSockInuse)][nsinum] = uint64(skstat.InUse)
-	// 	resMap[metricUniqueId("sock", TCPSockOrphan)][nsinum] = uint64(skstat.Orphan)
-	// 	resMap[metricUniqueId("sock", TCPSockTimewait)][nsinum] = uint64(skstat.TW)
-	// 	resMap[metricUniqueId("sock", TCPSockeAlloc)][nsinum] = uint64(skstat.Alloc)
-	// 	resMap[metricUniqueId("sock", TCPSockeMem)][nsinum] = uint64(skstat.Mem)
+	// 	resMap[metricUniqueID("sock", TCPSockInuse)][nsinum] = uint64(skstat.InUse)
+	// 	resMap[metricUniqueID("sock", TCPSockOrphan)][nsinum] = uint64(skstat.Orphan)
+	// 	resMap[metricUniqueID("sock", TCPSockTimewait)][nsinum] = uint64(skstat.TW)
+	// 	resMap[metricUniqueID("sock", TCPSockeAlloc)][nsinum] = uint64(skstat.Alloc)
+	// 	resMap[metricUniqueID("sock", TCPSockeMem)][nsinum] = uint64(skstat.Mem)
 	// }
-	skstat, err := getHostTcpSockstat()
+	skstat, err := getHostTCPSockstat()
 	if err != nil {
 		return resMap, err
 	}
 	nsinum := uint32(nettop.InitNetns)
-	resMap[metricUniqueId("sock", TCPSockInuse)][nsinum] = uint64(skstat.InUse)
-	resMap[metricUniqueId("sock", TCPSockOrphan)][nsinum] = uint64(skstat.Orphan)
-	resMap[metricUniqueId("sock", TCPSockTimewait)][nsinum] = uint64(skstat.TW)
-	resMap[metricUniqueId("sock", TCPSockeAlloc)][nsinum] = uint64(skstat.Alloc)
-	resMap[metricUniqueId("sock", TCPSockeMem)][nsinum] = uint64(skstat.Mem)
+	resMap[metricUniqueID("sock", TCPSockInuse)][nsinum] = uint64(skstat.InUse)
+	resMap[metricUniqueID("sock", TCPSockOrphan)][nsinum] = uint64(skstat.Orphan)
+	resMap[metricUniqueID("sock", TCPSockTimewait)][nsinum] = uint64(skstat.TW)
+	resMap[metricUniqueID("sock", TCPSockeAlloc)][nsinum] = uint64(skstat.Alloc)
+	resMap[metricUniqueID("sock", TCPSockeMem)][nsinum] = uint64(skstat.Mem)
 
 	return
 }
@@ -159,7 +159,7 @@ func collect(ctx context.Context) (resMap map[string]map[uint32]uint64, err erro
 // 	return res, nil
 // }
 
-func getHostTcpSockstat() (tcpsockstat, error) {
+func getHostTCPSockstat() (tcpsockstat, error) {
 	res := tcpsockstat{}
 	data, err := ReadFileNoStat("/proc/net/sockstat")
 	if err != nil {

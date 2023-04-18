@@ -45,10 +45,10 @@ const (
 )
 
 var (
-	MODULE_NAME = "insp_kernellatency" // nolint
-	probe       = &KernelLatencyProbe{once: sync.Once{}, mtx: sync.Mutex{}}
-	objs        = bpfObjects{}
-	links       = []link.Link{}
+	ModuleName = "insp_kernellatency" // nolint
+	probe      = &KernelLatencyProbe{once: sync.Once{}, mtx: sync.Mutex{}}
+	objs       = bpfObjects{}
+	links      = []link.Link{}
 
 	events     = []string{RXKERNEL_SLOW, TXKERNEL_SLOW}
 	metrics    = []string{RXKERNEL_SLOW_METRIC, RXKERNEL_SLOW100MS_METRIC, TXKERNEL_SLOW_METRIC, TXKERNEL_SLOW100MS_METRIC}
@@ -73,7 +73,7 @@ type KernelLatencyProbe struct {
 }
 
 func (p *KernelLatencyProbe) Name() string {
-	return MODULE_NAME
+	return ModuleName
 }
 
 func (p *KernelLatencyProbe) Ready() bool {
@@ -118,7 +118,7 @@ func (p *KernelLatencyProbe) Start(ctx context.Context) {
 	p.once.Do(func() {
 		err := loadSync()
 		if err != nil {
-			slog.Ctx(ctx).Warn("start", "module", MODULE_NAME, "err", err)
+			slog.Ctx(ctx).Warn("start", "module", ModuleName, "err", err)
 			return
 		}
 		p.enable = true
@@ -144,7 +144,7 @@ func (p *KernelLatencyProbe) updateMetrics(netns uint32, metric string) {
 func (p *KernelLatencyProbe) startRX(ctx context.Context) {
 	reader, err := perf.NewReader(objs.bpfMaps.InspKlatencyEvent, int(unsafe.Sizeof(bpfInspKlEventT{})))
 	if err != nil {
-		slog.Ctx(ctx).Warn("start new perf reader", "module", MODULE_NAME, "err", err)
+		slog.Ctx(ctx).Warn("start new perf reader", "module", ModuleName, "err", err)
 		return
 	}
 
@@ -152,21 +152,21 @@ func (p *KernelLatencyProbe) startRX(ctx context.Context) {
 		record, err := reader.Read()
 		if err != nil {
 			if errors.Is(err, ringbuf.ErrClosed) {
-				slog.Ctx(ctx).Info("received signal, exiting..", "module", MODULE_NAME)
+				slog.Ctx(ctx).Info("received signal, exiting..", "module", ModuleName)
 				return
 			}
-			slog.Ctx(ctx).Info("reading from reader", "module", MODULE_NAME, "err", err)
+			slog.Ctx(ctx).Info("reading from reader", "module", ModuleName, "err", err)
 			continue
 		}
 
 		if record.LostSamples != 0 {
-			slog.Ctx(ctx).Info("Perf event ring buffer full", "module", MODULE_NAME, "drop samples", record.LostSamples)
+			slog.Ctx(ctx).Info("Perf event ring buffer full", "module", ModuleName, "drop samples", record.LostSamples)
 			continue
 		}
 
 		var event bpfInspKlEventT
 		if err := binary.Read(bytes.NewBuffer(record.RawSample), binary.LittleEndian, &event); err != nil {
-			slog.Ctx(ctx).Info("parsing event", "module", MODULE_NAME, "err", err)
+			slog.Ctx(ctx).Info("parsing event", "module", ModuleName, "err", err)
 			continue
 		}
 		rawevt := proto.RawEvent{
@@ -204,12 +204,12 @@ func (p *KernelLatencyProbe) startRX(ctx context.Context) {
 			rawevt.EventBody = fmt.Sprintf("%s %s", tuple, strings.Join(latency, " "))
 			p.updateMetrics(rawevt.Netns, TXKERNEL_SLOW_METRIC)
 		default:
-			slog.Ctx(ctx).Info("parsing event", "module", MODULE_NAME, "ignore", event)
+			slog.Ctx(ctx).Info("parsing event", "module", ModuleName, "ignore", event)
 			continue
 		}
 
 		if p.sub != nil {
-			slog.Ctx(ctx).Debug("broadcast event", "module", MODULE_NAME)
+			slog.Ctx(ctx).Debug("broadcast event", "module", ModuleName)
 			p.sub <- rawevt
 		}
 	}

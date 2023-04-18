@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	MODULE_NAME = "procnetdev" // nolint
+	ModuleName = "procnetdev" // nolint
 
 	RxBytes   = "RxBytes"
 	RxErrors  = "RxErrors"
@@ -59,7 +59,7 @@ func (s *ProcNetdev) Ready() bool {
 }
 
 func (s *ProcNetdev) Name() string {
-	return MODULE_NAME
+	return ModuleName
 }
 
 func (s *ProcNetdev) GetMetricNames() []string {
@@ -73,7 +73,7 @@ func (s *ProcNetdev) GetMetricNames() []string {
 func (s *ProcNetdev) Collect(ctx context.Context) (map[string]map[uint32]uint64, error) {
 	ets := nettop.GetAllEntity()
 	if len(ets) == 0 {
-		slog.Ctx(ctx).Info("collect", "mod", MODULE_NAME, "ignore", "no entity found")
+		slog.Ctx(ctx).Info("collect", "mod", ModuleName, "ignore", "no entity found")
 	}
 	return collect(ctx, ets)
 }

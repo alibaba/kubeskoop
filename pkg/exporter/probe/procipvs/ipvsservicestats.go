@@ -14,7 +14,7 @@ import (
 const maxBufferSize = 1024 * 1024
 
 var (
-	MODULE_NAME = "insp_ipvs"
+	ModuleName = "insp_ipvs"
 
 	statf = "/proc/net/ip_vs_stats"
 
@@ -49,17 +49,17 @@ func GetProbe() *ProcIPVS {
 }
 
 func (p *ProcIPVS) Name() string {
-	return MODULE_NAME
+	return ModuleName
 }
 
-func (s *ProcIPVS) Close() error {
+func (p *ProcIPVS) Close() error {
 	return nil
 }
 
-func (s *ProcIPVS) Start(_ context.Context) {
+func (p *ProcIPVS) Start(_ context.Context) {
 }
 
-func (s *ProcIPVS) Ready() bool {
+func (p *ProcIPVS) Ready() bool {
 	// determine by if default ipvs stats file was ready
 	if _, err := os.Stat(statf); os.IsNotExist(err) {
 		return false
@@ -67,15 +67,15 @@ func (s *ProcIPVS) Ready() bool {
 	return true
 }
 
-func (s *ProcIPVS) GetMetricNames() []string {
+func (p *ProcIPVS) GetMetricNames() []string {
 	res := []string{}
 	for _, m := range IPVSMetrics {
-		res = append(res, metricUniqueId("ipvs", m))
+		res = append(res, metricUniqueID("ipvs", m))
 	}
 	return res
 }
 
-func (s *ProcIPVS) Collect(ctx context.Context) (map[string]map[uint32]uint64, error) {
+func (p *ProcIPVS) Collect(_ context.Context) (map[string]map[uint32]uint64, error) {
 	resMap := make(map[string]map[uint32]uint64)
 	f, err := os.Open(statf)
 	if err != nil {
@@ -94,15 +94,15 @@ func (s *ProcIPVS) Collect(ctx context.Context) (map[string]map[uint32]uint64, e
 		return resMap, err
 	}
 	// only handle stats in default netns
-	resMap[metricUniqueId("ipvs", Connections)] = map[uint32]uint64{0: stats.Connections}
-	resMap[metricUniqueId("ipvs", IncomingPackets)] = map[uint32]uint64{0: stats.IncomingBytes}
-	resMap[metricUniqueId("ipvs", IncomingBytes)] = map[uint32]uint64{0: stats.IncomingBytes}
-	resMap[metricUniqueId("ipvs", OutgoingPackets)] = map[uint32]uint64{0: stats.OutgoingPackets}
-	resMap[metricUniqueId("ipvs", OutgoingBytes)] = map[uint32]uint64{0: stats.OutgoingBytes}
+	resMap[metricUniqueID("ipvs", Connections)] = map[uint32]uint64{0: stats.Connections}
+	resMap[metricUniqueID("ipvs", IncomingPackets)] = map[uint32]uint64{0: stats.IncomingBytes}
+	resMap[metricUniqueID("ipvs", IncomingBytes)] = map[uint32]uint64{0: stats.IncomingBytes}
+	resMap[metricUniqueID("ipvs", OutgoingPackets)] = map[uint32]uint64{0: stats.OutgoingPackets}
+	resMap[metricUniqueID("ipvs", OutgoingBytes)] = map[uint32]uint64{0: stats.OutgoingBytes}
 	return resMap, nil
 }
 
-func metricUniqueId(subject string, m string) string {
+func metricUniqueID(subject string, m string) string {
 	return fmt.Sprintf("%s%s", subject, strings.ToLower(m))
 }
 

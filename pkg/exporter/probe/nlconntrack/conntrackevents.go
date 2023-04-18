@@ -20,22 +20,22 @@ import (
 )
 
 const (
-	CONNTRACK_NEW         = "CONNTRACK_NEW"
-	CONNTRACK_UPDATE      = "CONNTRACK_UPDATE"
-	CONNTRACK_DESTROY     = "CONNTRACK_DESTROY"
-	CONNTRACK_EXP_NEW     = "CONNTRACK_EXP_NEW"
-	CONNTRACK_EXP_DESTROY = "CONNTRACK_EXP_DESTROY"
-	CONNTRACK_UNKNOW      = "CONNTRACK_UNKNOW"
+	ConntrackNew        = "ConntrackNew"
+	ConntrackUpdate     = "ConntrackUpdate"
+	ConntrackDestroy    = "ConntrackDestroy"
+	ConntrackExpNew     = "ConntrackExpNew"
+	ConntrackExpDestroy = "ConntrackExpDestroy"
+	ConntrackUnknow     = "ConntrackUnknow"
 )
 
 var (
-	MODULE_NAME = "insp_conntrack"
+	ModuleName = "insp_conntrack"
 
-	events = []string{"CONNTRACK_NEW", "CONNTRACK_UPDATE", "CONNTRACK_DESTROY", "CONNTRACK_EXP_NEW", "CONNTRACK_EXP_DESTROY", "CONNTRACK_UNKNOW"}
-	probe  = &NlConntrackProbe{mtx: sync.Mutex{}, conns: make(map[int]chan struct{})}
+	events = []string{"ConntrackNew", "ConntrackUpdate", "ConntrackDestroy", "ConntrackExpNew", "ConntrackExpDestroy", "ConntrackUnknow"}
+	probe  = &Probe{mtx: sync.Mutex{}, conns: make(map[int]chan struct{})}
 )
 
-type NlConntrackProbe struct {
+type Probe struct {
 	enable   bool
 	sub      chan<- proto.RawEvent
 	mtx      sync.Mutex
@@ -43,22 +43,22 @@ type NlConntrackProbe struct {
 	initConn *conntrack.Conn
 }
 
-func GetProbe() *NlConntrackProbe {
+func GetProbe() *Probe {
 	return probe
 }
 
-func (p *NlConntrackProbe) Name() string {
-	return MODULE_NAME
+func (p *Probe) Name() string {
+	return ModuleName
 }
 
-func (p *NlConntrackProbe) Ready() bool {
+func (p *Probe) Ready() bool {
 	if _, err := p.getConn(); err != nil {
 		return false
 	}
 	return true
 }
 
-func (p *NlConntrackProbe) Close() error {
+func (p *Probe) Close() error {
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
 
@@ -67,11 +67,11 @@ func (p *NlConntrackProbe) Close() error {
 	return nil
 }
 
-func (p *NlConntrackProbe) GetEventNames() []string {
+func (p *Probe) GetEventNames() []string {
 	return events
 }
 
-func (p *NlConntrackProbe) Start(ctx context.Context) {
+func (p *Probe) Start(ctx context.Context) {
 
 	p.mtx.Lock()
 	p.enable = true
@@ -83,20 +83,20 @@ func (p *NlConntrackProbe) Start(ctx context.Context) {
 		if !p.enable {
 			return
 		}
-		slog.Ctx(ctx).Info("start update netns list", "module", MODULE_NAME)
+		slog.Ctx(ctx).Info("start update netns list", "module", ModuleName)
 		ets := nettop.GetAllEntity()
 		for _, et := range ets {
 			if et == nil {
-				slog.Ctx(ctx).Info("skip empty entity", "module", MODULE_NAME)
+				slog.Ctx(ctx).Info("skip empty entity", "module", ModuleName)
 				continue
 			}
 			nsfd, err := et.GetNetNsFd()
 			if err != nil {
-				slog.Ctx(ctx).Info("skip netns fd", "err", err, "module", MODULE_NAME)
+				slog.Ctx(ctx).Info("skip netns fd", "err", err, "module", ModuleName)
 				continue
 			}
 			if nsfd == 0 {
-				slog.Ctx(ctx).Info("skip empty netns fd", "module", MODULE_NAME)
+				slog.Ctx(ctx).Info("skip empty netns fd", "module", ModuleName)
 				continue
 			}
 			if _, ok := p.conns[et.GetNetns()]; !ok {
@@ -104,19 +104,19 @@ func (p *NlConntrackProbe) Start(ctx context.Context) {
 				go func() {
 					err := p.startCtListen(ctx, ctrch, nsfd, et.GetNetns())
 					if err != nil {
-						slog.Ctx(ctx).Warn("start worker", "err", err, "netns", et.GetNetns(), "nsfd", nsfd, "module", MODULE_NAME)
+						slog.Ctx(ctx).Warn("start worker", "err", err, "netns", et.GetNetns(), "nsfd", nsfd, "module", ModuleName)
 						return
 					}
 				}()
 				p.conns[et.GetNetns()] = ctrch
-				slog.Ctx(ctx).Info("start worker finished", "netns", et.GetNetns(), "nsfd", nsfd, "module", MODULE_NAME)
+				slog.Ctx(ctx).Info("start worker finished", "netns", et.GetNetns(), "nsfd", nsfd, "module", ModuleName)
 			}
 		}
 	}
 
 }
 
-func (p *NlConntrackProbe) release() {
+func (p *Probe) release() {
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
 	for _, ctrch := range p.conns {
@@ -125,36 +125,36 @@ func (p *NlConntrackProbe) release() {
 	p.conns = make(map[int]chan struct{})
 }
 
-func (p *NlConntrackProbe) startCtListen(ctx context.Context, ctrch <-chan struct{}, nsfd int, nsinum int) error {
+func (p *Probe) startCtListen(ctx context.Context, ctrch <-chan struct{}, nsfd int, nsinum int) error {
 	c, err := conntrack.Dial(&netlink.Config{
 		NetNS: nsfd,
 	})
 
 	if err != nil {
-		slog.Ctx(ctx).Info("start conntrack dial", "err", err, "module", MODULE_NAME)
+		slog.Ctx(ctx).Info("start conntrack dial", "err", err, "module", ModuleName)
 		return err
 	}
 
-	slog.Ctx(ctx).Info("start conntrack listen", "netns", nsfd, "module", MODULE_NAME)
+	slog.Ctx(ctx).Info("start conntrack listen", "netns", nsfd, "module", ModuleName)
 	evCh := make(chan conntrack.Event, 1024)
 	errCh, err := c.Listen(evCh, 4, append(netfilter.GroupsCT, netfilter.GroupsCTExp...))
 	if err != nil {
-		slog.Ctx(ctx).Info("start conntrack listen", "err", err, "module", MODULE_NAME)
+		slog.Ctx(ctx).Info("start conntrack listen", "err", err, "module", ModuleName)
 		return err
 	}
 
 	for {
 		select {
 		case <-ctrch:
-			slog.Ctx(ctx).Info("conntrack event listen stop", "module", MODULE_NAME)
+			slog.Ctx(ctx).Info("conntrack event listen stop", "module", ModuleName)
 			return nil
 		case err = <-errCh:
-			slog.Ctx(ctx).Info("conntrack event listen stop", "err", err, "module", MODULE_NAME)
+			slog.Ctx(ctx).Info("conntrack event listen stop", "err", err, "module", ModuleName)
 			return err
 		case event := <-evCh:
 			if p.sub != nil {
 				p.sub <- vanishEvent(event, nsinum)
-				slog.Ctx(ctx).Info("conntrack event listen", "event", event.String(), "module", MODULE_NAME)
+				slog.Ctx(ctx).Info("conntrack event listen", "event", event.String(), "module", ModuleName)
 			}
 		}
 	}
@@ -166,15 +166,15 @@ func (p *NlConntrackProbe) startCtListen(ctx context.Context, ctrch <-chan struc
 // 	})
 
 // 	if err != nil {
-// 		slog.Ctx(ctx).Info("start conntrack dial", "err", err, "module", MODULE_NAME)
+// 		slog.Ctx(ctx).Info("start conntrack dial", "err", err, "module", ModuleName)
 // 		return
 // 	}
 
-// 	slog.Ctx(ctx).Info("start conntrack listen", "netns", nsinum, "module", MODULE_NAME)
+// 	slog.Ctx(ctx).Info("start conntrack listen", "netns", nsinum, "module", ModuleName)
 // 	evCh = make(chan conntrack.Event, 1024)
 // 	errCh, err = c.Listen(evCh, 4, append(netfilter.GroupsCT, netfilter.GroupsCTExp...))
 // 	if err != nil {
-// 		slog.Ctx(ctx).Info("start conntrack listen", "err", err, "module", MODULE_NAME)
+// 		slog.Ctx(ctx).Info("start conntrack listen", "err", err, "module", ModuleName)
 // 		return
 // 	}
 
@@ -182,7 +182,7 @@ func (p *NlConntrackProbe) startCtListen(ctx context.Context, ctrch <-chan struc
 // }
 
 // Register register sub chan to get perf events
-func (p *NlConntrackProbe) Register(receiver chan<- proto.RawEvent) error {
+func (p *Probe) Register(receiver chan<- proto.RawEvent) error {
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
 	p.sub = receiver
@@ -196,17 +196,17 @@ func vanishEvent(evt conntrack.Event, nsinum int) proto.RawEvent {
 	}
 	switch evt.Type {
 	case conntrack.EventNew:
-		raw.EventType = CONNTRACK_NEW
+		raw.EventType = ConntrackNew
 	case conntrack.EventUpdate:
-		raw.EventType = CONNTRACK_UPDATE
+		raw.EventType = ConntrackUpdate
 	case conntrack.EventDestroy:
-		raw.EventType = CONNTRACK_DESTROY
+		raw.EventType = ConntrackDestroy
 	case conntrack.EventExpNew:
-		raw.EventType = CONNTRACK_EXP_NEW
+		raw.EventType = ConntrackExpNew
 	case conntrack.EventExpDestroy:
-		raw.EventType = CONNTRACK_EXP_DESTROY
+		raw.EventType = ConntrackExpDestroy
 	default:
-		raw.EventType = CONNTRACK_UNKNOW
+		raw.EventType = ConntrackUnknow
 	}
 
 	rawStr := fmt.Sprintf("Proto = %s Replied = %t ", bpfutil.GetProtoStr(evt.Flow.TupleOrig.Proto.Protocol), evt.Flow.Status.SeenReply())

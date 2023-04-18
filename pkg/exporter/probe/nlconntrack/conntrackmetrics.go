@@ -32,15 +32,15 @@ var (
 	conntrackMetrics = []string{Found, Invalid, Ignore, Insert, InsertFailed, Drop, EarlyDrop, Error, SearchRestart, Entries, MaxEntries}
 )
 
-func (s *NlConntrackProbe) GetMetricNames() []string {
+func (s *Probe) GetMetricNames() []string {
 	res := []string{}
 	for _, m := range conntrackMetrics {
-		res = append(res, metricUniqueId("conntrack", m))
+		res = append(res, metricUniqueID("conntrack", m))
 	}
 	return res
 }
 
-func (s *NlConntrackProbe) Collect(ctx context.Context) (map[string]map[uint32]uint64, error) {
+func (s *Probe) Collect(_ context.Context) (map[string]map[uint32]uint64, error) {
 	resMap := map[string]map[uint32]uint64{}
 	stats, err := s.collectStats()
 	if err != nil {
@@ -48,13 +48,13 @@ func (s *NlConntrackProbe) Collect(ctx context.Context) (map[string]map[uint32]u
 	}
 
 	for _, metric := range conntrackMetrics {
-		resMap[metricUniqueId("conntrack", metric)] = map[uint32]uint64{uint32(nettop.InitNetns): stats[metric]}
+		resMap[metricUniqueID("conntrack", metric)] = map[uint32]uint64{uint32(nettop.InitNetns): stats[metric]}
 	}
 
 	return resMap, nil
 }
 
-func (s *NlConntrackProbe) getConn() (*conntrack.Conn, error) {
+func (s *Probe) getConn() (*conntrack.Conn, error) {
 	if s.initConn == nil {
 		err := s.initStatConn()
 		if err != nil {
@@ -64,7 +64,7 @@ func (s *NlConntrackProbe) getConn() (*conntrack.Conn, error) {
 	return s.initConn, nil
 }
 
-func (s *NlConntrackProbe) collectStats() (map[string]uint64, error) {
+func (s *Probe) collectStats() (map[string]uint64, error) {
 	resMap := map[string]uint64{}
 
 	conn, err := s.getConn()
@@ -101,7 +101,7 @@ func (s *NlConntrackProbe) collectStats() (map[string]uint64, error) {
 }
 
 // initStatConn create a netlink connection in init netns
-func (s *NlConntrackProbe) initStatConn() error {
+func (s *Probe) initStatConn() error {
 	c, err := conntrack.Dial(nil)
 	if err != nil {
 		return err
@@ -110,6 +110,6 @@ func (s *NlConntrackProbe) initStatConn() error {
 	return nil
 }
 
-func metricUniqueId(subject string, m string) string {
+func metricUniqueID(subject string, m string) string {
 	return fmt.Sprintf("%s%s", subject, strings.ToLower(m))
 }

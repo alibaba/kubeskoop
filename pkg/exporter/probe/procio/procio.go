@@ -19,7 +19,7 @@ const (
 	IOReadBytes    = "IOReadBytes"
 	IOWriteBytes   = "IOWriteBytes"
 
-	MODULE_NAME = "procio" // nolint
+	ModuleName = "procio" // nolint
 )
 
 var (
@@ -47,7 +47,7 @@ func (s *ProcIO) Ready() bool {
 }
 
 func (s *ProcIO) Name() string {
-	return MODULE_NAME
+	return ModuleName
 }
 
 func (s *ProcIO) GetMetricNames() []string {
@@ -61,7 +61,7 @@ func (s *ProcIO) GetMetricNames() []string {
 func (s *ProcIO) Collect(ctx context.Context) (map[string]map[uint32]uint64, error) {
 	ets := nettop.GetAllEntity()
 	if len(ets) == 0 {
-		slog.Ctx(ctx).Info("collect", "mod", MODULE_NAME, "ignore", "no entity found")
+		slog.Ctx(ctx).Info("collect", "mod", ModuleName, "ignore", "no entity found")
 	}
 	return collect(ctx, ets)
 }

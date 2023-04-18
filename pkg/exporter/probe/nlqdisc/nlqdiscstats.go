@@ -18,30 +18,31 @@ import (
 )
 
 const (
-	TCA_UNSPEC = iota
-	TCA_KIND
-	TCA_OPTIONS
-	TCA_STATS
-	TCA_XSTATS
-	TCA_RATE
-	TCA_FCNT
-	TCA_STATS2
-	TCA_STAB
+	// nolint
+	TCAUnspec = iota
+	TCAKind
+	TCAOptions
+	TCAStats
+	TCAXStats
+	TCARate
+	TCAFcnt
+	TCAStats2
+	TCAStab
 	// __TCA_MAX
 
-	TCA_STATS_UNSPEC = iota
-	TCA_STATS_BASIC
-	TCA_STATS_RATE_EST
-	TCA_STATS_QUEUE
-	TCA_STATS_APP
-	TCA_STATS_RATE_EST64
-	// __TCA_STATS_MAX
+	TCAStatsUnspec = iota
+	TCAStatsBasic
+	TCAStatsRateEst
+	TCAStatsQueue
+	TCAStatsApp
+	TCAStatsRateEst64
+	// __TCAStats_MAX
 
 	familyRoute = 0
 )
 
 var (
-	MODULE_NAME = "insp_qdisc"
+	ModuleName = "insp_qdisc"
 
 	Bytes      = "Bytes"
 	Packets    = "Packets"
@@ -52,34 +53,34 @@ var (
 
 	QdiscMetrics = []string{Bytes, Packets, Drops, Qlen, Backlog, Overlimits}
 
-	probe = &NlQdiscProbe{mtx: sync.Mutex{}}
+	probe = &Probe{mtx: sync.Mutex{}}
 )
 
-type NlQdiscProbe struct {
+type Probe struct {
 	enable bool
 	mtx    sync.Mutex
 }
 
-func GetProbe() *NlQdiscProbe {
+func GetProbe() *Probe {
 	return probe
 }
 
-func (p *NlQdiscProbe) Name() string {
-	return MODULE_NAME
+func (p *Probe) Name() string {
+	return ModuleName
 }
 
-func (s *NlQdiscProbe) Start(_ context.Context) {
+func (p *Probe) Start(_ context.Context) {
 }
 
-func (p *NlQdiscProbe) Ready() bool {
+func (p *Probe) Ready() bool {
 	fd, err := nettop.GetHostnetworkNetnsFd()
 	if err != nil {
-		slog.Default().Warn("status not ready", "err", err, "module", MODULE_NAME)
+		slog.Default().Warn("status not ready", "err", err, "module", ModuleName)
 		return false
 	}
 	c, err := getConn(fd)
 	if err != nil {
-		slog.Default().Warn("status not ready", "err", err, "module", MODULE_NAME)
+		slog.Default().Warn("status not ready", "err", err, "module", ModuleName)
 		return false
 	}
 	defer c.Close()
@@ -87,15 +88,15 @@ func (p *NlQdiscProbe) Ready() bool {
 	return true
 }
 
-func (s *NlQdiscProbe) GetMetricNames() []string {
+func (p *Probe) GetMetricNames() []string {
 	res := []string{}
 	for _, m := range QdiscMetrics {
-		res = append(res, metricUniqueId("qdisc", m))
+		res = append(res, metricUniqueID("qdisc", m))
 	}
 	return res
 }
 
-func (p *NlQdiscProbe) Close() error {
+func (p *Probe) Close() error {
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
 
@@ -104,29 +105,29 @@ func (p *NlQdiscProbe) Close() error {
 	return nil
 }
 
-func (s *NlQdiscProbe) Collect(ctx context.Context) (map[string]map[uint32]uint64, error) {
+func (p *Probe) Collect(ctx context.Context) (map[string]map[uint32]uint64, error) {
 	resMap := make(map[string]map[uint32]uint64)
 	for _, metric := range QdiscMetrics {
-		resMap[metricUniqueId("qdisc", metric)] = make(map[uint32]uint64)
+		resMap[metricUniqueID("qdisc", metric)] = make(map[uint32]uint64)
 	}
 
 	ets := nettop.GetAllEntity()
 	for _, et := range ets {
 		stats, err := getQdiscStats(ctx, et)
 		if err != nil {
-			slog.Ctx(ctx).Info("get qdisc stats", "err", err, "module", MODULE_NAME)
+			slog.Ctx(ctx).Info("get qdisc stats", "err", err, "module", ModuleName)
 			continue
 		}
 
 		for _, stat := range stats {
 			// only care about eth0/eth1...
 			if strings.HasPrefix(stat.IfaceName, "eth") {
-				resMap[metricUniqueId("qdisc", Bytes)][uint32(et.GetNetns())] += stat.Bytes
-				resMap[metricUniqueId("qdisc", Packets)][uint32(et.GetNetns())] += uint64(stat.Packets)
-				resMap[metricUniqueId("qdisc", Drops)][uint32(et.GetNetns())] += uint64(stat.Drops)
-				resMap[metricUniqueId("qdisc", Qlen)][uint32(et.GetNetns())] += uint64(stat.Qlen)
-				resMap[metricUniqueId("qdisc", Backlog)][uint32(et.GetNetns())] += uint64(stat.Backlog)
-				resMap[metricUniqueId("qdisc", Overlimits)][uint32(et.GetNetns())] += uint64(stat.Overlimits)
+				resMap[metricUniqueID("qdisc", Bytes)][uint32(et.GetNetns())] += stat.Bytes
+				resMap[metricUniqueID("qdisc", Packets)][uint32(et.GetNetns())] += uint64(stat.Packets)
+				resMap[metricUniqueID("qdisc", Drops)][uint32(et.GetNetns())] += uint64(stat.Drops)
+				resMap[metricUniqueID("qdisc", Qlen)][uint32(et.GetNetns())] += uint64(stat.Qlen)
+				resMap[metricUniqueID("qdisc", Backlog)][uint32(et.GetNetns())] += uint64(stat.Backlog)
+				resMap[metricUniqueID("qdisc", Overlimits)][uint32(et.GetNetns())] += uint64(stat.Overlimits)
 			}
 		}
 	}
@@ -163,7 +164,7 @@ func getQdiscStats(ctx context.Context, entity *nettop.Entity) ([]QdiscInfo, err
 	for _, msg := range msgs {
 		m, err := parseMessage(msg)
 		if err != nil {
-			slog.Ctx(ctx).Info("parse qdisc msg", "err", err, "msg", msg, "module", MODULE_NAME)
+			slog.Ctx(ctx).Info("parse qdisc msg", "err", err, "msg", msg, "module", ModuleName)
 			continue
 		}
 		res = append(res, m)
@@ -208,7 +209,7 @@ type QdiscInfo struct {
 }
 
 // See struct tc_stats in /usr/include/linux/pkt_sched.h
-type TC_Stats struct {
+type TCStats struct {
 	Bytes      uint64
 	Packets    uint32
 	Drops      uint32
@@ -220,7 +221,7 @@ type TC_Stats struct {
 }
 
 // See /usr/include/linux/gen_stats.h
-type TC_Stats2 struct {
+type TCStats2 struct {
 	// struct gnet_stats_basic
 	Bytes   uint64
 	Packets uint32
@@ -233,10 +234,10 @@ type TC_Stats2 struct {
 }
 
 // See struct tc_fq_qd_stats /usr/include/linux/pkt_sched.h
-type TC_Fq_Qd_Stats struct {
+type TCFqQdStats struct {
 	GcFlows             uint64
 	HighprioPackets     uint64
-	TcpRetrans          uint64
+	TCPRetrans          uint64
 	Throttled           uint64
 	FlowsPlimit         uint64
 	PktsTooLong         uint64
@@ -248,8 +249,8 @@ type TC_Fq_Qd_Stats struct {
 	UnthrottleLatencyNs uint32
 }
 
-func parseTCAStats(attr netlink.Attribute) TC_Stats {
-	var stats TC_Stats
+func parseTCAStats(attr netlink.Attribute) TCStats {
+	var stats TCStats
 	stats.Bytes = nlenc.Uint64(attr.Data[0:8])
 	stats.Packets = nlenc.Uint32(attr.Data[8:12])
 	stats.Drops = nlenc.Uint32(attr.Data[12:16])
@@ -261,17 +262,17 @@ func parseTCAStats(attr netlink.Attribute) TC_Stats {
 	return stats
 }
 
-func parseTCAStats2(attr netlink.Attribute) TC_Stats2 {
-	var stats TC_Stats2
+func parseTCAStats2(attr netlink.Attribute) TCStats2 {
+	var stats TCStats2
 
 	nested, _ := netlink.UnmarshalAttributes(attr.Data)
 
 	for _, a := range nested {
 		switch a.Type {
-		case TCA_STATS_BASIC:
+		case TCAStatsBasic:
 			stats.Bytes = nlenc.Uint64(a.Data[0:8])
 			stats.Packets = nlenc.Uint32(a.Data[8:12])
-		case TCA_STATS_QUEUE:
+		case TCAStatsQueue:
 			stats.Qlen = nlenc.Uint32(a.Data[0:4])
 			stats.Backlog = nlenc.Uint32(a.Data[4:8])
 			stats.Drops = nlenc.Uint32(a.Data[8:12])
@@ -284,8 +285,8 @@ func parseTCAStats2(attr netlink.Attribute) TC_Stats2 {
 	return stats
 }
 
-func parseTC_Fq_Qd_Stats(attr netlink.Attribute) (TC_Fq_Qd_Stats, error) {
-	var stats TC_Fq_Qd_Stats
+func parseTCFqQdStats(attr netlink.Attribute) (TCFqQdStats, error) {
+	var stats TCFqQdStats
 
 	nested, err := netlink.UnmarshalAttributes(attr.Data)
 	if err != nil {
@@ -295,7 +296,7 @@ func parseTC_Fq_Qd_Stats(attr netlink.Attribute) (TC_Fq_Qd_Stats, error) {
 	pts := []*uint64{
 		&stats.GcFlows,
 		&stats.HighprioPackets,
-		&stats.TcpRetrans,
+		&stats.TCPRetrans,
 		&stats.Throttled,
 		&stats.FlowsPlimit,
 		&stats.PktsTooLong,
@@ -303,7 +304,7 @@ func parseTC_Fq_Qd_Stats(attr netlink.Attribute) (TC_Fq_Qd_Stats, error) {
 	}
 	for _, a := range nested {
 		switch a.Type {
-		case TCA_STATS_APP:
+		case TCAStatsApp:
 			for i := 0; i < len(pts) && (i+1)*8 <= len(a.Data); i++ {
 				*pts[i] = nlenc.Uint64(a.Data[i*8 : (i+1)*8])
 			}
@@ -317,9 +318,9 @@ func parseTC_Fq_Qd_Stats(attr netlink.Attribute) (TC_Fq_Qd_Stats, error) {
 // See https://tools.ietf.org/html/rfc3549#section-3.1.3
 func parseMessage(msg netlink.Message) (QdiscInfo, error) {
 	var m QdiscInfo
-	var s TC_Stats
-	var s2 TC_Stats2
-	var s_fq TC_Fq_Qd_Stats
+	var s TCStats
+	var s2 TCStats2
+	var sFq TCFqQdStats
 
 	/*
 	   struct tcmsg {
@@ -355,33 +356,33 @@ func parseMessage(msg netlink.Message) (QdiscInfo, error) {
 
 	for _, attr := range attrs {
 		switch attr.Type {
-		case TCA_KIND:
+		case TCAKind:
 			m.Kind = nlenc.String(attr.Data)
-		case TCA_STATS2:
-			s_fq, err = parseTC_Fq_Qd_Stats(attr)
+		case TCAStats2:
+			sFq, err = parseTCFqQdStats(attr)
 			if err != nil {
 				return m, err
 			}
-			if s_fq.GcFlows > 0 {
-				m.GcFlows = s_fq.GcFlows
+			if sFq.GcFlows > 0 {
+				m.GcFlows = sFq.GcFlows
 			}
-			if s_fq.Throttled > 0 {
-				m.Throttled = s_fq.Throttled
+			if sFq.Throttled > 0 {
+				m.Throttled = sFq.Throttled
 			}
-			if s_fq.FlowsPlimit > 0 {
-				m.FlowsPlimit = s_fq.FlowsPlimit
+			if sFq.FlowsPlimit > 0 {
+				m.FlowsPlimit = sFq.FlowsPlimit
 			}
 
 			s2 = parseTCAStats2(attr)
 			m.Bytes = s2.Bytes
 			m.Packets = s2.Packets
 			m.Drops = s2.Drops
-			// requeues only available in TCA_STATS2, not in TCA_STATS
+			// requeues only available in TCAStats2, not in TCAStats
 			m.Requeues = s2.Requeues
 			m.Overlimits = s2.Overlimits
 			m.Qlen = s2.Qlen
 			m.Backlog = s2.Backlog
-		case TCA_STATS:
+		case TCAStats:
 			// Legacy
 			s = parseTCAStats(attr)
 			m.Bytes = s.Bytes
@@ -391,7 +392,7 @@ func parseMessage(msg netlink.Message) (QdiscInfo, error) {
 			m.Qlen = s.Qlen
 			m.Backlog = s.Backlog
 		default:
-			// TODO: TCA_OPTIONS and TCA_XSTATS
+			// TODO: TCAOptions and TCAXStats
 		}
 	}
 
@@ -404,6 +405,6 @@ func parseMessage(msg netlink.Message) (QdiscInfo, error) {
 	return m, err
 }
 
-func metricUniqueId(subject string, m string) string {
+func metricUniqueID(subject string, m string) string {
 	return fmt.Sprintf("%s%s", subject, strings.ToLower(m))
 }

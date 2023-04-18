@@ -10,6 +10,11 @@ import (
 	"golang.org/x/exp/slog"
 )
 
+const (
+	hostNetwork   = "hostNetwork"
+	unknowNetwork = "unknow"
+)
+
 var (
 	cacheUpdateInterval = 10 * time.Second
 	podCache            = cache.New(20*cacheUpdateInterval, 20*cacheUpdateInterval)
@@ -43,13 +48,13 @@ type Entity struct {
 	pids []int
 }
 
-func (e *Entity) GetIp() string {
+func (e *Entity) GetIP() string {
 	return e.podMeta.ip
 }
 
 func (e *Entity) GetAppLabel() string {
 	if e.netnsMeta.isHostNetwork {
-		return "hostNetwork"
+		return hostNetwork
 	}
 	return e.podMeta.app
 }
@@ -66,34 +71,34 @@ func (e *Entity) GetLabel(labelkey string) (string, bool) {
 
 func (e *Entity) GetPodName() string {
 	if e.netnsMeta.isHostNetwork {
-		return "hostNetwork"
+		return hostNetwork
 	}
 
 	if e.podMeta.name != "" {
 		return e.podMeta.name
 	}
 
-	return "unknow"
+	return unknowNetwork
 }
 
 func (e *Entity) GetPodNamespace() string {
 	if e.netnsMeta.isHostNetwork {
-		return "hostNetwork"
+		return hostNetwork
 	}
 
 	if e.podMeta.namespace != "" {
 		return e.podMeta.namespace
 	}
 
-	return "unknow"
+	return unknowNetwork
 }
 
-func (et *Entity) GetMeta(name string) (string, error) {
+func (e *Entity) GetMeta(name string) (string, error) {
 	switch name {
 	case "ip":
-		return et.GetIp(), nil
+		return e.GetIP(), nil
 	case "netns":
-		return fmt.Sprintf("ns%d", et.GetNetns()), nil
+		return fmt.Sprintf("ns%d", e.GetNetns()), nil
 	default:
 		return "", fmt.Errorf("unkonw or unsupported meta %s", name)
 	}
@@ -111,7 +116,7 @@ func (e *Entity) GetNetnsMountPoint() string {
 	return e.netnsMeta.mountPath
 }
 
-func (e *Entity) GetPodSandboxId() string {
+func (e *Entity) GetPodSandboxID() string {
 	return e.podMeta.sandbox
 }
 

@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -129,10 +128,9 @@ func (i *inspServer) MergeConfig() error {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			slog.Ctx(i.ctx).Info("validate config", "path", configPath, "err", err)
 			return errors.Wrapf(err, "no such config")
-		} else {
-			slog.Ctx(i.ctx).Info("validate config", "err", err)
-			return err
 		}
+		slog.Ctx(i.ctx).Info("validate config", "err", err)
+		return err
 	}
 
 	cfg := &inspServerConfig{}

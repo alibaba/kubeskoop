@@ -28,7 +28,7 @@ type InfoSpec struct {
 
 func getPodMetas(client internalapi.RuntimeService) (map[string]podMeta, error) {
 	if client == nil {
-		return nil, errors.New("not in cloudnative enviroment")
+		return nil, errors.New("not in cloudnative environment")
 	}
 	// only list live pods
 	filter := runtimeapi.PodSandboxFilter{

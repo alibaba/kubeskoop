@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	MODULE_NAME = "procnetstat" // nolint
+	ModuleName = "procnetstat" // nolint
 
 	ProtocolTCPExt = "TcpExt"
 
@@ -119,7 +119,7 @@ func (s *ProcNetstat) Ready() bool {
 }
 
 func (s *ProcNetstat) Name() string {
-	return MODULE_NAME
+	return ModuleName
 }
 
 func (s *ProcNetstat) GetMetricNames() []string {
@@ -133,7 +133,7 @@ func (s *ProcNetstat) GetMetricNames() []string {
 func (s *ProcNetstat) Collect(ctx context.Context) (map[string]map[uint32]uint64, error) {
 	ets := nettop.GetAllEntity()
 	if len(ets) == 0 {
-		slog.Ctx(ctx).Info("collect", "mod", MODULE_NAME, "ignore", "no entity found")
+		slog.Ctx(ctx).Info("collect", "mod", ModuleName, "ignore", "no entity found")
 		return nil, errors.New("no entity to collect")
 	}
 	return collect(ctx, ets)
@@ -148,16 +148,16 @@ func collect(ctx context.Context, nslist []*nettop.Entity) (map[string]map[uint3
 	for _, et := range nslist {
 		stats, err := getNetstatByPid(uint32(et.GetPid()))
 		if err != nil {
-			slog.Ctx(ctx).Info("collect", "mod", MODULE_NAME, "ignore", "no entity found")
+			slog.Ctx(ctx).Info("collect", "mod", ModuleName, "ignore", "no entity found")
 			continue
 		}
-		slog.Ctx(ctx).Debug("collect", "mod", MODULE_NAME, "netns", et.GetNetns(), "stats", stats)
+		slog.Ctx(ctx).Debug("collect", "mod", ModuleName, "netns", et.GetNetns(), "stats", stats)
 		extstats := stats[ProtocolTCPExt]
 		for _, stat := range TCPExtMetrics {
 			if _, ok := extstats[stat]; ok {
 				data, err := strconv.ParseUint(extstats[stat], 10, 64)
 				if err != nil {
-					slog.Ctx(ctx).Warn("collect", "mod", MODULE_NAME, "ignore", stat, "err", err)
+					slog.Ctx(ctx).Warn("collect", "mod", ModuleName, "ignore", stat, "err", err)
 					continue
 				}
 				resMap[metricUniqueID("tcpext", stat)][uint32(et.GetNetns())] += data

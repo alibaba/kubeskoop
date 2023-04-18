@@ -23,7 +23,7 @@ import (
 type LogLevel int
 
 const (
-	LOG_ENTRIES_CHAN_SIZE = 5000
+	LogEntriesChanSize = 5000
 )
 
 var (
@@ -44,7 +44,7 @@ func NewLokiIngester(ctx context.Context, addr string, node string) (*Ingester, 
 		name:    fmt.Sprintf("loki_%s", node),
 		Labels:  fmt.Sprintf(`{instance = "%s",job = "inspector"}`, node),
 		quit:    make(chan struct{}),
-		entries: make(chan *logproto.Entry, LOG_ENTRIES_CHAN_SIZE),
+		entries: make(chan *logproto.Entry, LogEntriesChanSize),
 		client:  httpClient{},
 	}
 
@@ -162,7 +162,7 @@ func (i *Ingester) send(ctx context.Context, entries []*logproto.Entry) {
 
 	buf = snappy.Encode(nil, buf)
 
-	resp, body, err := i.client.sendJsonReq("POST", i.PushURL, "application/x-protobuf", buf)
+	resp, body, err := i.client.sendJSONReq("POST", i.PushURL, "application/x-protobuf", buf)
 	if err != nil {
 		slog.Ctx(ctx).Warn("loki ingester request error", "err", err)
 		return
@@ -174,7 +174,7 @@ func (i *Ingester) send(ctx context.Context, entries []*logproto.Entry) {
 	}
 }
 
-func (client *httpClient) sendJsonReq(method, url string, ctype string, reqBody []byte) (resp *http.Response, resBody []byte, err error) {
+func (client *httpClient) sendJSONReq(method, url string, ctype string, reqBody []byte) (resp *http.Response, resBody []byte, err error) {
 	req, err := http.NewRequest(method, url, bytes.NewBuffer(reqBody))
 	if err != nil {
 		return nil, nil, err

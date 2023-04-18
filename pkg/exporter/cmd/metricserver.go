@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	METRICLABEL_META  = "meta"
-	METRICLABEL_LABEL = "label"
+	MetricLabelMeta  = "meta"
+	MetricLabelLabel = "label"
 )
 
 var (
@@ -56,8 +56,8 @@ func NewMServer(ctx context.Context, config MetricConfig) *MServer {
 		slog.Ctx(ctx).Debug("new mserver add subject", "subject", p)
 	}
 
-	ms.additional_labels = validateExposeLabels(ms.config.ExposeLabels)
-	slog.Default().Debug("metric config", "config", ms.additional_labels)
+	ms.additionalLabels = validateExposeLabels(ms.config.ExposeLabels)
+	slog.Default().Debug("metric config", "config", ms.additionalLabels)
 
 	for sub, mp := range ms.probes {
 		mnames := mp.GetMetricNames()
@@ -67,7 +67,7 @@ func NewMServer(ctx context.Context, config MetricConfig) *MServer {
 			}
 			slog.Ctx(ctx).Debug("new mserver add desc", "probe", mp.Name(), "subject", sub, "metric", mname)
 			if ms.config.Verbose {
-				ms.descs[mname] = getDescOfMetricVerbose(sub, mname, ms.additional_labels)
+				ms.descs[mname] = getDescOfMetricVerbose(sub, mname, ms.additionalLabels)
 			} else {
 				ms.descs[mname] = getDescOfMetric(sub, mname)
 			}
@@ -84,13 +84,13 @@ func NewMServer(ctx context.Context, config MetricConfig) *MServer {
 }
 
 type MServer struct {
-	ctx               context.Context
-	descs             map[string]*prometheus.Desc
-	config            MetricConfig
-	metricCache       *cache.Cache
-	probes            map[string]proto.MetricProbe
-	loopctrl          chan struct{}
-	additional_labels []ExposeLabel
+	ctx              context.Context
+	descs            map[string]*prometheus.Desc
+	config           MetricConfig
+	metricCache      *cache.Cache
+	probes           map[string]proto.MetricProbe
+	loopctrl         chan struct{}
+	additionalLabels []ExposeLabel
 }
 
 // Close if cache process loop exited, close the metric server will be stuck, check is first
@@ -122,8 +122,8 @@ func (s *MServer) Collect(ch chan<- prometheus.Metric) {
 			slog.Ctx(s.ctx).Debug("collect metric", "pod", et.GetPodName(), "netns", nsinum, "metric", mname, "value", value)
 			labelValues := []string{nettop.GetNodeName(), et.GetPodNamespace(), et.GetPodName()}
 			if s.config.Verbose {
-				if len(s.additional_labels) > 0 {
-					for _, label := range s.additional_labels {
+				if len(s.additionalLabels) > 0 {
+					for _, label := range s.additionalLabels {
 						switch label.LabelType {
 						case "label":
 							if value, ok := et.GetLabel(label.Source); ok {
@@ -253,27 +253,11 @@ func getDescOfMetric(mp, mname string) *prometheus.Desc {
 	)
 }
 
-// func getDescOfMetricVerbose(mp, mname string, additional_labels ...string) *prometheus.Desc {
-// 	labels := []string{"node", "namespace", "pod", "netns", "ip", "app"}
-// 	if len(additional_labels) > 0 {
-// 		slog.Info("build metric description", "addtional", additional_labels)
-// 		labels = append(labels, additional_labels...)
-// 	}
-// 	return prometheus.NewDesc(
-// 		prometheus.BuildFQName("inspector", "pod", mname),
-// 		fmt.Sprintf("%s %s count in netns/pod", mp, mname),
-// 		labels,
-// 		nil,
-// 	)
-// }
-
-func getDescOfMetricVerbose(mp, mname string, additional_labels []ExposeLabel) *prometheus.Desc {
+func getDescOfMetricVerbose(mp, mname string, additionalLabels []ExposeLabel) *prometheus.Desc {
 	labels := []string{"node", "namespace", "pod"}
-	if len(additional_labels) > 0 {
-		// slog.Info("build metric description", "addtional", additional_labels)
-		// labels = append(labels, additional_labels...)
-		for _, label := range additional_labels {
-			slog.Info("build metric description", "addtional label", label)
+	if len(additionalLabels) > 0 {
+		for _, label := range additionalLabels {
+			slog.Info("build metric description", "additional label", label)
 			labels = append(labels, label.Replace)
 		}
 	}
@@ -288,7 +272,7 @@ func getDescOfMetricVerbose(mp, mname string, additional_labels []ExposeLabel) *
 func validateExposeLabels(labels []ExposeLabel) []ExposeLabel {
 	res := []ExposeLabel{}
 	for _, label := range labels {
-		if label.LabelType != METRICLABEL_LABEL && label.LabelType != METRICLABEL_META {
+		if label.LabelType != MetricLabelLabel && label.LabelType != MetricLabelMeta {
 			continue
 		}
 

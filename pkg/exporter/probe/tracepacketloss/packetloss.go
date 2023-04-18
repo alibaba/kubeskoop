@@ -28,7 +28,7 @@ import (
 
 // nolint
 const (
-	MODULE_NAME          = "insp_packetloss"
+	ModuleName           = "insp_packetloss"
 	PACKETLOSS_ABNORMAL  = "packetloss_abnormal"
 	PACKETLOSS_TOTAL     = "packetloss_total"
 	PACKETLOSS_NETFILTER = "packetloss_netfilter"
@@ -101,7 +101,7 @@ type PacketLossProbe struct {
 }
 
 func (p *PacketLossProbe) Name() string {
-	return MODULE_NAME
+	return ModuleName
 }
 
 func (p *PacketLossProbe) Ready() bool {
@@ -147,7 +147,7 @@ func (p *PacketLossProbe) Collect(ctx context.Context) (map[string]map[uint32]ui
 
 	m := objs.bpfMaps.InspPlMetric
 	if m == nil {
-		slog.Ctx(ctx).Warn("get metric map with nil", "module", MODULE_NAME)
+		slog.Ctx(ctx).Warn("get metric map with nil", "module", ModuleName)
 		return nil, nil
 	}
 	var (
@@ -183,7 +183,7 @@ func (p *PacketLossProbe) Collect(ctx context.Context) (map[string]map[uint32]ui
 
 		sym, err := bpfutil.GetSymPtFromBpfLocation(key.Location)
 		if err != nil {
-			slog.Ctx(ctx).Warn("get sym failed", "err", err, "module", MODULE_NAME, "location", key.Location)
+			slog.Ctx(ctx).Warn("get sym failed", "err", err, "module", ModuleName, "location", key.Location)
 			continue
 		}
 
@@ -223,7 +223,7 @@ func (p *PacketLossProbe) Start(ctx context.Context) {
 	p.once.Do(func() {
 		err := loadSync()
 		if err != nil {
-			slog.Ctx(ctx).Warn("start", "module", MODULE_NAME, "err", err)
+			slog.Ctx(ctx).Warn("start", "module", ModuleName, "err", err)
 			return
 		}
 		p.enable = true
@@ -236,7 +236,7 @@ func (p *PacketLossProbe) Start(ctx context.Context) {
 
 	reader, err := perf.NewReader(objs.bpfMaps.InspPlEvent, int(unsafe.Sizeof(bpfInspPlEventT{})))
 	if err != nil {
-		slog.Ctx(ctx).Warn("start new perf reader", "module", MODULE_NAME, "err", err)
+		slog.Ctx(ctx).Warn("start new perf reader", "module", ModuleName, "err", err)
 		return
 	}
 
@@ -245,21 +245,21 @@ func (p *PacketLossProbe) Start(ctx context.Context) {
 		record, err := reader.Read()
 		if err != nil {
 			if errors.Is(err, ringbuf.ErrClosed) {
-				slog.Ctx(ctx).Info("received signal, exiting..", "module", MODULE_NAME)
+				slog.Ctx(ctx).Info("received signal, exiting..", "module", ModuleName)
 				return
 			}
-			slog.Ctx(ctx).Info("reading from reader", "module", MODULE_NAME, "err", err)
+			slog.Ctx(ctx).Info("reading from reader", "module", ModuleName, "err", err)
 			continue
 		}
 
 		if record.LostSamples != 0 {
-			slog.Ctx(ctx).Info("Perf event ring buffer full", "module", MODULE_NAME, "drop samples", record.LostSamples)
+			slog.Ctx(ctx).Info("Perf event ring buffer full", "module", ModuleName, "drop samples", record.LostSamples)
 			continue
 		}
 
 		var event bpfInspPlEventT
 		if err := binary.Read(bytes.NewBuffer(record.RawSample), binary.LittleEndian, &event); err != nil {
-			slog.Ctx(ctx).Info("parsing event", "module", MODULE_NAME, "err", err)
+			slog.Ctx(ctx).Info("parsing event", "module", ModuleName, "err", err)
 			continue
 		}
 		// filter netlink/unixsock/tproxy packet
@@ -275,7 +275,7 @@ func (p *PacketLossProbe) Start(ctx context.Context) {
 
 		stacks, err := bpfutil.GetSymsByStack(uint32(event.StackId), objs.InspPlStack)
 		if err != nil {
-			slog.Ctx(ctx).Warn("get sym by stack with", "module", MODULE_NAME, "err", err)
+			slog.Ctx(ctx).Warn("get sym by stack with", "module", ModuleName, "err", err)
 			continue
 		}
 		strs := []string{}
@@ -293,7 +293,7 @@ func (p *PacketLossProbe) Start(ctx context.Context) {
 
 		rawevt.EventBody = fmt.Sprintf("%s stacktrace:%s", tuple, stackStr)
 		if p.sub != nil {
-			slog.Ctx(ctx).Debug("broadcast event", "module", MODULE_NAME)
+			slog.Ctx(ctx).Debug("broadcast event", "module", ModuleName)
 			p.sub <- rawevt
 		}
 	}

@@ -20,7 +20,7 @@ const (
 	SNProcessed = "Processed"
 	SNDropped   = "Dropped"
 
-	MODULE_NAME = "procsoftnet"
+	ModuleName = "procsoftnet"
 )
 
 var (
@@ -54,13 +54,13 @@ func (s *ProcSoftnet) Ready() bool {
 }
 
 func (s *ProcSoftnet) Name() string {
-	return MODULE_NAME
+	return ModuleName
 }
 
 func (s *ProcSoftnet) GetMetricNames() []string {
 	res := []string{}
 	for _, m := range SoftnetMetrics {
-		res = append(res, metricUniqueId("softnet", m))
+		res = append(res, metricUniqueID("softnet", m))
 	}
 	return res
 }
@@ -68,20 +68,20 @@ func (s *ProcSoftnet) GetMetricNames() []string {
 func (s *ProcSoftnet) Collect(ctx context.Context) (map[string]map[uint32]uint64, error) {
 	ets := nettop.GetAllEntity()
 	if len(ets) == 0 {
-		slog.Ctx(ctx).Info("collect", "mod", MODULE_NAME, "ignore", "no entity found")
+		slog.Ctx(ctx).Info("collect", "mod", ModuleName, "ignore", "no entity found")
 	}
 	return collect(ctx, ets)
 }
 
-func metricUniqueId(subject string, m string) string {
+func metricUniqueID(subject string, m string) string {
 	return fmt.Sprintf("%s%s", subject, strings.ToLower(m))
 }
 
-func collect(ctx context.Context, nslist []*nettop.Entity) (map[string]map[uint32]uint64, error) {
+func collect(_ context.Context, nslist []*nettop.Entity) (map[string]map[uint32]uint64, error) {
 	resMap := make(map[string]map[uint32]uint64)
 
 	for idx := range SoftnetMetrics {
-		resMap[metricUniqueId("softnet", SoftnetMetrics[idx])] = map[uint32]uint64{}
+		resMap[metricUniqueID("softnet", SoftnetMetrics[idx])] = map[uint32]uint64{}
 	}
 
 	for idx := range nslist {
@@ -90,7 +90,7 @@ func collect(ctx context.Context, nslist []*nettop.Entity) (map[string]map[uint3
 			continue
 		}
 		for indx := range SoftnetMetrics {
-			resMap[metricUniqueId("softnet", SoftnetMetrics[indx])][uint32(nslist[idx].GetNetns())] = stat[SoftnetMetrics[indx]]
+			resMap[metricUniqueID("softnet", SoftnetMetrics[indx])][uint32(nslist[idx].GetNetns())] = stat[SoftnetMetrics[indx]]
 		}
 	}
 	return resMap, nil

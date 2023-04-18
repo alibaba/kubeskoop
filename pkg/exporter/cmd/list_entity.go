@@ -62,7 +62,7 @@ func listEntities(slct ...selector) {
 				texts = append(texts, []string{
 					et.GetPodName(),
 					et.GetAppLabel(),
-					et.GetIp(),
+					et.GetIP(),
 					et.GetNetnsMountPoint(),
 					et.GetPodNamespace(),
 					fmt.Sprintf("%d", et.GetPid()),
@@ -73,7 +73,7 @@ func listEntities(slct ...selector) {
 			texts = append(texts, []string{
 				et.GetPodName(),
 				et.GetAppLabel(),
-				et.GetIp(),
+				et.GetIP(),
 				et.GetNetnsMountPoint(),
 				et.GetPodNamespace(),
 				fmt.Sprintf("%d", et.GetPid()),

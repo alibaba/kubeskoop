@@ -14,7 +14,7 @@ var (
 )
 
 type slimDocker struct {
-	Id    string          `json:"Id,omitempty"`
+	ID    string          `json:"Id,omitempty"`
 	State slimDockerState `json:"State"`
 }
 

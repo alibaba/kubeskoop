@@ -24,7 +24,7 @@ import (
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -cflags $BPF_CFLAGS  -type insp_biolat_event_t bpf ../../../../bpf/tracebiolatency.c -- -I../../../../bpf/headers -D__TARGET_ARCH_x86
 var (
-	MODULE_NAME = "insp_biolatency" // nolint
+	ModuleName = "insp_biolatency" // nolint
 
 	probe  = &BiolatencyProbe{once: sync.Once{}}
 	links  = []link.Link{}
@@ -45,7 +45,7 @@ func GetProbe() *BiolatencyProbe {
 }
 
 func (p *BiolatencyProbe) Name() string {
-	return MODULE_NAME
+	return ModuleName
 }
 
 // Register register sub chan to get perf events
@@ -85,7 +85,7 @@ func (p *BiolatencyProbe) Start(ctx context.Context) {
 	p.once.Do(func() {
 		err := start()
 		if err != nil {
-			slog.Ctx(ctx).Warn("start", "module", MODULE_NAME, "err", err)
+			slog.Ctx(ctx).Warn("start", "module", ModuleName, "err", err)
 			return
 		}
 		p.enable = true
@@ -96,9 +96,9 @@ func (p *BiolatencyProbe) Start(ctx context.Context) {
 		return
 	}
 
-	slog.Debug("start probe", "module", MODULE_NAME)
+	slog.Debug("start probe", "module", ModuleName)
 	if perfReader == nil {
-		slog.Ctx(ctx).Warn("start", "module", MODULE_NAME, "err", "perf reader not ready")
+		slog.Ctx(ctx).Warn("start", "module", ModuleName, "err", "perf reader not ready")
 		return
 	}
 
@@ -107,15 +107,15 @@ func (p *BiolatencyProbe) Start(ctx context.Context) {
 		record, err := perfReader.Read()
 		if err != nil {
 			if errors.Is(err, ringbuf.ErrClosed) {
-				slog.Ctx(ctx).Info("received signal, exiting..", "module", MODULE_NAME)
+				slog.Ctx(ctx).Info("received signal, exiting..", "module", ModuleName)
 				return
 			}
-			slog.Ctx(ctx).Info("reading from reader", "module", MODULE_NAME, "err", err)
+			slog.Ctx(ctx).Info("reading from reader", "module", ModuleName, "err", err)
 			continue
 		}
 
 		if record.LostSamples != 0 {
-			slog.Ctx(ctx).Info("Perf event ring buffer full", "module", MODULE_NAME, "drop samples", record.LostSamples)
+			slog.Ctx(ctx).Info("Perf event ring buffer full", "module", ModuleName, "drop samples", record.LostSamples)
 			continue
 		}
 
@@ -123,7 +123,7 @@ func (p *BiolatencyProbe) Start(ctx context.Context) {
 		var event bpfInspBiolatEventT
 		// Parse the ringbuf event entry into a bpfEvent structure.
 		if err := binary.Read(bytes.NewBuffer(record.RawSample), binary.LittleEndian, &event); err != nil {
-			slog.Ctx(ctx).Info("parsing event", "module", MODULE_NAME, "err", err)
+			slog.Ctx(ctx).Info("parsing event", "module", ModuleName, "err", err)
 			continue
 		}
 		pid := event.Pid
@@ -138,7 +138,7 @@ func (p *BiolatencyProbe) Start(ctx context.Context) {
 
 		// 分发给注册的dispatcher，其余逻辑由框架完成
 		if p.sub != nil {
-			slog.Ctx(ctx).Debug("broadcast event", "module", MODULE_NAME)
+			slog.Ctx(ctx).Debug("broadcast event", "module", ModuleName)
 			p.sub <- rawevt
 		}
 	}

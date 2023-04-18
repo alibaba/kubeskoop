@@ -74,7 +74,7 @@ func NewEServer(ctx context.Context, config EventConfig) *EServer {
 	return es
 }
 
-func (e *EServer) WatchEvent(req *proto.WatchRequest, srv proto.Inspector_WatchEventServer) error {
+func (e *EServer) WatchEvent(_ *proto.WatchRequest, srv proto.Inspector_WatchEventServer) error {
 	client := getPeerClient(srv.Context())
 	datach := make(chan proto.RawEvent)
 	slog.Ctx(e.ctx).Info("watch event income", "client", client)
@@ -100,7 +100,7 @@ func (e *EServer) WatchEvent(req *proto.WatchRequest, srv proto.Inspector_WatchE
 	return nil
 }
 
-func (e *EServer) QueryMetric(ctx context.Context, req *proto.QueryMetricRequest) (*proto.QueryMetricResponse, error) {
+func (e *EServer) QueryMetric(_ context.Context, _ *proto.QueryMetricRequest) (*proto.QueryMetricResponse, error) {
 	res := &proto.QueryMetricResponse{}
 	return res, nil
 }
