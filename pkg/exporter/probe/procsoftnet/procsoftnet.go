@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+
 	"io"
 	"os"
 	"strconv"
@@ -19,7 +20,7 @@ const (
 	SNProcessed = "Processed"
 	SNDropped   = "Dropped"
 
-	MODULE_NAME = "procsoftnet" // nolint
+	MODULE_NAME = "procsoftnet"
 )
 
 var (
@@ -46,8 +47,7 @@ func (s *ProcSoftnet) Start(_ context.Context) {
 }
 
 func (s *ProcSoftnet) Ready() bool {
-	// determine by if default snmp file was ready
-	if _, err := os.Stat("/proc/net/snmp"); os.IsNotExist(err) {
+	if _, err := os.Stat("/proc/net/softnet"); os.IsNotExist(err) {
 		return false
 	}
 	return true
@@ -60,7 +60,7 @@ func (s *ProcSoftnet) Name() string {
 func (s *ProcSoftnet) GetMetricNames() []string {
 	res := []string{}
 	for _, m := range SoftnetMetrics {
-		res = append(res, metricUniqueID("softnet", m))
+		res = append(res, metricUniqueId("softnet", m))
 	}
 	return res
 }
@@ -73,15 +73,15 @@ func (s *ProcSoftnet) Collect(ctx context.Context) (map[string]map[uint32]uint64
 	return collect(ctx, ets)
 }
 
-func metricUniqueID(subject string, m string) string {
+func metricUniqueId(subject string, m string) string {
 	return fmt.Sprintf("%s%s", subject, strings.ToLower(m))
 }
 
-func collect(_ context.Context, nslist []*nettop.Entity) (map[string]map[uint32]uint64, error) {
+func collect(ctx context.Context, nslist []*nettop.Entity) (map[string]map[uint32]uint64, error) {
 	resMap := make(map[string]map[uint32]uint64)
 
 	for idx := range SoftnetMetrics {
-		resMap[metricUniqueID("softnet", SoftnetMetrics[idx])] = map[uint32]uint64{}
+		resMap[metricUniqueId("softnet", SoftnetMetrics[idx])] = map[uint32]uint64{}
 	}
 
 	for idx := range nslist {
@@ -90,7 +90,7 @@ func collect(_ context.Context, nslist []*nettop.Entity) (map[string]map[uint32]
 			continue
 		}
 		for indx := range SoftnetMetrics {
-			resMap[metricUniqueID("softnet", SoftnetMetrics[indx])][uint32(nslist[idx].GetNetns())] = stat[SoftnetMetrics[indx]]
+			resMap[metricUniqueId("softnet", SoftnetMetrics[indx])][uint32(nslist[idx].GetNetns())] = stat[SoftnetMetrics[indx]]
 		}
 	}
 	return resMap, nil

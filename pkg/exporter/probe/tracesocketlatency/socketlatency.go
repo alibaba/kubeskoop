@@ -127,6 +127,11 @@ func (p *SocketLatencyProbe) Start(ctx context.Context) {
 		p.enable = true
 	})
 
+	if !p.enable {
+		// if load failed, do nat start process
+		return
+	}
+
 	p.startEventPoll(ctx)
 }
 

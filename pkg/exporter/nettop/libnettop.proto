@@ -2,8 +2,6 @@ syntax="proto3";
 
 package nettop;
 
-option go_package = "github.com/alibaba/kubeskoop/nettop";
-
 message Kernel {
     string release = 1;
     string version = 2;

@@ -3,6 +3,7 @@ package nlconntrack
 import (
 	"context"
 	"fmt"
+
 	"net"
 	"strconv"
 	"sync"
@@ -18,7 +19,6 @@ import (
 	"golang.org/x/exp/slog"
 )
 
-// nolint
 const (
 	CONNTRACK_NEW         = "CONNTRACK_NEW"
 	CONNTRACK_UPDATE      = "CONNTRACK_UPDATE"
@@ -29,32 +29,36 @@ const (
 )
 
 var (
-	MODULE_NAME = "insp_conntrack" // nolint
+	MODULE_NAME = "insp_conntrack"
 
 	events = []string{"CONNTRACK_NEW", "CONNTRACK_UPDATE", "CONNTRACK_DESTROY", "CONNTRACK_EXP_NEW", "CONNTRACK_EXP_DESTROY", "CONNTRACK_UNKNOW"}
-	probe  = &Probe{mtx: sync.Mutex{}, conns: make(map[int]chan struct{})}
+	probe  = &NlConntrackProbe{mtx: sync.Mutex{}, conns: make(map[int]chan struct{})}
 )
 
-type Probe struct {
-	enable bool
-	sub    chan<- proto.RawEvent
-	mtx    sync.Mutex
-	conns  map[int]chan struct{}
+type NlConntrackProbe struct {
+	enable   bool
+	sub      chan<- proto.RawEvent
+	mtx      sync.Mutex
+	conns    map[int]chan struct{}
+	initConn *conntrack.Conn
 }
 
-func GetProbe() *Probe {
+func GetProbe() *NlConntrackProbe {
 	return probe
 }
 
-func (p *Probe) Name() string {
+func (p *NlConntrackProbe) Name() string {
 	return MODULE_NAME
 }
 
-func (p *Probe) Ready() bool {
-	return p.enable
+func (p *NlConntrackProbe) Ready() bool {
+	if _, err := p.getConn(); err != nil {
+		return false
+	}
+	return true
 }
 
-func (p *Probe) Close() error {
+func (p *NlConntrackProbe) Close() error {
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
 
@@ -63,11 +67,11 @@ func (p *Probe) Close() error {
 	return nil
 }
 
-func (p *Probe) GetEventNames() []string {
+func (p *NlConntrackProbe) GetEventNames() []string {
 	return events
 }
 
-func (p *Probe) Start(ctx context.Context) {
+func (p *NlConntrackProbe) Start(ctx context.Context) {
 
 	p.mtx.Lock()
 	p.enable = true
@@ -86,7 +90,11 @@ func (p *Probe) Start(ctx context.Context) {
 				slog.Ctx(ctx).Info("skip empty entity", "module", MODULE_NAME)
 				continue
 			}
-			nsfd := et.GetNetNsFd()
+			nsfd, err := et.GetNetNsFd()
+			if err != nil {
+				slog.Ctx(ctx).Info("skip netns fd", "err", err, "module", MODULE_NAME)
+				continue
+			}
 			if nsfd == 0 {
 				slog.Ctx(ctx).Info("skip empty netns fd", "module", MODULE_NAME)
 				continue
@@ -108,7 +116,7 @@ func (p *Probe) Start(ctx context.Context) {
 
 }
 
-func (p *Probe) release() {
+func (p *NlConntrackProbe) release() {
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
 	for _, ctrch := range p.conns {
@@ -117,7 +125,7 @@ func (p *Probe) release() {
 	p.conns = make(map[int]chan struct{})
 }
 
-func (p *Probe) startCtListen(ctx context.Context, ctrch <-chan struct{}, nsfd int, nsinum int) error {
+func (p *NlConntrackProbe) startCtListen(ctx context.Context, ctrch <-chan struct{}, nsfd int, nsinum int) error {
 	c, err := conntrack.Dial(&netlink.Config{
 		NetNS: nsfd,
 	})
@@ -152,8 +160,29 @@ func (p *Probe) startCtListen(ctx context.Context, ctrch <-chan struct{}, nsfd i
 	}
 }
 
+func getEventCh(ctx context.Context, nsinum int) (evCh chan conntrack.Event, errCh chan error, err error) {
+	c, err := conntrack.Dial(&netlink.Config{
+		NetNS: nsinum,
+	})
+
+	if err != nil {
+		slog.Ctx(ctx).Info("start conntrack dial", "err", err, "module", MODULE_NAME)
+		return
+	}
+
+	slog.Ctx(ctx).Info("start conntrack listen", "netns", nsinum, "module", MODULE_NAME)
+	evCh = make(chan conntrack.Event, 1024)
+	errCh, err = c.Listen(evCh, 4, append(netfilter.GroupsCT, netfilter.GroupsCTExp...))
+	if err != nil {
+		slog.Ctx(ctx).Info("start conntrack listen", "err", err, "module", MODULE_NAME)
+		return
+	}
+
+	return
+}
+
 // Register register sub chan to get perf events
-func (p *Probe) Register(receiver chan<- proto.RawEvent) error {
+func (p *NlConntrackProbe) Register(receiver chan<- proto.RawEvent) error {
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
 	p.sub = receiver

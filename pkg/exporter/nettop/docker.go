@@ -9,8 +9,12 @@ import (
 	"net/http"
 )
 
+var (
+	dockerhttpc *http.Client
+)
+
 type slimDocker struct {
-	ID    string          `json:"Id,omitempty"`
+	Id    string          `json:"Id,omitempty"`
 	State slimDockerState `json:"State"`
 }
 
@@ -22,16 +26,18 @@ type slimDockerState struct {
 func getPidForContainerBySock(id string) (int, error) {
 	// logger.Infof("start get pid of %s", id)
 	dockersock := "/var/run/docker.sock"
-	httpc := http.Client{
-		Transport: &http.Transport{
-			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
-				return net.Dial("unix", dockersock)
+	if dockerhttpc == nil {
+		dockerhttpc = &http.Client{
+			Transport: &http.Transport{
+				DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
+					return net.Dial("unix", dockersock)
+				},
 			},
-		},
+		}
 	}
 
 	url := fmt.Sprintf("http://localhost/containers/%s/json", id)
-	response, err := httpc.Get(url)
+	response, err := dockerhttpc.Get(url)
 	if err != nil {
 		logger.Warn("get response with %s", err.Error())
 		return 0, err

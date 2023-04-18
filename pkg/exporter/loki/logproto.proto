@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package logproto;
+option go_package = "/logproto";
+
+import "google/protobuf/timestamp.proto";
+
+import "google/protobuf/descriptor.proto";
+
+extend google.protobuf.FieldOptions {
+    bool non_sensitive = 50000;
+}
+
+message PushRequest {
+  repeated Stream streams = 1;
+}
+
+message Stream {
+  string labels = 1;
+  repeated Entry entries = 2;
+}
+
+message Entry {
+  google.protobuf.Timestamp timestamp = 1;
+  string line = 2;
+}

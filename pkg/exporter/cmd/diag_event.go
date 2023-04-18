@@ -23,14 +23,11 @@ var (
 		Short: "diagnose specific event probe",
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(probeName) == 0 {
-				_ = cmd.Help()
+				cmd.Help()
 				return
 			}
 
-			err := nettop.SyncNetTopology()
-			if err != nil {
-				slog.Ctx(cmd.Context()).Error("error sync net topology", err)
-			}
+			nettop.SyncNetTopology()
 			go nettop.StartCache(cmd.Context())
 			defer nettop.StopCache()
 

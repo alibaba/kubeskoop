@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+
 	"io"
 	"net"
 	"os"
@@ -17,12 +18,13 @@ import (
 )
 
 const (
-	MODULE_NAME = "proctcpsummary" // nolint
+	MODULE_NAME = "proctcpsummary"
 
 	TCPEstablishedConn = "tcpsummarytcpestablishedconn"
 	TCPTimewaitConn    = "tcpsummarytcptimewaitconn"
 	TCPTXQueue         = "tcpsummarytcptxqueue"
 	TCPRXQueue         = "tcpsummarytcprxqueue"
+	TCPListenBacklog   = "tcpsummarytcplistenbacklog"
 
 	// st mapping of tcp state
 	/*TCP_ESTABLISHED:1   TCP_SYN_SENT:2
@@ -31,8 +33,9 @@ const (
 	TCP_CLOSE:7         TCP_CLOSE_WAIT:8
 	TCP_LAST_ACL:9      TCP_LISTEN:10
 	TCP_CLOSING:11*/
-	TCP_ESTABLISHED = uint64(1) // nolint
-	TCP_TIME_WAIT   = uint64(6) // nolint
+	TCP_ESTABLISHED = uint64(1)
+	TCP_TIME_WAIT   = uint64(6)
+	TCP_LISTEN      = uint64(10)
 
 	readLimit = 4294967296 // Byte -> 4 GiB
 )
@@ -152,8 +155,10 @@ func (n NetTCP) getEstTwCount() (est uint64, tw uint64) {
 
 func (n NetTCP) getTxRxQueueLength() (tx uint64, rx uint64) {
 	for idx := range n {
-		tx += n[idx].TxQueue
-		rx += n[idx].RxQueue
+		if n[idx].St != TCP_LISTEN {
+			tx += n[idx].TxQueue
+			rx += n[idx].RxQueue
+		}
 	}
 	return tx, rx
 }

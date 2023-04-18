@@ -114,6 +114,11 @@ func (p *VirtcmdLatencyProbe) Start(ctx context.Context) {
 		p.enable = true
 	})
 
+	if !p.enable {
+		// if load failed, do nat start process
+		return
+	}
+
 	reader, err := perf.NewReader(objs.bpfMaps.InspVirtcmdlatEvents, int(unsafe.Sizeof(bpfInspVirtcmdlatEventT{})))
 	if err != nil {
 		slog.Ctx(ctx).Warn("start new perf reader", "module", MODULE_NAME, "err", err)

@@ -9,16 +9,19 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
+	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
 	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
 
 	gops "github.com/google/gops/agent"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -48,6 +51,12 @@ var (
 				opts := slog.HandlerOptions{
 					AddSource: true,
 					Level:     slog.DebugLevel,
+				}
+				insp.ctx = slog.NewContext(context.Background(), slog.New(opts.NewJSONHandler(os.Stderr)))
+			} else {
+				opts := slog.HandlerOptions{
+					AddSource: false,
+					Level:     slog.InfoLevel,
 				}
 				insp.ctx = slog.NewContext(context.Background(), slog.New(opts.NewJSONHandler(os.Stderr)))
 			}
@@ -85,15 +94,23 @@ type inspServerConfig struct {
 	Econfig   EventConfig  `mapstructure:"event_config"`
 }
 
+type ExposeLabel struct {
+	Source    string `mapstructure:"source"`
+	LabelType string `mapstructure:"type"`
+	Replace   string `mapstructure:"replace"`
+}
+
 type MetricConfig struct {
-	Interval int      `mapstructure:"interval"`
-	Port     int      `mapstructure:"port"`
-	Probes   []string `mapstructure:"probes"`
-	Verbose  bool     `mapstructure:"verbose"`
+	Interval     int           `mapstructure:"interval"`
+	Port         int           `mapstructure:"port"`
+	Probes       []string      `mapstructure:"probes"`
+	Verbose      bool          `mapstructure:"verbose"`
+	ExposeLabels []ExposeLabel `mapstructure:"expose_labels"`
 }
 
 type EventConfig struct {
 	Port        int      `mapstructure:"port"`
+	InfoToLog   bool     `mapstructure:"infotolog"`
 	LokiAddress string   `mapstructure:"loki_address"`
 	LokiEnable  bool     `mapstructure:"loki_enable"`
 	Probes      []string `mapstructure:"probes"`
@@ -111,9 +128,10 @@ func (i *inspServer) MergeConfig() error {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			slog.Ctx(i.ctx).Info("validate config", "path", configPath, "err", err)
 			return errors.Wrapf(err, "no such config")
+		} else {
+			slog.Ctx(i.ctx).Info("validate config", "err", err)
+			return err
 		}
-		slog.Ctx(i.ctx).Info("validate config", "err", err)
-		return err
 	}
 
 	cfg := &inspServerConfig{}
@@ -145,6 +163,16 @@ func (i *inspServer) start() error {
 		http.Handle("/metrics", handler)
 		http.Handle("/", http.HandlerFunc(defaulPage))
 		http.Handle("/config", http.HandlerFunc(i.configPage))
+		http.Handle("/status", http.HandlerFunc(status))
+		if i.config.DebugMode {
+			reg := prometheus.NewRegistry()
+
+			reg.MustRegister(
+				collectors.NewGoCollector(),
+				collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
+			)
+			http.Handle("/internal", promhttp.HandlerFor(reg, promhttp.HandlerOpts{Registry: reg}))
+		}
 		listenaddr := fmt.Sprintf(":%d", i.config.Mconfig.Port)
 		slog.Ctx(i.ctx).Info("inspector start metric server", "listenaddr", listenaddr)
 		srv := &http.Server{Addr: listenaddr}
@@ -182,8 +210,7 @@ func WaitSignals(ctx context.Context, sgs ...os.Signal) {
 }
 
 func defaulPage(w http.ResponseWriter, _ *http.Request) {
-	// nolint
-	w.Write([]byte(`<html> 
+	w.Write([]byte(`<html>
 		<head><title>Net Exporter</title></head>
 		<body>
 		<h1>Net Exporter</h1>
@@ -196,5 +223,17 @@ func (i *inspServer) configPage(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	rawText, _ := json.MarshalIndent(i.config, " ", "    ")
 	w.WriteHeader(http.StatusOK)
-	w.Write(rawText) // nolint
+	w.Write(rawText)
+}
+
+func status(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	res := make(map[string]bool)
+	for _, pn := range probe.ListMetricProbes(context.Background(), true) {
+		p := probe.GetProbe(pn)
+		res[p.Name()] = p.Ready()
+	}
+	rawText, _ := json.Marshal(res)
+	w.Write(rawText)
 }

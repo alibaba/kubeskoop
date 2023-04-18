@@ -6,12 +6,14 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+
 	"math/bits"
 	"strings"
 	"sync"
 	"unsafe"
 
 	"github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
+	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
 
 	"github.com/cilium/ebpf"
@@ -26,9 +28,13 @@ import (
 
 // nolint
 const (
-	MODULE_NAME         = "insp_packetloss"
-	PACKETLOSS_ABNORMAL = "packetloss_abnormal"
-	PACKETLOSS_TOTAL    = "packetloss_total"
+	MODULE_NAME          = "insp_packetloss"
+	PACKETLOSS_ABNORMAL  = "packetloss_abnormal"
+	PACKETLOSS_TOTAL     = "packetloss_total"
+	PACKETLOSS_NETFILTER = "packetloss_netfilter"
+	PACKETLOSS_TCPSTATEM = "packetloss_tcpstatm"
+	PACKETLOSS_TCPRCV    = "packetloss_tcprcv"
+	PACKETLOSS_TCPHANDLE = "packetloss_tcphandle"
 
 	PACKETLOSS = "PACKETLOSS"
 )
@@ -37,22 +43,27 @@ var (
 	ignoreSymbolList  = map[string]struct{}{}
 	uselessSymbolList = map[string]struct{}{}
 
+	netfilterSymbol = "nf_hook_slow"
+	tcpstatmSymbol  = "tcp_rcv_state_process"
+	tcprcvSymbol    = "tcp_v4_rcv"
+	tcpdorcvSymbol  = "tcp_v4_do_rcv"
+
 	probe  = &PacketLossProbe{}
 	objs   = bpfObjects{}
 	links  = []link.Link{}
 	events = []string{PACKETLOSS}
 
-	packetLossMetrics = []string{PACKETLOSS_ABNORMAL, PACKETLOSS_TOTAL}
+	packetLossMetrics = []string{PACKETLOSS_TCPHANDLE, PACKETLOSS_TCPRCV, PACKETLOSS_ABNORMAL, PACKETLOSS_TOTAL, PACKETLOSS_NETFILTER, PACKETLOSS_TCPSTATEM}
 )
 
 func init() {
 	// sk_stream_kill_queues: skb moved to sock rqueue and then will be cleanup by this symbol
 	ignore("sk_stream_kill_queues")
 	// tcp_v4_rcv: skb of ingress stream will pass the symbol.
-	ignore("tcp_v4_rcv")
-	ignore("tcp_v6_rcv")
-	// tcp_v4_do_rcv: skb drop when check CSUMERRORS
-	ignore("tcp_v4_do_rcv")
+	// ignore("tcp_v4_rcv")
+	// ignore("tcp_v6_rcv")
+	// // tcp_v4_do_rcv: skb drop when check CSUMERRORS
+	// ignore("tcp_v4_do_rcv")
 	// skb_queue_purge netlink recv function
 	ignore("skb_queue_purge")
 	ignore("nfnetlink_rcv_batch")
@@ -129,10 +140,11 @@ func (p *PacketLossProbe) Register(receiver chan<- proto.RawEvent) error {
 }
 
 func (p *PacketLossProbe) Collect(ctx context.Context) (map[string]map[uint32]uint64, error) {
-	res := map[string]map[uint32]uint64{
-		PACKETLOSS_ABNORMAL: {},
-		PACKETLOSS_TOTAL:    {},
+	resMap := make(map[string]map[uint32]uint64)
+	for _, metric := range packetLossMetrics {
+		resMap[metric] = make(map[uint32]uint64)
 	}
+
 	m := objs.bpfMaps.InspPlMetric
 	if m == nil {
 		slog.Ctx(ctx).Warn("get metric map with nil", "module", MODULE_NAME)
@@ -144,17 +156,30 @@ func (p *PacketLossProbe) Collect(ctx context.Context) (map[string]map[uint32]ui
 		key     = bpfInspPlMetricT{}
 	)
 
+	// if no entity found, do not report metric
+	ets := nettop.GetAllEntity()
+	if len(ets) == 0 {
+		return resMap, nil
+	}
+
+	for _, et := range ets {
+		// default set all stat to zero to prevent empty metric
+		for _, metric := range packetLossMetrics {
+			resMap[metric][uint32(et.GetNetns())] = 0
+		}
+	}
+
 	for entries.Next(&key, &value) {
 		// in tcp_v4_do_rcv situation, after sock_rps_save_rxhash, skb->dev was removed and sock was not bind
 		if key.Netns == 0 {
 			continue
 		}
 
-		if _, ok := res[PACKETLOSS_TOTAL][key.Netns]; ok {
-			res[PACKETLOSS_TOTAL][key.Netns] += value
-		} else {
-			res[PACKETLOSS_TOTAL][key.Netns] += value
-		}
+		// if _, ok := res[PACKETLOSS_TOTAL][key.Netns]; ok {
+		// 	res[PACKETLOSS_TOTAL][key.Netns] += value
+		// } else {
+		// 	res[PACKETLOSS_TOTAL][key.Netns] += value
+		// }
 
 		sym, err := bpfutil.GetSymPtFromBpfLocation(key.Location)
 		if err != nil {
@@ -162,16 +187,32 @@ func (p *PacketLossProbe) Collect(ctx context.Context) (map[string]map[uint32]ui
 			continue
 		}
 
-		if _, ok := ignoreSymbolList[sym.GetName()]; !ok {
-			if _, ok := res[PACKETLOSS_ABNORMAL][key.Netns]; ok {
-				res[PACKETLOSS_ABNORMAL][key.Netns] += value
-			} else {
-				res[PACKETLOSS_ABNORMAL][key.Netns] += value
+		switch sym.GetName() {
+		case netfilterSymbol:
+			resMap[PACKETLOSS_NETFILTER][key.Netns] += value
+		case tcpstatmSymbol:
+			resMap[PACKETLOSS_TCPSTATEM][key.Netns] += value
+		case tcprcvSymbol:
+			resMap[PACKETLOSS_TCPRCV][key.Netns] += value
+		case tcpdorcvSymbol:
+			resMap[PACKETLOSS_TCPHANDLE][key.Netns] += value
+		default:
+			if _, ok := ignoreSymbolList[sym.GetName()]; !ok {
+				resMap[PACKETLOSS_ABNORMAL][key.Netns] += value
 			}
+			resMap[PACKETLOSS_TOTAL][key.Netns] += value
 		}
+
+		// if _, ok := ignoreSymbolList[sym.GetName()]; !ok {
+		// 	if _, ok := res[PACKETLOSS_ABNORMAL][key.Netns]; ok {
+		// 		res[PACKETLOSS_ABNORMAL][key.Netns] += value
+		// 	} else {
+		// 		res[PACKETLOSS_ABNORMAL][key.Netns] += value
+		// 	}
+		// }
 	}
 
-	return res, nil
+	return resMap, nil
 }
 
 func (p *PacketLossProbe) Start(ctx context.Context) {
@@ -187,6 +228,11 @@ func (p *PacketLossProbe) Start(ctx context.Context) {
 		}
 		p.enable = true
 	})
+
+	if !p.enable {
+		// if load failed, do not start process
+		return
+	}
 
 	reader, err := perf.NewReader(objs.bpfMaps.InspPlEvent, int(unsafe.Sizeof(bpfInspPlEventT{})))
 	if err != nil {

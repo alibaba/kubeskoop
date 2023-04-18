@@ -27,13 +27,15 @@ type netnsMeta struct {
 }
 
 type podMeta struct {
-	name      string
-	namespace string
-	sandbox   string
-	pid       int
-	nspath    string
-	app       string // app label from cri response
-	ip        string // ip addr from cri response
+	name       string
+	namespace  string
+	sandbox    string
+	pid        int
+	nspath     string
+	app        string // app label from cri response
+	ip         string // ip addr from cri response
+	labels     map[string]string
+	containers map[string]string
 }
 
 type Entity struct {
@@ -42,22 +44,30 @@ type Entity struct {
 	pids []int
 }
 
-func (e *Entity) GetIP() string {
+func (e *Entity) GetIp() string {
 	return e.podMeta.ip
 }
 
-const hostNetworkContainer = "hostNetwork"
-
 func (e *Entity) GetAppLabel() string {
 	if e.netnsMeta.isHostNetwork {
-		return hostNetworkContainer
+		return "hostNetwork"
 	}
 	return e.podMeta.app
 }
 
+func (e *Entity) GetLabel(labelkey string) (string, bool) {
+	if e.podMeta.labels != nil {
+		if v, ok := e.podMeta.labels[labelkey]; ok {
+			return v, true
+		}
+	}
+
+	return "", false
+}
+
 func (e *Entity) GetPodName() string {
 	if e.netnsMeta.isHostNetwork {
-		return hostNetworkContainer
+		return "hostNetwork"
 	}
 
 	if e.podMeta.name != "" {
@@ -69,7 +79,7 @@ func (e *Entity) GetPodName() string {
 
 func (e *Entity) GetPodNamespace() string {
 	if e.netnsMeta.isHostNetwork {
-		return hostNetworkContainer
+		return "hostNetwork"
 	}
 
 	if e.podMeta.namespace != "" {
@@ -77,6 +87,17 @@ func (e *Entity) GetPodNamespace() string {
 	}
 
 	return "unknow"
+}
+
+func (et *Entity) GetMeta(name string) (string, error) {
+	switch name {
+	case "ip":
+		return et.GetIp(), nil
+	case "netns":
+		return fmt.Sprintf("ns%d", et.GetNetns()), nil
+	default:
+		return "", fmt.Errorf("unkonw or unsupported meta %s", name)
+	}
 }
 
 func (e *Entity) IsHostNetwork() bool {
@@ -91,7 +112,7 @@ func (e *Entity) GetNetnsMountPoint() string {
 	return e.netnsMeta.mountPath
 }
 
-func (e *Entity) GetPodSandboxId() string { // nolint
+func (e *Entity) GetPodSandboxId() string {
 	return e.podMeta.sandbox
 }
 
@@ -103,8 +124,13 @@ func (e *Entity) GetNsHandle() (netns.NsHandle, error) {
 	return netns.GetFromPath(e.netnsMeta.mountPath)
 }
 
-func (e *Entity) GetNetNsFd() int {
-	return 0
+func (e *Entity) GetNetNsFd() (int, error) {
+	h, err := e.GetNsHandle()
+	if err != nil {
+		return InitNetns, err
+	}
+
+	return int(h), nil
 }
 
 // GetPid return a random pid of entify, if no process in netns,return 0
@@ -118,16 +144,16 @@ func (e *Entity) GetPids() []int {
 	return e.pids
 }
 
-func StartCache(ctx context.Context) {
+func StartCache(ctx context.Context) error {
 	slog.Ctx(ctx).Info("nettop cache loop statrt", "interval", cacheUpdateInterval)
-	cacheDaemonLoop(ctx, control)
+	return cacheDaemonLoop(ctx, control)
 }
 
 func StopCache() {
 	control <- struct{}{}
 }
 
-func cacheDaemonLoop(ctx context.Context, control chan struct{}) {
+func cacheDaemonLoop(ctx context.Context, control chan struct{}) error {
 	t := time.NewTicker(cacheUpdateInterval)
 	defer t.Stop()
 
@@ -135,6 +161,7 @@ func cacheDaemonLoop(ctx context.Context, control chan struct{}) {
 		select {
 		case <-control:
 			slog.Ctx(ctx).Info("cache daemon loop exit of control signal")
+			return nil
 		case <-t.C:
 			go cacheProcess()
 		}

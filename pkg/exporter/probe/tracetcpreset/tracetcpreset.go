@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+
 	"math/bits"
 	"sync"
 	"syscall"
@@ -92,6 +93,11 @@ func (p *TCPResetProbe) Start(ctx context.Context) {
 		}
 		p.enable = true
 	})
+
+	if !p.enable {
+		// if load failed, do not start process
+		return
+	}
 
 	reader, err := perf.NewReader(objs.bpfMaps.InspTcpresetEvents, int(unsafe.Sizeof(bpfInspTcpresetEventT{})))
 	if err != nil {

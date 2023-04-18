@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+
 	"sync"
 	"time"
 
@@ -60,12 +61,12 @@ func NewEServer(ctx context.Context, config EventConfig) *EServer {
 	// handle grafana loki ingester preparation
 	if config.LokiEnable && config.LokiAddress != "" {
 		datach := make(chan proto.RawEvent)
-		ingester, err := lokiwrapper.NewIngester(config.LokiAddress, nettop.GetNodeName(), datach)
+		ingester, err := lokiwrapper.NewLokiIngester(ctx, config.LokiAddress, nettop.GetNodeName())
 		if err != nil {
 			slog.Ctx(ctx).Info("new loki ingester", "err", err, "client", ingester.Name())
 		} else {
 			es.subscribe(ingester.Name(), datach)
-			go ingester.Watch(ctx)
+			go ingester.Watch(ctx, datach)
 		}
 
 	}
@@ -73,7 +74,7 @@ func NewEServer(ctx context.Context, config EventConfig) *EServer {
 	return es
 }
 
-func (e *EServer) WatchEvent(_ *proto.WatchRequest, srv proto.Inspector_WatchEventServer) error {
+func (e *EServer) WatchEvent(req *proto.WatchRequest, srv proto.Inspector_WatchEventServer) error {
 	client := getPeerClient(srv.Context())
 	datach := make(chan proto.RawEvent)
 	slog.Ctx(e.ctx).Info("watch event income", "client", client)
@@ -99,7 +100,7 @@ func (e *EServer) WatchEvent(_ *proto.WatchRequest, srv proto.Inspector_WatchEve
 	return nil
 }
 
-func (e *EServer) QueryMetric(_ context.Context, _ *proto.QueryMetricRequest) (*proto.QueryMetricResponse, error) {
+func (e *EServer) QueryMetric(ctx context.Context, req *proto.QueryMetricRequest) (*proto.QueryMetricResponse, error) {
 	res := &proto.QueryMetricResponse{}
 	return res, nil
 }
@@ -161,6 +162,10 @@ func (e *EServer) broadcast(evt proto.RawEvent) error {
 
 		done <- struct{}{}
 	}(workdone)
+
+	if e.config.InfoToLog {
+		slog.Ctx(e.ctx).Warn("broadcast event", "type", evt.EventType, "body", evt.EventBody, "netns", evt.Netns)
+	}
 
 	select {
 	case <-ctx.Done():

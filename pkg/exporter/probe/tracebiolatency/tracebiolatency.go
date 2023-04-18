@@ -91,6 +91,11 @@ func (p *BiolatencyProbe) Start(ctx context.Context) {
 		p.enable = true
 	})
 
+	if !p.enable {
+		// if load failed, do nat start process
+		return
+	}
+
 	slog.Debug("start probe", "module", MODULE_NAME)
 	if perfReader == nil {
 		slog.Ctx(ctx).Warn("start", "module", MODULE_NAME, "err", "perf reader not ready")

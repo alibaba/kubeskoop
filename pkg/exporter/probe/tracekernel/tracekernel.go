@@ -124,6 +124,11 @@ func (p *KernelLatencyProbe) Start(ctx context.Context) {
 		p.enable = true
 	})
 
+	if !p.enable {
+		// if load failed, do nat start process
+		return
+	}
+
 	go p.startRX(ctx)
 	// go p.startTX(ctx)
 }
