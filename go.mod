@@ -49,7 +49,6 @@ require (
 	k8s.io/component-base v0.22.5
 	k8s.io/cri-api v0.25.2
 	k8s.io/klog/v2 v2.90.1
-	k8s.io/kubernetes v1.27.1
 	k8s.io/utils v0.0.0-20230209194617-a36077c30491
 )
 
@@ -156,6 +155,7 @@ require (
 	go.etcd.io/bbolt v1.3.6 // indirect
 	go.mozilla.org/pkcs7 v0.0.0-20200128120323-432b2356ecb1 // indirect
 	go.opencensus.io v0.24.0 // indirect
+	go.uber.org/goleak v1.2.1 // indirect
 	golang.org/x/crypto v0.1.0 // indirect
 	golang.org/x/image v0.0.0-20200119044424-58c23975cae1 // indirect
 	golang.org/x/net v0.8.0 // indirect
