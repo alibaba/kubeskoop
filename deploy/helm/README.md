@@ -10,7 +10,7 @@ helm repo add kubeskoop https://github.com/alibaba/kubeskoop/charts
 helm repo update
 
 # 安装skoop exporter
-helm install skoop-exporter kubeskoop/skoop-exporter
+helm install kubeskoop-exporter kubeskoop/kubeskoop-exporter
 ```
 
 如果需要调试Helm Charts信息，可以通过本地安装：
@@ -20,29 +20,31 @@ helm install skoop-exporter kubeskoop/skoop-exporter
 git clone https://github.com/alibaba/kubeskoop.git
 
 # 进行本地安装
-helm install --set namespace=kube-system skoop-exporter ./kubeskoop/deploy/skoop-exporter-0.1.0.tgz --debug
+helm install --set namespace=kube-system kubeskoop-exporter ./kubeskoop/deploy/kubeskoop-exporter-0.1.0.tgz --debug
 ```
 
-Skoop-exporter以DeamonSet方式部署在集群中，可以通过以下方式验证是否正常工作：
+kubeskoop-exporter以DeamonSet方式部署在集群中，可以通过以下方式验证是否正常工作：
 
 ```shell
 # 查看Skoop exporter的运行状态
-kubectl get pod -n skoop -l app=skoop-exporter -o wide
+kubectl get pod -n kubeskoop -l app=kubeskoop-exporter -o wide
 
 # 获取到pod的信息后，可以通过apiserver查看Probe采集探针的运行状态
-kubectl get --raw /api/v1/namespaces/{{skoop-exporter的pod namespace}}/pods/{{skoop-exporter的pod name}}:9102/proxy/status |jq .
+kubectl get --raw /api/v1/namespaces/{{kubeskoop-exporter的pod namespace}}/pods/{{kubeskoop-exporter的pod name}}:9102/proxy/status |jq .
 
-# 如果可以直接访问skoop-exporter实例，也可以直接查看Probe的运行状态
-curl {{skoop-exporter的pod ip}}:9102/status |jq .
+# 如果可以直接访问kubeskoop-exporter实例，也可以直接查看Probe的运行状态
+curl {{kubeskoop-exporter的pod ip}}:9102/status |jq .
 ```
 
 ## VARIABLE
 
 | Setting                            | Description                                                                                                          | Default                            |
 |------------------------------------|----------------------------------------------------------------------------------------------------------------------|------------------------------------|
-| name                               | Skoop-exporter daemonset name                                                                                        | `skoop-exporter`                   |
-| namespace                          | The namespace of skoop-exporter workload                                                                             | `skoop`                            |
-| debugmode                          | Enable the debugmode of skoop-exporter, with debug interface, debug log level and pprof support                      | `false`                            |
+| name                               | kubeskoop-exporter daemonset name                                                                                    | `kubeskoop-exporter`               |
+| namespace                          | The namespace of kubeskoop-exporter workload                                                                         | `kubeskoop`                        |
+| debugmode                          | Enable the debugmode of kubeskoop-exporter, with debug interface, debug log level and pprof support                  | `false`                            |
+| appName                            | Pod  `app` label                                                                                                     | `kubeskoop-exporter`               |
+| runtimeEndpoint                    | CRI runtime endpoint socket, you can use  `crictl info |awk -F":" '/containerdEndpoint/ {print $2'` to obtain it     | `/run/containerd/containerd.sock`  |
 | config.enableEventServer           | Enable the event server                                                                                              | `false`                            |
 | config.enableMetricServer          | Enable the metric server                                                                                             | `true`                             |
 | config.remoteLokiAddress           | Set the remote grafana loki endpoint to push events                                                                  | ``                                 |

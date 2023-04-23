@@ -4,31 +4,32 @@ metadata:
   name: {{ .Values.name }}
   namespace: {{ .Values.namespace }}
   labels:
-    app: skoop-exporter
+    app: {{ .Values.appName }}
 spec:
   selector:
     matchLabels:
-      app: skoop-exporter
+      app: {{ .Values.appName }}
   template:
     metadata:
       labels:
-        app: skoop-exporter
+        app: {{ .Values.appName }}
       annotations:
         prometheus.io/path: /metrics
         prometheus.io/port: "9102"
         prometheus.io/scheme: http
         prometheus.io/scrape: "true"
-      name: skoop-exporter
+      name: {{ .Values.appName }}
     spec:
       hostNetwork: true
       hostPID: true
       hostIPC: true
       dnsPolicy: ClusterFirstWithHostNet
       initContainers:
-        - name: inspector-prepare
+        - name: preparels
+
           image: "{{ .Values.initcontainer.repository }}:{{ .Values.initcontainer.tag }}"
           volumeMounts:
-            - name: btf-rawdata
+            - name: bpfdir
               mountPath: /etc/net-exporter/btf
             - mountPath: /boot/
               name: boot
@@ -42,24 +43,21 @@ spec:
             fieldRef:
               fieldPath: spec.nodeName
         volumeMounts:
-          - name: config-volume
+          - name: configvolume
             mountPath: /etc/config/
-          - name: btf-rawdata
+          - name: bpfdir
             mountPath: /etc/net-exporter/btf
-          - name: proc
+          - name: procfs
             mountPath: /proc
-          - mountPath: /run/containerd/
-            name: containerd
+          - mountPath: /run/containerd/containerd.sock
+            name: runtimeendpoint
           - mountPath: /var/run/
-            name: dockershim
+            name: rundir
           - mountPath: /sys/fs/bpf
-            name: bpf-maps
-            mountPropagation: HostToContainer
-          - mountPath: /sys/fs/cgroup
-            name: cgroup
+            name: bpfmap
             mountPropagation: HostToContainer
           - mountPath: /sys/kernel/debug
-            name: bpf-events
+            name: bpfdebugfs
             mountPropagation: HostToContainer
           - mountPath: /etc/node-hostname
             name: hostname
@@ -73,35 +71,31 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       volumes:
-        - name: proc
+        - name: procfs
           hostPath:
             path: /proc
-        - name: containerd
+        - name: runtimeendpoint
           hostPath:
-            path: /run/containerd/
+            path: {{ .Values.runtimeEndpoint }}
         - name: boot
           hostPath:
             path: /boot/
-        - name: dockershim
+        - name: rundir
           hostPath:
             path: /var/run/
         - hostPath:
             path: /sys/fs/bpf
             type: DirectoryOrCreate
-          name: bpf-maps
-        - hostPath:
-            path: /sys/fs/cgroup
-            type: DirectoryOrCreate
-          name: cgroup
+          name: bpfmap
         - hostPath:
             path: /sys/kernel/debug
-          name: bpf-events
+          name: bpfdebugfs
         - name: hostname
           hostPath:
             path: /etc/hostname
             type: FileOrCreate
-        - name: config-volume
+        - name: configvolume
           configMap:
-            name: inspector-config
-        - name: btf-rawdata
+            name: kubeskoop-config
+        - name: bpfdir
           emptyDir: {}
