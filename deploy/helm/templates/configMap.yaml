@@ -6,6 +6,10 @@ data:
       interval: {{ .Values.config.metricCacheInterval }}
       port: {{ .Values.config.metricServerPort }}
       verbose: {{ .Values.config.metricLabelVerbose }}
+      expose_labels:
+      {{- with .Values.expose_labels }}
+        {{- toYaml . | nindent 8 }} 
+      {{- end }}
       probes:{{- range .Values.config.metricProbes }}
       - {{ . }}{{- end }}
     event_config:
@@ -16,5 +20,5 @@ data:
       - {{ . }}{{- end }}
 kind: ConfigMap
 metadata:
-  name: inspector-config
+  name: kubeskoop-config
   namespace: {{ .Values.namespace }}
