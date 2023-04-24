@@ -393,6 +393,11 @@ func (m *simplePodCollectorManager) createCollectorPod(nodeName string) (*v1.Pod
 					},
 				},
 			},
+			Tolerations: []v1.Toleration{
+				{
+					Operator: v1.TolerationOpExists,
+				},
+			},
 		},
 		Status: v1.PodStatus{},
 	}
