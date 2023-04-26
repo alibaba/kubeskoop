@@ -332,7 +332,7 @@ data:
                 "name": "prometheus",
                 "orgId": 1,
                 "type": "prometheus",
-                "url": "http://prometheus-service.skoop.svc",
+                "url": "http://prometheus-service.kubeskoop.svc",
                 "version": 1
             }
         ]
