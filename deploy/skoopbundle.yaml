@@ -135,7 +135,7 @@ data:
     event_config:
       port: 19102
       loki_enable: true
-      loki_address: loki-service.skoop.svc.cluster.local
+      loki_address: loki-service.kubeskoop.svc.cluster.local
       probes:
       - tcpreset
       - packetloss
