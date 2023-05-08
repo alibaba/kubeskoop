@@ -89,9 +89,9 @@ Confirm that the installation is complete and obtain access through the followin
 
 ```shell
 # View the status of KubeSkoop exporter
-kubectl get pod -n kubeskoop -l app=skoop-exporter -o wide
+kubectl get pod -n kubeskoop -l app=kubeskoop-exporter -o wide
 # View the status of Probe collection probes
-kubectl get --raw /api/v1/namespaces/kubeskoop/pods/skoop-exporter-t4d9m:9102/proxy/status |jq .
+kubectl get --raw /api/v1/namespaces/kubeskoop/pods/kubeskoop-exporter-t4d9m:9102/proxy/status |jq .
 # Obtain the entrance of Prometheus service, which is exposed by NodePort by default
 kubectl get service -n kubeskoop prometheus-service -o wide
 # Obtain the access entry of the Grafana console, which is exposed by NodePort by default
