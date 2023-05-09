@@ -19,7 +19,7 @@ import (
 var (
 	entityCmd = &cobra.Command{
 		Use:   "entity",
-		Short: "list network entity, aka no-hostNetwork pod",
+		Short: "List all network entities, including all non-hostnetwork pods and the host itself.",
 		Run: func(cmd *cobra.Command, args []string) {
 			if LabelSelector != "" {
 				slct, err := parseLabelSelector(LabelSelector)

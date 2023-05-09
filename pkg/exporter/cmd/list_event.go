@@ -4,12 +4,9 @@ Copyright © 2022 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"context"
-
 	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
-	"golang.org/x/exp/slog"
 )
 
 // eventCmd represents the event command
@@ -17,16 +14,31 @@ var eventCmd = &cobra.Command{
 	Use:   "event",
 	Short: "list all available metrics",
 	Run: func(cmd *cobra.Command, args []string) {
-		ctx := slog.NewContext(context.Background(), slog.Default())
-		if len(listprobe) == 0 {
-			listprobe = probe.ListMetricProbes(ctx, true)
-		}
-
 		events := probe.ListEvents()
-		pterm.Print(events)
+
+		sliceMapTextOutput("events", events)
 	},
 }
 
 func init() {
 	listCmd.AddCommand(eventCmd)
+}
+
+func sliceMapTextOutput(title string, data map[string][]string) {
+	tree := pterm.TreeNode{
+		Text:     title,
+		Children: []pterm.TreeNode{},
+	}
+
+	for p, unit := range data {
+		parent := pterm.TreeNode{
+			Text:     p,
+			Children: []pterm.TreeNode{},
+		}
+		for i := range unit {
+			parent.Children = append(parent.Children, pterm.TreeNode{Text: unit[i]})
+		}
+		tree.Children = append(tree.Children, parent)
+	}
+	pterm.DefaultTree.WithRoot(tree).Render()
 }

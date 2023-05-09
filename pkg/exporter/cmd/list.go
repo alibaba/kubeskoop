@@ -13,8 +13,12 @@ var (
 			cmd.Help() // nolint
 		},
 	}
+
+	output string
 )
 
 func init() {
 	rootCmd.AddCommand(listCmd)
+
+	listCmd.PersistentFlags().StringVarP(&output, "output", "o", "text", "output format, support text/json/file")
 }
