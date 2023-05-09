@@ -73,9 +73,10 @@ func getAllProcessFd(nslist []*nettop.Entity) (map[string]map[uint32]uint64, err
 		nsprocfsock := map[string]struct{}{}
 		for _, idx := range nslogic.GetPids() {
 			procfds, err := getProcessFdStat(idx)
-			if err != nil {
+			if err != nil && !os.IsNotExist(err) {
 				return resMap, err
 			}
+
 			for fd := range procfds {
 				nsprocfd[fd] = struct{}{}
 				if strings.HasPrefix(fd, "socket:") {
