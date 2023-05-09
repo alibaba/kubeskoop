@@ -230,7 +230,7 @@ func status(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	res := make(map[string]bool)
-	for _, pn := range probe.ListMetricProbes(context.Background(), true) {
+	for _, pn := range probe.ListMetricProbes() {
 		p := probe.GetProbe(pn)
 		res[p.Name()] = p.Ready()
 	}

@@ -4,33 +4,59 @@ Copyright © 2022 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"context"
+	"strings"
 
 	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
-	"golang.org/x/exp/slog"
 )
 
 // metricCmd represents the metric command
 var (
 	listmetricCmd = &cobra.Command{
 		Use:   "metric",
-		Short: "list all available metrics",
+		Short: "list available metrics of probe",
 		Run: func(cmd *cobra.Command, args []string) {
-			ctx := slog.NewContext(context.Background(), slog.Default())
-			if len(listprobe) == 0 {
-				listprobe = probe.ListMetricProbes(ctx, true)
-			}
-
-			metriclist := []string{}
-			metrics := probe.ListMetrics()
-			for _, p := range listprobe {
-				if mnames, ok := metrics[p]; ok {
-					metriclist = append(metriclist, mnames...)
+			showprobes := []string{}
+			allprobes := probe.ListMetricProbes()
+			for idx := range listprobe {
+				for _, probe := range allprobes {
+					if strings.Contains(probe, listprobe[idx]) {
+						showprobes = append(showprobes, probe)
+						break
+					}
 				}
 			}
-			pterm.Print(metriclist)
+
+			if len(showprobes) == 0 {
+				showprobes = allprobes
+			}
+
+			tree := pterm.TreeNode{
+				Text:     "metrics",
+				Children: []pterm.TreeNode{},
+			}
+			metrics := probe.ListMetrics()
+			for _, p := range showprobes {
+				if mnames, ok := metrics[p]; ok {
+					parent := pterm.TreeNode{
+						Text:     p,
+						Children: []pterm.TreeNode{},
+					}
+					for i := range mnames {
+						if !strings.HasPrefix(mnames[i], p) {
+							continue
+						}
+						children := pterm.TreeNode{
+							Text: mnames[i],
+						}
+						parent.Children = append(parent.Children, children)
+					}
+					tree.Children = append(tree.Children, parent)
+				}
+			}
+
+			pterm.DefaultTree.WithRoot(tree).Render() // nolint
 
 		},
 	}

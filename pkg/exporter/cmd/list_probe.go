@@ -4,10 +4,10 @@ Copyright © 2022 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"context"
+	"encoding/json"
+	"fmt"
 
 	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
-	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slog"
 )
@@ -16,18 +16,34 @@ import (
 var (
 	probeCmd = &cobra.Command{
 		Use:   "probe",
-		Short: "A brief description of your command",
+		Short: "list supported probe with metric exporting",
 		Run: func(cmd *cobra.Command, args []string) {
-			ctx := slog.NewContext(context.Background(), slog.Default())
-			pls := probe.ListMetricProbes(ctx, avail)
-			pterm.Println(pls)
+			res := map[string][]string{
+				"metric": {},
+				"event":  {},
+			}
+			res["metric"] = probe.ListMetricProbes()
+
+			els := probe.ListEvents()
+			for ep := range els {
+				res["event"] = append(res["event"], ep)
+			}
+
+			switch output {
+			case "json":
+				text, err := json.MarshalIndent(res, "", "  ")
+				if err != nil {
+					slog.Warn("json marshal failed", "err", err)
+					return
+				}
+				fmt.Println(string(text))
+			default:
+				sliceMapTextOutput("probes", res)
+			}
 		},
 	}
-
-	avail bool
 )
 
 func init() {
 	listCmd.AddCommand(probeCmd)
-	probeCmd.PersistentFlags().BoolVarP(&avail, "avail", "a", false, "list all available probes")
 }

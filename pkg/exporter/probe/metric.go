@@ -6,6 +6,7 @@ import (
 
 	"github.com/alibaba/kubeskoop/pkg/exporter/probe/nlconntrack"
 	"github.com/alibaba/kubeskoop/pkg/exporter/probe/nlqdisc"
+	"github.com/alibaba/kubeskoop/pkg/exporter/probe/procfd"
 	"github.com/alibaba/kubeskoop/pkg/exporter/probe/procio"
 	"github.com/alibaba/kubeskoop/pkg/exporter/probe/procipvs"
 	"github.com/alibaba/kubeskoop/pkg/exporter/probe/procnetdev"
@@ -48,9 +49,10 @@ func init() {
 	availmprobes["conntrack"] = nlconntrack.GetProbe()
 	availmprobes["ipvs"] = procipvs.GetProbe()
 	availmprobes["qdisc"] = nlqdisc.GetProbe()
+	availmprobes["fd"] = procfd.GetProbe()
 }
 
-func ListMetricProbes(_ context.Context, _ bool) (probelist []string) {
+func ListMetricProbes() (probelist []string) {
 	for k := range availmprobes {
 		probelist = append(probelist, k)
 	}

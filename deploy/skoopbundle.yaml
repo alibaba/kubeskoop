@@ -135,7 +135,7 @@ data:
     event_config:
       port: 19102
       loki_enable: true
-      loki_address: loki-service.kubeskoop.svc.cluster.local
+      loki_address: loki-service
       probes:
       - tcpreset
       - packetloss
@@ -332,7 +332,7 @@ data:
                 "name": "prometheus",
                 "orgId": 1,
                 "type": "prometheus",
-                "url": "http://prometheus-service.kubeskoop.svc",
+                "url": "http://prometheus-service",
                 "version": 1
             }
         ]
@@ -358,8 +358,11 @@ spec:
       - name: grafana
         image: grafana/grafana:latest
         ports:
-        - name: grafana
-          containerPort: 3000
+          - name: grafana
+            containerPort: 3000
+        env:
+          - name: GF_SECURITY_ADMIN_PASSWORD
+            value: "kubeskoop"
         resources:
           limits:
             memory: "1Gi"
