@@ -40,5 +40,5 @@ func sliceMapTextOutput(title string, data map[string][]string) {
 		}
 		tree.Children = append(tree.Children, parent)
 	}
-	pterm.DefaultTree.WithRoot(tree).Render()
+	pterm.DefaultTree.WithRoot(tree).Render() // nolint
 }

@@ -91,9 +91,9 @@ kubectl apply -f https://raw.githubusercontent.com/alibaba/kubeskoop/main/deploy
 
 ```shell
 # 查看KubeSkoop exporter状态
-kubectl get pod -n kubeskoop -l app=skoop-exporter -o wide
+kubectl get pod -n kubeskoop -l app=kubeskoop-exporter -o wide
 # 查看探针状态
-kubectl get --raw /api/v1/namespaces/kubeskoop/pods/skoop-exporter-t4d9m:9102/proxy/status |jq .
+kubectl get --raw /api/v1/namespaces/kubeskoop/pods/kubeskoop-exporter-t4d9m:9102/proxy/status |jq .
 # 获得Prometheus服务的访问入口，服务默认为NodePort类型
 kubectl get service -n kubeskoop prometheus-service -o wide
 # 获得Grafana控制台服务的访问入口，服务默认为NodePort类型

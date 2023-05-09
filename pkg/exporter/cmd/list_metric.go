@@ -56,7 +56,7 @@ var (
 				}
 			}
 
-			pterm.DefaultTree.WithRoot(tree).Render()
+			pterm.DefaultTree.WithRoot(tree).Render() // nolint
 
 		},
 	}

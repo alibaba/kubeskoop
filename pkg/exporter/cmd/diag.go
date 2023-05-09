@@ -10,7 +10,7 @@ var (
 		Use:   "diag",
 		Short: "Run command in the command line to probe metrics and events.",
 		Run: func(cmd *cobra.Command, args []string) {
-			cmd.Help()
+			cmd.Help() // nolint
 		},
 	}
 

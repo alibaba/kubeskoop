@@ -20,7 +20,7 @@ var (
 		Short: "get metric data in cli",
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(probeName) == 0 {
-				cmd.Help()
+				cmd.Help() // nolint
 				return
 			}
 			ctx := slog.NewContext(context.Background(), slog.Default())
