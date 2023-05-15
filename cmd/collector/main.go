@@ -5,8 +5,10 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"path"
+	"runtime"
 
 	pod_collector "github.com/alibaba/kubeskoop/pkg/skoop/collector/podcollector"
 
@@ -15,10 +17,28 @@ import (
 )
 
 func main() {
-	var dumpPath string
+	runtime.GOMAXPROCS(1)
+	runtime.LockOSThread()
+
+	if os.Args[0] == "nsenter" {
+		output, err := pod_collector.NSExec(os.Args)
+		if err != nil {
+			os.Stderr.WriteString(fmt.Sprintf("error: %v\n", err))
+			os.Stderr.Sync()
+			os.Exit(1)
+		}
+		fmt.Print(output)
+		return
+	}
+	var (
+		dumpPath, podNamespace, podName, runtimeEndpoint string
+	)
 	flag.StringVar(&dumpPath, "dump-path", "/data/collector.json", "Collector result path")
+	flag.StringVar(&podNamespace, "namespace", "", "pod namespace to collect")
+	flag.StringVar(&podName, "name", "", "pod name to collect, 'host' as host network namespace")
+	flag.StringVar(&runtimeEndpoint, "runtime-endpoint", "", "runtime socket addr to resolve pod info")
 	flag.Parse()
-	c, err := pod_collector.NewCollector()
+	c, err := pod_collector.NewCollector(podNamespace, podName, runtimeEndpoint)
 	if err != nil {
 		log.Fatalf("error init collector, %v", err)
 	}
