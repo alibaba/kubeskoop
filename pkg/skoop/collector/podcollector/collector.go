@@ -13,6 +13,9 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/samber/lo"
+	"golang.org/x/sys/unix"
+
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/alibaba/kubeskoop/pkg/skoop/collector"
@@ -31,21 +34,35 @@ import (
 )
 
 type podCollector struct {
+	runtimeEndpoint string
+	podNamespace    string
+	podName         string
+
 	dockerCli  client.APIClient
 	runtimeCli pb.RuntimeServiceClient
 }
 
 func (a *podCollector) DumpNodeInfos() (*k8s.NodeNetworkStackDump, error) {
-	runtime.GOMAXPROCS(1)
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
 	dump := &k8s.NodeNetworkStackDump{}
 	var err error
 	dump.Pods, err = a.PodList()
 	if err != nil {
 		return nil, fmt.Errorf("error get pod list, %v", err)
 	}
-	dump.Netns, err = a.SandboxInfos(dump.Pods)
+
+	collectHost := true
+	if a.podNamespace == "" && a.podName == "host" {
+		// only collect for host namespace
+		dump.Pods = nil
+	}
+	if a.podNamespace != "" && a.podName != "" {
+		dump.Pods = lo.Filter(dump.Pods, func(item k8s.PodNetInfo, index int) bool {
+			return item.PodNamespace == a.podNamespace && item.PodName == a.podName
+		})
+		collectHost = false
+	}
+
+	dump.Netns, err = a.SandboxInfos(dump.Pods, collectHost)
 	if err != nil {
 		return nil, fmt.Errorf("error get sandboxs info, %v", err)
 	}
@@ -53,10 +70,13 @@ func (a *podCollector) DumpNodeInfos() (*k8s.NodeNetworkStackDump, error) {
 	return dump, nil
 }
 
-func NewCollector() (collector.Collector, error) {
-	pc := &podCollector{}
+func NewCollector(podNamespace, podName, runtimeEndpoint string) (collector.Collector, error) {
+	pc := &podCollector{podNamespace: podNamespace, podName: podName, runtimeEndpoint: runtimeEndpoint}
 
 	socket := os.Getenv("RUNTIME_SOCK")
+	if runtimeEndpoint != "" {
+		socket = runtimeEndpoint
+	}
 	if socket == "" {
 		socket = "unix:///var/run/dockershim.sock"
 		_, err := os.Stat("/var/run/dockershim.sock")
@@ -140,13 +160,15 @@ func (a *podCollector) PodList() ([]k8s.PodNetInfo, error) {
 	return pods, nil
 }
 
-func (a *podCollector) SandboxInfos(pods []k8s.PodNetInfo) ([]netstack.NetNSInfo, error) {
+func (a *podCollector) SandboxInfos(pods []k8s.PodNetInfo, collectHostNs bool) ([]netstack.NetNSInfo, error) {
 	var sandboxInfos []netstack.NetNSInfo
-	hostNsInfo, err := a.SandboxInfo("/proc/1/ns/net", "", 1)
-	if err != nil {
-		return nil, err
+	if collectHostNs {
+		hostNsInfo, err := a.SandboxInfo("/proc/1/ns/net", "", 1)
+		if err != nil {
+			return nil, err
+		}
+		sandboxInfos = append(sandboxInfos, hostNsInfo)
 	}
-	sandboxInfos = append(sandboxInfos, hostNsInfo)
 	for _, p := range pods {
 		if p.NetworkMode == "none" {
 			nsInfo, err := a.SandboxInfo(p.Netns, fmt.Sprintf("%s/%s", p.PodNamespace, p.PodName), p.PID)
@@ -220,8 +242,34 @@ func getFileInode(path string) (string, error) {
 	return strconv.FormatUint(fileInfo.Ino, 10), nil
 }
 
+// NSExec nsenter {pid} {command}
+func NSExec(args []string) (string, error) {
+	if len(args) < 3 {
+		return "", fmt.Errorf("command args invalid: %v", args)
+	}
+	fd, err := unix.Open(fmt.Sprintf("/proc/%s/ns/net", args[1]), unix.O_RDONLY|unix.O_CLOEXEC, 0)
+	if err != nil {
+		return "", fmt.Errorf("cannot get pid: %v", err)
+	}
+	defer func() {
+		unix.Close(fd)
+	}()
+
+	err = unix.Setns(fd, unix.CLONE_NEWNET)
+	if err != nil {
+		return "", fmt.Errorf("cannot get pid from pid: %v", err)
+	}
+	output, err := exec.Command(args[2], args[3:]...).CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("err:%v, output: %v", err, string(output))
+	}
+	return string(output), nil
+}
+
 func namespaceCmd(pid uint32, cmd string) (string, error) {
-	output, err := exec.Command("nsenter", "-t", strconv.Itoa(int(pid)), "--net", "--", "sh", "-c", cmd).CombinedOutput()
+	cmdExec := exec.Command("nsenter", strconv.Itoa(int(pid)), "sh", "-c", cmd)
+	cmdExec.Path = "/proc/self/exe"
+	output, err := cmdExec.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("err:%v, output: %v", err, string(output))
 	}
