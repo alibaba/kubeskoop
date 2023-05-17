@@ -12,7 +12,6 @@ import (
 	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
-	"golang.org/x/exp/slog"
 )
 
 // entityCmd represents the entity command
@@ -24,7 +23,7 @@ var (
 			if LabelSelector != "" {
 				slct, err := parseLabelSelector(LabelSelector)
 				if err != nil {
-					slog.Warn("parse label failed", "err", err, "label", LabelSelector)
+					fmt.Printf("parse label %s failed:%s\n", LabelSelector, err.Error())
 					return
 				}
 				listEntities(slct)
@@ -40,14 +39,13 @@ var (
 
 func init() {
 	listCmd.AddCommand(entityCmd)
-
 	entityCmd.PersistentFlags().StringVarP(&LabelSelector, "label", "l", "", "label filter")
 }
 
 func listEntities(slct ...selector) {
 	err := nettop.SyncNetTopology()
 	if err != nil {
-		slog.Warn("sync nettop", "err", err)
+		fmt.Printf("sync nettop failed:%s\n", err.Error())
 		return
 	}
 
