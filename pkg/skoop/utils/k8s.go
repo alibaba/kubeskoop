@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/samber/lo"
+	"golang.org/x/exp/slices"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -138,4 +141,16 @@ func GetOSFromNode(node *v1.Node) string {
 	}
 
 	return node.Labels["beta.kubernetes.io/os"]
+}
+
+func ContainsLoadBalancerIP(svc *v1.Service, ip string) bool {
+	if slices.Contains(svc.Spec.ExternalIPs, ip) {
+		return true
+	}
+	if lo.ContainsBy(svc.Status.LoadBalancer.Ingress, func(ingress v1.LoadBalancerIngress) bool {
+		return ingress.IP == ip
+	}) {
+		return true
+	}
+	return false
 }
