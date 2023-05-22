@@ -96,7 +96,7 @@ func (g *Graphviz) buildGraph(p *model.PacketPath) (*cgraph.Graph, error) {
 		label := p.GetLinkLabel(l, action)
 		edge.Set("linklabels", label)
 
-		if action.Type == model.ActionTypeServe {
+		if action != nil && action.Type == model.ActionTypeServe {
 			edge.SetArrowHead(cgraph.DotArrow)
 		}
 	}

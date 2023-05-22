@@ -81,6 +81,16 @@ func buildCloudManager(_ *ctx.Context, region, instanceOfCluster string) (*aliyu
 	return aliyun.NewCloudManager(options)
 }
 
+func buildNetNodeManager(ctx *ctx.Context, plgn plugin.Plugin, infraShim network.InfraShim, serviceProcessor service.Processor, collectorManager collector.Manager) (nodemanager.NetNodeManager, error) {
+	aliyunNetNodeManager := &netNodeManager{
+		infraShim:  infraShim,
+		ipCache:    ctx.ClusterConfig().IPCache,
+		processor:  serviceProcessor,
+		pluginName: ctx.ClusterConfig().NetworkPlugin,
+	}
+	return nodemanager.NewNetNodeManagerWithParent(ctx, aliyunNetNodeManager, plgn, collectorManager)
+}
+
 func NewFlannelNetwork(ctx *ctx.Context) (network.Network, error) {
 	region, instance, err := getRegionAndInstanceID(ctx)
 	if err != nil {
@@ -109,12 +119,12 @@ func NewFlannelNetwork(ctx *ctx.Context) (network.Network, error) {
 		return nil, err
 	}
 
-	netNodeManager, err := nodemanager.NewNetNodeManager(ctx, plgn, collectorManager)
+	networkPolicy, err := plugin.NewNetworkPolicy(false, false, ctx.ClusterConfig().IPCache, ctx.KubernetesClient(), serviceProcessor)
 	if err != nil {
 		return nil, err
 	}
 
-	networkPolicy, err := plugin.NewNetworkPolicy(false, false, ctx.ClusterConfig().IPCache, ctx.KubernetesClient(), serviceProcessor)
+	netNodeManager, err := buildNetNodeManager(ctx, plgn, infraShim, serviceProcessor, collectorManager)
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +170,7 @@ func NewCalicoNetwork(ctx *ctx.Context) (network.Network, error) {
 		return nil, err
 	}
 
-	netNodeManager, err := nodemanager.NewNetNodeManager(ctx, plgn, collectorManager)
+	netNodeManager, err := buildNetNodeManager(ctx, plgn, infraShim, serviceProcessor, collectorManager)
 	if err != nil {
 		return nil, err
 	}

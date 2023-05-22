@@ -53,7 +53,7 @@ func (b *BasePluginNode) Send(dst model.Endpoint, protocol model.Protocol) (tran
 			return nil, err
 		}
 		return b.SimplePluginNode.ToHost(nil, dst, protocol, host)
-	case model.EndpointTypeService:
+	case model.EndpointTypeService, model.EndpointTypeLoadbalancer:
 		svc, err := b.IPCache.GetServiceFromIP(dst.IP)
 		if err != nil {
 			return nil, err
@@ -100,7 +100,7 @@ func (b *BasePluginNode) Receive(upstream *model.Link) (trans []model.Transmissi
 			return b.SimplePluginNode.Serve(upstream, dst, protocol)
 		}
 		return b.SimplePluginNode.ToHost(upstream, dst, protocol, host)
-	case model.EndpointTypeService:
+	case model.EndpointTypeService, model.EndpointTypeLoadbalancer:
 		svc, err := b.IPCache.GetServiceFromIP(dst.IP)
 		if err != nil {
 			return nil, err

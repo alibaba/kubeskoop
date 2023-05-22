@@ -2,6 +2,7 @@ package aliyun
 
 import (
 	"fmt"
+	"net"
 	"strings"
 
 	openapi "github.com/alibabacloud-go/darabonba-openapi/client"
@@ -13,8 +14,9 @@ import (
 )
 
 type CloudManager struct {
-	vpcID  string
-	region string
+	vpcID    string
+	region   string
+	vpcCIDRs []*net.IPNet
 
 	vpc *vpc.Client
 	ecs *ecs.Client
@@ -84,7 +86,6 @@ type Listener struct {
 
 func NewCloudManager(options *CloudManagerOptions) (*CloudManager, error) {
 	//TODO user-agent
-	//TODO vpc id
 	cfg := &openapiv2.Config{
 		AccessKeyId:     tea.String(options.AccessKeyID),
 		AccessKeySecret: tea.String(options.AccessKeySecret),
@@ -112,15 +113,45 @@ func NewCloudManager(options *CloudManagerOptions) (*CloudManager, error) {
 		return nil, fmt.Errorf("create slb client: %s", err)
 	}
 
-	return &CloudManager{
+	vpcID := ""
+	if options.VPCID != "" {
+		vpcID = options.VPCID
+	} else if options.InstanceOfCluster != "" {
+		request := &ecs.DescribeInstancesRequest{}
+		request.SetRegionId(options.Region).
+			SetInstanceIds(fmt.Sprintf("[\"%s\"]", options.InstanceOfCluster))
+
+		response, err := ecsClient.DescribeInstances(request)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(response.Body.Instances.Instance) == 0 {
+			return nil, fmt.Errorf("cannot find ecs instance info from id %s", options.InstanceOfCluster)
+		}
+		info := response.Body.Instances.Instance[0]
+		vpcID = *info.VpcAttributes.VpcId
+	} else {
+		return nil, fmt.Errorf("VPCID or InstanceOfCluster must be provided to get VPC ID")
+	}
+
+	cm := &CloudManager{
 		vpc: vpcClient,
 		ecs: ecsClient,
 		slb: slbClient,
 
 		region: options.Region,
+		vpcID:  vpcID,
 
 		ecsInfoCache: map[string]*ECSInfo{},
-	}, nil
+	}
+
+	cm.vpcCIDRs, err = cm.GetCIDRsFromVPC(vpcID)
+	if err != nil {
+		return nil, err
+	}
+
+	return cm, nil
 }
 
 func (m *CloudManager) VPC() string {
@@ -410,6 +441,22 @@ func (m *CloudManager) GetSLBFromPrivateIP(ip string) (*slb.DescribeLoadBalancer
 	return response.Body.LoadBalancers.LoadBalancer[0], nil
 }
 
+func (m *CloudManager) GetSLBFromID(id string) (*slb.DescribeLoadBalancersResponseBodyLoadBalancersLoadBalancer, error) {
+	request := &slb.DescribeLoadBalancersRequest{}
+	request.SetRegionId(m.region).SetLoadBalancerId(id)
+
+	response, err := m.slb.DescribeLoadBalancers(request)
+	if err != nil {
+		return nil, err
+	}
+
+	if *response.Body.TotalCount == 0 {
+		return nil, nil
+	}
+
+	return response.Body.LoadBalancers.LoadBalancer[0], nil
+}
+
 func (m *CloudManager) GetSLBListener(id string, port int32, protocol string) (*Listener, error) {
 	ret := &Listener{}
 
@@ -419,6 +466,9 @@ func (m *CloudManager) GetSLBListener(id string, port int32, protocol string) (*
 
 		response, err := m.slb.DescribeLoadBalancerUDPListenerAttribute(request)
 		if err != nil {
+			if strings.Contains(err.Error(), "The specified resource does not exist") {
+				return nil, nil
+			}
 			return nil, err
 		}
 		ret.UDP = response.Body
@@ -428,6 +478,9 @@ func (m *CloudManager) GetSLBListener(id string, port int32, protocol string) (*
 
 		response, err := m.slb.DescribeLoadBalancerTCPListenerAttribute(request)
 		if err != nil {
+			if strings.Contains(err.Error(), "The specified resource does not exist") {
+				return nil, nil
+			}
 			return nil, err
 		}
 		ret.TCP = response.Body
@@ -442,6 +495,9 @@ func (m *CloudManager) GetSLBVserverGroup(id string) (*slb.DescribeVServerGroupA
 
 	response, err := m.slb.DescribeVServerGroupAttribute(request)
 	if err != nil {
+		if strings.Contains(err.Error(), "The specified VServerGroupId does not exist") {
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -461,6 +517,9 @@ func (m *CloudManager) GetSLBHealthStatus(id string, port int32, protocol string
 
 	response, err := m.slb.DescribeHealthStatus(request)
 	if err != nil {
+		if strings.Contains(err.Error(), "ListenerNotFound") {
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -524,4 +583,60 @@ func (m *CloudManager) GetVSwitch(id string) (*vpc.DescribeVSwitchesResponseBody
 	}
 
 	return response.Body.VSwitches.VSwitch[0], nil
+}
+
+func (m *CloudManager) VPCCIDRs() []*net.IPNet {
+	return m.vpcCIDRs
+}
+
+func (m *CloudManager) GetCIDRsFromVPC(id string) ([]*net.IPNet, error) {
+	request := &vpc.DescribeVpcsRequest{}
+	request.SetRegionId(m.region).SetVpcId(id)
+
+	response, err := m.vpc.DescribeVpcs(request)
+	if err != nil {
+		return nil, err
+	}
+
+	if *response.Body.TotalCount == 0 {
+		return nil, fmt.Errorf("cannot find vpc %s", id)
+	}
+
+	v := *response.Body.Vpcs.Vpc[0]
+
+	var ipNets []*net.IPNet
+	_, n, err := net.ParseCIDR(*v.CidrBlock)
+	if err != nil {
+		return nil, err
+	}
+
+	ipNets = append(ipNets, n)
+
+	if v.UserCidrs == nil {
+		return ipNets, nil
+	}
+
+	for _, cidr := range v.UserCidrs.UserCidr {
+		_, n, err := net.ParseCIDR(*cidr)
+		if err != nil {
+			return nil, err
+		}
+		ipNets = append(ipNets, n)
+	}
+	return ipNets, nil
+}
+
+func (m *CloudManager) GetACLFromID(id string) (*slb.DescribeAccessControlListAttributeResponseBody, error) {
+	request := &slb.DescribeAccessControlListAttributeRequest{}
+	request.SetRegionId(m.region).SetAclId(id)
+
+	response, err := m.slb.DescribeAccessControlListAttribute(request)
+	if err != nil {
+		if strings.Contains(err.Error(), "Acl does not exist") {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return response.Body, nil
 }

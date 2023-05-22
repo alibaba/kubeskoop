@@ -6,6 +6,10 @@ import (
 	"net"
 	"strings"
 
+	"github.com/alibaba/kubeskoop/pkg/skoop/utils"
+	"github.com/samber/lo"
+	"k8s.io/utils/pointer"
+
 	ctx "github.com/alibaba/kubeskoop/pkg/skoop/context"
 	"github.com/alibaba/kubeskoop/pkg/skoop/model"
 	"github.com/alibaba/kubeskoop/pkg/skoop/netstack"
@@ -31,7 +35,7 @@ type Processor interface {
 	Validate(packet model.Packet, backends []Backend, netns netstack.NetNS) error
 
 	//根据packet和svc，返回正确的backends
-	Process(packet model.Packet, svc *v1.Service) []Backend
+	Process(packet model.Packet, svc *v1.Service, node *v1.Node) []Backend
 }
 
 type KubeProxyServiceProcessor struct {
@@ -74,13 +78,13 @@ func (k *KubeProxyServiceProcessor) Validate(packet model.Packet, backends []Bac
 	}
 
 	if len(backendsSet) != 0 {
-		return fmt.Errorf("k8s endpoint %s is not in ipvs realserver, which cloud make network issues", strings.Join(maps.Keys(backendsSet), ","))
+		return fmt.Errorf("k8s endpoint %s is not in ipvs realserver, which could make network issues", strings.Join(maps.Keys(backendsSet), ","))
 	}
 
 	return nil
 }
 
-func serviceTargetPort(svc *v1.Service, dport uint16, protocol model.Protocol) uint16 {
+func GetTargetPort(svc *v1.Service, dport uint16, protocol model.Protocol) uint16 {
 	for _, port := range svc.Spec.Ports {
 		if port.Port == int32(dport) && strings.EqualFold(string(port.Protocol), string(protocol)) {
 			//TODO 处理named port
@@ -93,11 +97,23 @@ func serviceTargetPort(svc *v1.Service, dport uint16, protocol model.Protocol) u
 	return 0
 }
 
+func GetNodePort(svc *v1.Service, dport uint16, protocol model.Protocol) uint16 {
+	for _, port := range svc.Spec.Ports {
+		if port.Port == int32(dport) && strings.EqualFold(string(port.Protocol), string(protocol)) {
+			//TODO 处理named port
+			if port.TargetPort.Type == intstr.String {
+				klog.Warningf("named port not support now for service %q port %q", svc.Name, port.TargetPort.StrVal)
+			}
+			return uint16(port.NodePort)
+		}
+	}
+	return 0
+}
+
 func serviceTargetPortByNodePort(svc *v1.Service, nodePort uint16, protocol model.Protocol) uint16 {
 	for _, port := range svc.Spec.Ports {
 		if strings.EqualFold(string(port.Protocol), string(protocol)) && port.NodePort == int32(nodePort) {
-			return uint16(port.NodePort)
-
+			return uint16(port.TargetPort.IntVal)
 		}
 	}
 
@@ -121,7 +137,7 @@ func isTrafficLocalService(svc *v1.Service) bool {
 
 func (k *KubeProxyServiceProcessor) shouldMasquerade(packet model.Packet, svc *v1.Service) (bool, uint16) {
 	masquerade := false
-	targetPort := serviceTargetPort(svc, packet.Dport, packet.Protocol)
+	targetPort := GetTargetPort(svc, packet.Dport, packet.Protocol)
 	dst := packet.Dst.String()
 	if targetPort != 0 && slices.Contains(serviceLBIPs(svc), dst) {
 		masquerade = !isTrafficLocalService(svc)
@@ -139,7 +155,7 @@ func (k *KubeProxyServiceProcessor) shouldMasquerade(packet model.Packet, svc *v
 	return masquerade, targetPort
 }
 
-func (k *KubeProxyServiceProcessor) Process(packet model.Packet, svc *v1.Service) []Backend {
+func (k *KubeProxyServiceProcessor) Process(packet model.Packet, svc *v1.Service, node *v1.Node) []Backend {
 	masquerade, targetPort := k.shouldMasquerade(packet, svc)
 	ep, err := k.client.CoreV1().Endpoints(svc.Namespace).Get(context.TODO(), svc.Name, metav1.GetOptions{})
 	if err != nil {
@@ -147,10 +163,15 @@ func (k *KubeProxyServiceProcessor) Process(packet model.Packet, svc *v1.Service
 		return nil
 	}
 
-	var ret []Backend
+	localBackend := isExternalTraffic(svc, node, packet) &&
+		svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal
 
+	var ret []Backend
 	for _, ss := range ep.Subsets {
 		for _, addr := range ss.Addresses {
+			if node != nil && localBackend && pointer.StringDeref(addr.NodeName, "") != node.Name {
+				continue
+			}
 			backend := Backend{
 				IP:         addr.IP,
 				Port:       targetPort,
@@ -161,6 +182,22 @@ func (k *KubeProxyServiceProcessor) Process(packet model.Packet, svc *v1.Service
 	}
 
 	return ret
+}
+
+func isExternalTraffic(svc *v1.Service, node *v1.Node, pkt model.Packet) bool {
+	if utils.ContainsLoadBalancerIP(svc, pkt.Dst.String()) {
+		return true
+	}
+
+	if !lo.ContainsBy(node.Status.Addresses, func(a v1.NodeAddress) bool {
+		return a.Address == pkt.Dst.String()
+	}) {
+		return false
+	}
+
+	return lo.ContainsBy(svc.Spec.Ports, func(p v1.ServicePort) bool {
+		return p.NodePort == int32(pkt.Dport)
+	})
 }
 
 func NewKubeProxyServiceProcessor(ctx *ctx.Context) *KubeProxyServiceProcessor {

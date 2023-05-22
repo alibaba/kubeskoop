@@ -594,7 +594,12 @@ func (h *calicoHost) ToService(upstream *model.Link, dst model.Endpoint, protoco
 		pkt.Src = net.ParseIP(src)
 	}
 
-	backends := h.serviceProcessor.Process(*pkt, service)
+	node, err := h.ipCache.GetNodeFromName(h.nodeInfo.NodeName)
+	if err != nil {
+		return nil, err
+	}
+
+	backends := h.serviceProcessor.Process(*pkt, service, node)
 	if len(backends) == 0 {
 		h.netNode.Suspicions = append(h.netNode.Suspicions, model.Suspicion{
 			Level:   model.SuspicionLevelFatal,

@@ -91,7 +91,7 @@ func (np *networkPolicy) CheckNetworkPolicy(src, dst model.Endpoint, protocol mo
 			Dst:      net.ParseIP(dst.IP),
 			Dport:    dst.Port,
 			Protocol: protocol,
-		}, svc)
+		}, svc, nil)
 		for _, backend := range backends {
 			if backend.IP == dst.IP {
 				return nil, fmt.Errorf("service network loop")

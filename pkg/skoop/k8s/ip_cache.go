@@ -6,13 +6,15 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/alibaba/kubeskoop/pkg/skoop/utils"
+	"github.com/samber/lo"
+
 	"github.com/alibaba/kubeskoop/pkg/skoop/model"
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/utils/strings/slices"
 )
 
 type IPCache struct {
@@ -130,7 +132,7 @@ func (c *IPCache) GetIPType(ip string) (model.EndpointType, error) {
 	}
 
 	if svc, ok := c.serviceCache[ip]; ok {
-		if slices.Contains(svc.Spec.ExternalIPs, ip) && svc.Spec.Type == v1.ServiceTypeLoadBalancer {
+		if svc.Spec.Type == v1.ServiceTypeLoadBalancer && utils.ContainsLoadBalancerIP(svc, ip) {
 			return model.EndpointTypeLoadbalancer, nil
 		}
 		return model.EndpointTypeService, nil
@@ -167,6 +169,15 @@ func (c *IPCache) BuildClusterIPCache() error {
 		return fmt.Errorf("error build cluster ip cache: %v", innerErr)
 	}
 	return nil
+}
+
+func (c *IPCache) GetNodes() ([]*v1.Node, error) {
+	err := c.BuildClusterIPCache()
+	if err != nil {
+		return nil, err
+	}
+
+	return lo.Values(c.nodeCache), nil
 }
 
 func (c *IPCache) addPodIPCache(ipaddr string, pod *v1.Pod) error {

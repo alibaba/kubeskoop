@@ -112,7 +112,7 @@ func (na *NetstackAssertion) AssertListen(localIP net.IP, localPort uint16, prot
 	})
 
 	AssertTrue(na, len(socks) != 0, model.SuspicionLevelFatal,
-		fmt.Sprintf("no process listening on 0.0.0.0:%v or %v:%v", localPort, localIP, localPort))
+		fmt.Sprintf("no process listening on 0.0.0.0:%v or %v:%v protocol %s", localPort, localIP, localPort, protocol))
 }
 
 func (na *NetstackAssertion) AssertHostBridge(name string) {
