@@ -6,19 +6,19 @@ import (
 )
 
 type PodNetInfo struct {
-	ContainerID  string `json:"container_id"`
-	PodName      string `json:"pod_name"`
-	PodNamespace string `json:"pod_namespace"`
-	PodUID       string `json:"pod_uid"`
+	ContainerID  string `json:"id"`
+	PodName      string `json:"n"`
+	PodNamespace string `json:"ns"`
+	PodUID       string `json:"u"`
 	PID          uint32 `json:"pid"`
-	Netns        string `json:"netns"`
-	HostNetwork  bool   `json:"host_network"`
-	NetworkMode  string `json:"network_mode"`
+	Netns        string `json:"net"`
+	HostNetwork  bool   `json:"hn"`
+	NetworkMode  string `json:"nm"`
 }
 
 type NodeNetworkStackDump struct {
-	Pods  []PodNetInfo         `json:"pods"`
-	Netns []netstack.NetNSInfo `json:"netns"`
+	Pods  []PodNetInfo         `json:"p"`
+	Netns []netstack.NetNSInfo `json:"n"`
 }
 
 type NodeMeta struct {

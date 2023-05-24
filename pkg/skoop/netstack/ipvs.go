@@ -12,19 +12,19 @@ import (
 )
 
 type RealServer struct {
-	Service    string
-	IP         string
-	Port       uint16
-	Masquerade bool
-	Weight     int
+	Service    string `json:"s,omitempty"`
+	IP         string `json:"ip"`
+	Port       uint16 `json:"p"`
+	Masquerade bool   `json:"m"`
+	Weight     int    `json:"w"`
 }
 
 type IPVSService struct {
-	Protocol  model.Protocol
-	IP        string
-	Port      uint16
-	Scheduler string
-	RS        []RealServer
+	Protocol  model.Protocol `json:"pro"`
+	IP        string         `json:"ip"`
+	Port      uint16         `json:"p"`
+	Scheduler string         `json:"s"`
+	RS        []RealServer   `json:"r"`
 }
 
 func (s *IPVSService) Service() string {
@@ -141,4 +141,10 @@ func ParseIPVS(dump []string) (*IPVS, error) {
 	}
 
 	return ipvs, nil
+}
+
+func NewIPVS(services map[string]*IPVSService) *IPVS {
+	return &IPVS{
+		services: services,
+	}
 }

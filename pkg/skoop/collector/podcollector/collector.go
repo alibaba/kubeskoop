@@ -26,6 +26,7 @@ import (
 	"github.com/bastjan/netstat"
 	"github.com/containerd/containerd/pkg/cri/server"
 	"github.com/docker/docker/client"
+	"github.com/moby/ipvs"
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
 	"golang.org/x/exp/slices"
@@ -265,7 +266,6 @@ func NSExec(args []string) (string, error) {
 	}
 	return string(output), nil
 }
-
 func namespaceCmd(pid uint32, cmd string) (string, error) {
 	cmdExec := exec.Command("nsenter", strconv.Itoa(int(pid)), "sh", "-c", cmd)
 	cmdExec.Path = "/proc/self/exe"
@@ -477,16 +477,52 @@ func iptablesCollector(sandboxInfo *netstack.NetNSInfo) error {
 
 func ipsetCollector(sandboxInfo *netstack.NetNSInfo) error {
 	var err error
-	sandboxInfo.IpsetInfo, err = namespaceCmd(sandboxInfo.PID, "ipset list -o xml")
+	info, err := namespaceCmd(sandboxInfo.PID, "ipset list -o xml")
+	if err != nil {
+		return err
+	}
+	sandboxInfo.IpsetInfo, err = netstack.ParseIPSet(info)
 	return err
 }
 
 func ipvsCollector(sandboxInfo *netstack.NetNSInfo) error {
-	ipvsStr, err := namespaceCmd(sandboxInfo.PID, "ipvsadm-save -n")
+	path := fmt.Sprintf("/proc/%d/ns/net", sandboxInfo.PID)
+	handler, err := ipvs.New(path)
 	if err != nil {
 		return err
 	}
-	sandboxInfo.IPVSInfo = strings.Split(ipvsStr, "\n")
+	services, err := handler.GetServices()
+	if err != nil {
+		return err
+	}
+
+	m := map[string]*netstack.IPVSService{}
+	for _, svc := range services {
+		i := &netstack.IPVSService{
+			Protocol:  intToProtocol(svc.Protocol),
+			IP:        svc.Address.String(),
+			Port:      svc.Port,
+			Scheduler: svc.SchedName,
+			RS:        nil,
+		}
+		dsts, err := handler.GetDestinations(svc)
+		if err != nil {
+			return err
+		}
+		for _, dst := range dsts {
+			rs := netstack.RealServer{
+				IP:         dst.Address.String(),
+				Port:       dst.Port,
+				Masquerade: dst.ConnectionFlags == ipvs.ConnectionFlagMasq,
+				Weight:     dst.Weight,
+			}
+			i.RS = append(i.RS, rs)
+		}
+
+		m[i.Service()] = i
+	}
+
+	sandboxInfo.IPVSInfo = m
 	return nil
 }
 
@@ -545,4 +581,14 @@ func sockCollector(sandboxInfo *netstack.NetNSInfo) error {
 		sandboxInfo.ConnStats = append(sandboxInfo.ConnStats, conn)
 	}
 	return nil
+}
+
+func intToProtocol(proto uint16) model.Protocol {
+	switch proto {
+	case unix.IPPROTO_TCP:
+		return model.TCP
+	case unix.IPPROTO_UDP:
+		return model.UDP
+	}
+	return "unknown"
 }

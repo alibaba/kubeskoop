@@ -34,17 +34,17 @@ var (
 )
 
 type Interface struct {
-	Name        string            `json:"name"`
-	Index       int               `json:"index"`
-	MTU         int               `json:"MTU"`
-	Driver      string            `json:"driver"`
-	Addrs       []Addr            `json:"addrs"`
-	State       int               `json:"state"`
-	DevSysctls  map[string]string `json:"dev_sysctls"`
-	NeighInfo   []Neigh           `json:"neigh_info"`
-	FdbInfo     []Neigh           `json:"fdb_info"`
-	PeerIndex   int               `json:"peer_index"`
-	MasterIndex int               `json:"master_index"`
+	Name        string            `json:"n"`
+	Index       int               `json:"i"`
+	MTU         int               `json:"m"`
+	Driver      string            `json:"d"`
+	Addrs       []Addr            `json:"a"`
+	State       int               `json:"st"`
+	DevSysctls  map[string]string `json:"s"`
+	NeighInfo   []Neigh           `json:"ne"`
+	FdbInfo     []Neigh           `json:"f"`
+	PeerIndex   int               `json:"p"`
+	MasterIndex int               `json:"mi"`
 }
 
 func GetDefaultIPv4(iface *Interface) (net.IP, net.IPMask) {

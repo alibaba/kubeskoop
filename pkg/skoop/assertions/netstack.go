@@ -209,12 +209,6 @@ func (na *NetstackAssertion) AssertVEthOnBridge(index int, expectedBridgeName st
 	// todo: br_port_state
 }
 
-func (na *NetstackAssertion) AssertIPVSServiceExists(service, servicePort, protocol string) {
-	key := fmt.Sprintf("%s:%s:%s", protocol, service, servicePort)
-	AssertTrue(na, slices.Contains(na.netns.NetNSInfo.IPVSInfo, key), model.SuspicionLevelWarning,
-		fmt.Sprintf("ipvs has no service %s", key))
-}
-
 type RouteAssertion struct {
 	Dev      *string
 	Scope    *netstack.Scope
@@ -464,7 +458,7 @@ func (na *NetstackAssertion) AssertNetfilterServe(pktIn model.Packet, iif string
 func (na *NetstackAssertion) AssertIPVSServerExists(service string, servicePort uint16, protocol model.Protocol,
 	backend string, backendPort uint16) {
 	key := fmt.Sprintf("%s:%s:%d", protocol, service, servicePort)
-	_, ok := lo.Find(na.netns.NetNSInfo.IPVSInfo, func(i string) bool { return i == key })
+	_, ok := na.netns.NetNSInfo.IPVSInfo[key]
 	if !ok {
 		return
 	}
