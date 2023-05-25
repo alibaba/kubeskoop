@@ -140,7 +140,7 @@ func (n *slbNode) Receive(upstream *model.Link) ([]model.Transmission, error) {
 					if _, ok := nodeMap[node.Name]; ok {
 						continue
 					}
-					pkt.Dst = net.ParseIP(node.Status.Addresses[0].Address)
+					pkt.Dst = net.ParseIP(getNodeInternalIP(node))
 					pkt.Dport = nodePort
 					nodeMap[node.Name] = struct{}{}
 				}
@@ -211,7 +211,7 @@ func (n *slbNode) getTransmissionsToNodePort(nodePort uint16, pkt *model.Packet)
 			ID:   node.Name,
 		}
 
-		ip := node.Status.Addresses[0].Address
+		ip := getNodeInternalIP(node)
 		pkt := pkt.DeepCopy()
 		pkt.Dst = net.ParseIP(ip)
 		pkt.Dport = nodePort
@@ -362,4 +362,13 @@ func (n *externalNode) sendToLoadBalancer(dst model.Endpoint, protocol model.Pro
 
 func (n *externalNode) Receive(upstream *model.Link) ([]model.Transmission, error) {
 	return n.genericNode.Receive(upstream)
+}
+
+func getNodeInternalIP(node *v1.Node) string {
+	for _, n := range node.Status.Addresses {
+		if n.Type == v1.NodeInternalIP {
+			return n.Address
+		}
+	}
+	return ""
 }

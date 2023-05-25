@@ -42,19 +42,19 @@ const (
 var ErrNoRouteToHost = errors.New("no route to host")
 
 type Route struct {
-	Family   int
-	OifName  string
-	IifName  string
-	Scope    Scope
-	Dst      *net.IPNet
-	Src      net.IP
-	Gw       net.IP
-	Protocol int
-	Priority int
-	Table    int
-	Type     int
-	Tos      int
-	Flags    int
+	Family   int        `json:"f"`
+	OifName  string     `json:"o"`
+	IifName  string     `json:"i"`
+	Scope    Scope      `json:"sc"`
+	Dst      *net.IPNet `json:"d"`
+	Src      net.IP     `json:"s"`
+	Gw       net.IP     `json:"g"`
+	Protocol int        `json:"p"`
+	Priority int        `json:"pr"`
+	Table    int        `json:"tb"`
+	Type     int        `json:"t"`
+	Tos      int        `json:"tos"`
+	Flags    int        `json:"fl"`
 }
 
 func (r Route) String() string {
@@ -143,19 +143,19 @@ func RouteProtocolToString(protocol int) string {
 }
 
 type Rule struct {
-	Priority int
-	Family   int
-	Table    int
-	Mark     int
-	Mask     int
-	Tos      uint
-	TunID    uint
-	Goto     int
-	Src      *net.IPNet
-	Dst      *net.IPNet
-	Flow     int
-	IifName  string
-	OifName  string
+	Priority int        `json:"p"`
+	Family   int        `json:"f"`
+	Table    int        `json:"tb"`
+	Mark     int        `json:"m"`
+	Mask     int        `json:"ma"`
+	Tos      uint       `json:"tos"`
+	TunID    uint       `json:"ti"`
+	Goto     int        `json:"gt"`
+	Src      *net.IPNet `json:"s"`
+	Dst      *net.IPNet `json:"d"`
+	Flow     int        `json:"fl"`
+	IifName  string     `json:"i"`
+	OifName  string     `json:"o"`
 }
 
 type Router interface {

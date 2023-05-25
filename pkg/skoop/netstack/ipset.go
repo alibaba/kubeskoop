@@ -14,19 +14,24 @@ func (m *IPSetManager) GetIPSet(name string) *IPSet {
 }
 
 type IPSet struct {
-	Name    string
-	Type    string
-	Members map[string]string
+	Name    string            `json:"n"`
+	Type    string            `json:"t"`
+	Members map[string]string `json:"m"`
 }
 
-func ParseIPSet(dump string) (*IPSetManager, error) {
+func NewIPSetManager(ipsets []*IPSet) (*IPSetManager, error) {
 	ret := &IPSetManager{
 		sets: make(map[string]*IPSet),
 	}
-	if dump == "" {
-		return ret, nil
-	}
 
+	for _, i := range ipsets {
+		ret.sets[i.Name] = i
+	}
+	return ret, nil
+}
+
+func ParseIPSet(dump string) ([]*IPSet, error) {
+	var ret []*IPSet
 	doc := etree.NewDocument()
 	if err := doc.ReadFromString(dump); err != nil {
 		return nil, err
@@ -36,7 +41,7 @@ func ParseIPSet(dump string) (*IPSetManager, error) {
 		if err != nil {
 			return nil, errors.Wrap(err, "error parse ipset")
 		}
-		ret.sets[ipset.Name] = ipset
+		ret = append(ret, ipset)
 	}
 	return ret, nil
 }

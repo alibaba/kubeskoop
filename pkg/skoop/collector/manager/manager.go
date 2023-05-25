@@ -172,12 +172,12 @@ func (m *simplePodCollectorManager) buildCache(nodeName string) error {
 	}
 
 	nodeInfo.Router = netstack.NewSimulateRouter(nodeInfo.NetNSInfo.RuleInfo, nodeInfo.NetNSInfo.RouteInfo, nodeInfo.NetNSInfo.Interfaces)
-	nodeInfo.IPVS, err = netstack.ParseIPVS(nodeInfo.NetNSInfo.IPVSInfo)
+	nodeInfo.IPVS = netstack.NewIPVS(nodeInfo.NetNSInfo.IPVSInfo)
 	nodeInfo.IPTables = netstack.ParseIPTables(nodeInfo.NetNSInfo.IptablesInfo)
 	if err != nil {
 		return err
 	}
-	nodeInfo.IPSetManager, err = netstack.ParseIPSet(nodeInfo.NetNSInfo.IpsetInfo)
+	nodeInfo.IPSetManager, err = netstack.NewIPSetManager(nodeInfo.NetNSInfo.IpsetInfo)
 	if err != nil {
 		return err
 	}
@@ -212,12 +212,12 @@ func (m *simplePodCollectorManager) buildCache(nodeName string) error {
 			podInfo.NetNSInfo = &podNetNS
 		}
 
-		podInfo.IPVS, err = netstack.ParseIPVS(podInfo.NetNSInfo.IPVSInfo)
+		podInfo.IPVS = netstack.NewIPVS(podInfo.NetNSInfo.IPVSInfo)
 		podInfo.IPTables = netstack.ParseIPTables(podInfo.NetNSInfo.IptablesInfo)
 		if err != nil {
 			return err
 		}
-		podInfo.IPSetManager, err = netstack.ParseIPSet(podInfo.NetNSInfo.IpsetInfo)
+		podInfo.IPSetManager, err = netstack.NewIPSetManager(podInfo.NetNSInfo.IpsetInfo)
 		if err != nil {
 			return err
 		}
