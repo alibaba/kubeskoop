@@ -1,6 +1,7 @@
 syntax="proto3";
 
 package nettop;
+option go_package = ".;nettop";
 
 message Kernel {
     string release = 1;
