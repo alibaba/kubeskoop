@@ -47,7 +47,7 @@ func (s *ProcSoftnet) Start(_ context.Context) {
 }
 
 func (s *ProcSoftnet) Ready() bool {
-	if _, err := os.Stat("/proc/net/softnet"); os.IsNotExist(err) {
+	if _, err := os.Stat("/proc/net/softnet_stat"); os.IsNotExist(err) {
 		return false
 	}
 	return true
