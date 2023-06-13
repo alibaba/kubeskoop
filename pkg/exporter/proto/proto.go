@@ -4,7 +4,7 @@ import (
 	"context"
 )
 
-//go:generate protoc --go-grpc_out=. ./inspector.proto
+//go:generate protoc --go_out=. ./inspector.proto
 
 type RawEvent struct {
 	Netns     uint32

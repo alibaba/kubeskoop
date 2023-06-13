@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package proto;
 
-option go_package = "github.com/alibaba/kubeskoop/proto";
+option go_package = ".;proto";
 
 service inspector {
   rpc WatchEvent(WatchRequest) returns (stream WatchReply) {}

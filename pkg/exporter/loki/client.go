@@ -14,10 +14,10 @@ import (
 	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 	inspproto "github.com/alibaba/kubeskoop/pkg/exporter/proto"
 
-	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/golang/snappy"
 	"golang.org/x/exp/slog"
 	"google.golang.org/protobuf/proto"
+	timestamp "google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type LogLevel int

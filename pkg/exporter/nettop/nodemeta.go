@@ -11,7 +11,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-//go:generate protoc  --go-grpc_out=. ./libnettop.proto
+//go:generate protoc --go_out=. ./libnettop.proto
 
 var (
 	logger *slog.Logger
@@ -31,7 +31,7 @@ func init() {
 	if err != nil {
 		logger.Warn("failed to get node kernel info %s", err.Error())
 	} else {
-		top.Kernel = &kr
+		top.Kernel = kr
 	}
 	// use empty cri meta, fulfillize it when updated
 	c := &CriMeta{}
@@ -55,8 +55,8 @@ func getNodeName() string {
 	return node
 }
 
-func getKernelRelease() (Kernel, error) {
-	k := Kernel{}
+func getKernelRelease() (*Kernel, error) {
+	k := &Kernel{}
 	var uname unix.Utsname
 	if err := unix.Uname(&uname); err != nil {
 		return k, fmt.Errorf("uname failed: %w", err)
