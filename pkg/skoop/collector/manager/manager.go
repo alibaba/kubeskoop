@@ -44,16 +44,17 @@ type SimplePodCollectorManagerOptions struct {
 }
 
 type simplePodCollectorManager struct {
-	image        string
-	namespace    string
-	client       *kubernetes.Clientset
-	restConfig   *rest.Config
-	ipCache      *k8s.IPCache
-	cache        map[string]*k8s.NodeNetworkStackDump
-	nodeCache    map[string]*k8s.NodeInfo
-	podCache     map[string]*k8s.Pod
-	waitInterval time.Duration
-	waitTimeout  time.Duration
+	image                string
+	namespace            string
+	client               *kubernetes.Clientset
+	restConfig           *rest.Config
+	ipCache              *k8s.IPCache
+	cache                map[string]*k8s.NodeNetworkStackDump
+	nodeCache            map[string]*k8s.NodeInfo
+	podCache             map[string]*k8s.Pod
+	waitInterval         time.Duration
+	waitTimeout          time.Duration
+	preserveCollectorPod bool
 }
 
 func NewSimplePodCollectorManager(ctx *ctx.Context) (collector.Manager, error) {
@@ -74,16 +75,17 @@ func NewSimplePodCollectorManager(ctx *ctx.Context) (collector.Manager, error) {
 	}
 
 	return &simplePodCollectorManager{
-		image:        Config.SimplePodCollectorConfig.Image,
-		namespace:    Config.SimplePodCollectorConfig.CollectorNamespace,
-		client:       ctx.KubernetesClient(),
-		restConfig:   ctx.KubernetesRestClient(),
-		ipCache:      ctx.ClusterConfig().IPCache,
-		cache:        map[string]*k8s.NodeNetworkStackDump{},
-		nodeCache:    map[string]*k8s.NodeInfo{},
-		podCache:     map[string]*k8s.Pod{},
-		waitInterval: Config.SimplePodCollectorConfig.WaitInterval,
-		waitTimeout:  Config.SimplePodCollectorConfig.WaitTimeout,
+		image:                Config.SimplePodCollectorConfig.Image,
+		namespace:            Config.SimplePodCollectorConfig.CollectorNamespace,
+		client:               ctx.KubernetesClient(),
+		restConfig:           ctx.KubernetesRestClient(),
+		ipCache:              ctx.ClusterConfig().IPCache,
+		cache:                map[string]*k8s.NodeNetworkStackDump{},
+		nodeCache:            map[string]*k8s.NodeInfo{},
+		podCache:             map[string]*k8s.Pod{},
+		waitInterval:         Config.SimplePodCollectorConfig.WaitInterval,
+		waitTimeout:          Config.SimplePodCollectorConfig.WaitTimeout,
+		preserveCollectorPod: Config.SimplePodCollectorConfig.PreserveCollectorPod,
 	}, nil
 }
 
@@ -256,6 +258,9 @@ func (m *simplePodCollectorManager) collectNodeStackDump(nodeName string) (*k8s.
 	}
 
 	defer func() {
+		if m.preserveCollectorPod {
+			return
+		}
 		err := m.deleteCollectorPod(nodeName)
 		if err != nil {
 			klog.Errorf("failed delete collector pod: %s", err)
