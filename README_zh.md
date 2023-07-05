@@ -28,7 +28,7 @@ KubeSkoop是一个Kubernetes网络诊断工具。针对不同的网络插件和I
 
 #### 深度网络监控
 
-- 通过eBPF实现无侵入的Kernel Montor
+- 通过eBPF实现无侵入的Kernel Monitor
 
 - 通过BTF在各种版本的Kernel上直接运行
 
