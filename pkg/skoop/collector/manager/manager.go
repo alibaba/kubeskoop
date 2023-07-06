@@ -308,6 +308,7 @@ func (m *simplePodCollectorManager) ensureNamespace() error {
 }
 
 func (m *simplePodCollectorManager) createCollectorPod(nodeName string) (*v1.Pod, error) {
+	klog.V(3).Infof("Creating pod on node %s with image %s", nodeName, m.image)
 	hostPathType := v1.HostPathDirectory
 	podName := fmt.Sprintf("collector-%s", nodeName)
 	err := m.ensurePodClean(podName)
@@ -446,29 +447,26 @@ func (m *simplePodCollectorManager) ensurePodClean(podName string) error {
 }
 
 func (m *simplePodCollectorManager) waitPodRunning(pod *v1.Pod) error {
-	var lastError error
-	_ = wait.PollImmediate(m.waitInterval, m.waitTimeout, func() (bool, error) {
-		klog.V(2).Infof("Waiting pod %s/%s running", pod.Namespace, pod.Name)
+	err := wait.PollImmediate(m.waitInterval, m.waitTimeout, func() (bool, error) {
 		current, err := m.client.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		if err != nil {
-			lastError = err
+			klog.V(2).Infof("Get pod %s/%s failed, will retry. error: %s", pod.Namespace, pod.Name, err.Error())
 			return false, nil
 		}
+		klog.V(2).Infof("Waiting pod %s/%s running, current status: %s", pod.Namespace, pod.Name, current.Status.Phase)
 
 		switch current.Status.Phase {
 		case v1.PodRunning:
-			lastError = nil
 			return true, nil
 		case v1.PodSucceeded, v1.PodFailed, v1.PodUnknown:
-			lastError = fmt.Errorf("pod in unexpected status %s, log: %s", current.Status.Phase, m.getCollectorPodTailLog(pod))
-			return false, lastError
+			return false, fmt.Errorf("pod in unexpected status %s, log: %s", current.Status.Phase, m.getCollectorPodTailLog(pod))
 		}
 
 		return false, nil
 	})
 
-	if lastError != nil {
-		return fmt.Errorf("wait pod running failed: %s", lastError)
+	if err != nil {
+		return fmt.Errorf("wait pod running failed: %s", err)
 	}
 
 	return nil
@@ -488,6 +486,7 @@ func (m *simplePodCollectorManager) getCollectorPodTailLog(pod *v1.Pod) string {
 }
 
 func (m *simplePodCollectorManager) readCollectorData(pod *v1.Pod) (*k8s.NodeNetworkStackDump, error) {
+	klog.V(3).Infof("Trying read collector data from pod %s/%s", pod.Namespace, pod.Name)
 	req := m.client.CoreV1().RESTClient().Post().Resource("pods").
 		Namespace(pod.Namespace).
 		Name(pod.Name).

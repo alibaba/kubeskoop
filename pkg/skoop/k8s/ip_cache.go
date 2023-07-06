@@ -213,8 +213,8 @@ func (c *IPCache) buildPodCache() error {
 	}
 	for _, pod := range podList.Items {
 		if pod.Spec.HostNetwork || pod.Status.Phase != v1.PodRunning {
-			klog.V(4).Infof("Pod %s/%s skipped, hostNetwork: %t, phase: %s",
-				pod.Namespace, pod.Name, pod.Spec.HostNetwork, pod.Status.Phase)
+			klog.V(4).Infof("Pod %s/%s skipped, hostNetwork: %t, phase: %s, address: %v",
+				pod.Namespace, pod.Name, pod.Spec.HostNetwork, pod.Status.Phase, pod.Status.PodIP)
 			continue
 		}
 		copiedPod := pod.DeepCopy()
