@@ -21,6 +21,7 @@ func init() {
 type SimplePodCollectorConfig struct {
 	Image                string
 	CollectorNamespace   string
+	RuntimeAPIAddress    string
 	WaitInterval         time.Duration
 	WaitTimeout          time.Duration
 	PreserveCollectorPod bool
@@ -29,6 +30,7 @@ type SimplePodCollectorConfig struct {
 func (cc *SimplePodCollectorConfig) BindFlags(fs *pflag.FlagSet) {
 	fs.StringVarP(&cc.Image, "collector-image", "", "kubeskoop/kubeskoop:v0.1.0", "Image used for collector.")
 	fs.StringVarP(&cc.CollectorNamespace, "collector-namespace", "", "skoop", "Namespace where collector pods in.")
+	fs.StringVarP(&cc.CollectorNamespace, "collector-cri-address", "", "", "Runtime CRI API endpoint address.")
 	fs.DurationVarP(&cc.WaitInterval, "collector-pod-wait-interval", "", 2*time.Second, "Collector pod running check interval.")
 	fs.DurationVarP(&cc.WaitTimeout, "collector-pod-wait-timeout", "", 120*time.Second, "Collector pod running check timeout.")
 	fs.BoolVarP(&cc.PreserveCollectorPod, "preserve-collector-pod", "", false, "Preserve collector pod after diagnosis complete.")

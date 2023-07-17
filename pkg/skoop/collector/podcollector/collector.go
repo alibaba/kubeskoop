@@ -88,7 +88,20 @@ func NewCollector(podNamespace, podName, runtimeEndpoint string) (collector.Coll
 		_, err := os.Stat("/var/run/dockershim.sock")
 		if err != nil {
 			if os.IsNotExist(err) {
-				socket = "unix:///run/containerd/containerd.sock"
+				containerdSockets := []string{
+					"unix:///run/containerd/containerd.sock",
+					"unix:///run/k3s/containerd/containerd.sock",
+				}
+
+				for _, containerdAddr := range containerdSockets {
+					if _, err = os.Stat(strings.TrimPrefix(containerdAddr, "unix://")); err == nil {
+						socket = containerdAddr
+						break
+					}
+				}
+				if socket == "" {
+					return nil, fmt.Errorf("cannot found comportable endpoint address for cri-api, please specify cri address by --collector-cri-address")
+				}
 			} else {
 				return nil, err
 			}
