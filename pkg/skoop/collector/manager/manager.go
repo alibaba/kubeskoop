@@ -46,6 +46,7 @@ type SimplePodCollectorManagerOptions struct {
 type simplePodCollectorManager struct {
 	image                string
 	namespace            string
+	runtimeAPIAddress    string
 	client               *kubernetes.Clientset
 	restConfig           *rest.Config
 	ipCache              *k8s.IPCache
@@ -86,6 +87,7 @@ func NewSimplePodCollectorManager(ctx *ctx.Context) (collector.Manager, error) {
 		waitInterval:         Config.SimplePodCollectorConfig.WaitInterval,
 		waitTimeout:          Config.SimplePodCollectorConfig.WaitTimeout,
 		preserveCollectorPod: Config.SimplePodCollectorConfig.PreserveCollectorPod,
+		runtimeAPIAddress:    Config.SimplePodCollectorConfig.RuntimeAPIAddress,
 	}, nil
 }
 
@@ -334,6 +336,10 @@ func (m *simplePodCollectorManager) createCollectorPod(nodeName string) (*v1.Pod
 					SecurityContext: &v1.SecurityContext{
 						Privileged: pointer.Bool(true),
 					},
+					Env: []v1.EnvVar{{
+						Name:  "RUNTIME_SOCK",
+						Value: m.runtimeAPIAddress,
+					}},
 					Command: []string{"/bin/pod-collector"},
 					VolumeMounts: []v1.VolumeMount{
 						{
