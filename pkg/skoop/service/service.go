@@ -189,6 +189,10 @@ func isExternalTraffic(svc *v1.Service, node *v1.Node, pkt model.Packet) bool {
 		return true
 	}
 
+	if node == nil {
+		return false
+	}
+
 	if !lo.ContainsBy(node.Status.Addresses, func(a v1.NodeAddress) bool {
 		return a.Address == pkt.Dst.String()
 	}) {
