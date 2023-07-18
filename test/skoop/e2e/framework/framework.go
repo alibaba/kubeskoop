@@ -564,7 +564,7 @@ func (f *Framework) Assert() error {
 
 func (f *Framework) assertSuspicions(idMap map[string]string) error {
 	foundSuspicion := false
-	actualSuspicions := map[string][]ui.DiagnoseSummaryNodeSuspicion{}
+	actualSuspicions := map[string][]ui.DiagnoseSummarySuspicion{}
 	for _, n := range f.result.Summary.Nodes {
 		actualSuspicions[n.ID] = n.Suspicions
 		if len(n.Suspicions) != 0 {
@@ -573,7 +573,7 @@ func (f *Framework) assertSuspicions(idMap map[string]string) error {
 	}
 
 	if f.spec.Assertion.NoSuspicion && foundSuspicion {
-		suspicions := lo.SliceToMap(f.result.Summary.Nodes, func(n ui.DiagnoseSummaryNode) (string, []ui.DiagnoseSummaryNodeSuspicion) {
+		suspicions := lo.SliceToMap(f.result.Summary.Nodes, func(n ui.DiagnoseSummaryNode) (string, []ui.DiagnoseSummarySuspicion) {
 			return n.ID, n.Suspicions
 		})
 		return fmt.Errorf("assert no suspicion, but suspicions found: %+v", suspicions)
@@ -590,7 +590,7 @@ func (f *Framework) assertSuspicions(idMap map[string]string) error {
 			return fmt.Errorf("cannot find actual node for skoop id %s", skoopID)
 		}
 
-		_, found := lo.Find(suspicions, func(actual ui.DiagnoseSummaryNodeSuspicion) bool {
+		_, found := lo.Find(suspicions, func(actual ui.DiagnoseSummarySuspicion) bool {
 			return actual.Level == s.Level && strings.Contains(actual.Message, s.Contains)
 		})
 
