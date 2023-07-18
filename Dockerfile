@@ -5,15 +5,12 @@ ARG GOPROXY
 ARG ALPINE_MIRROR
 
 RUN if [ ! -z "$ALPINE_MIRROR" ]; then sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories; fi && \
-    apk add gcc g++ linux-headers && \
+    apk add gcc g++ linux-headers git make bash && \
     go env -w GOPROXY=$GOPROXY
 
 WORKDIR /go/src/github.com/alibaba/kubeskoop/
 ADD . /go/src/github.com/alibaba/kubeskoop/
-RUN mkdir bin && cd cmd/collector && go build -o /go/src/github.com/alibaba/kubeskoop/bin/pod-collector
-RUN cd /go/src/github.com/alibaba/kubeskoop/cmd/exporter && go build -o /go/src/github.com/alibaba/kubeskoop/bin/inspector
-RUN cd /go/src/github.com/alibaba/kubeskoop/cmd/skoop && go build -o /go/src/github.com/alibaba/kubeskoop/bin/skoop
-
+RUN mkdir -p bin && make all
 
 FROM docker.io/library/alpine
 

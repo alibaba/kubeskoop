@@ -1,28 +1,45 @@
 SKOOP_REPO ?= kubeskoop/kubeskoop
-TAG ?= latest
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # This is a requirement for 'setup-envtest.sh' in the test target.
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
+VERSION_PKG=github.com/alibaba/kubeskoop/version
+TARGETOS?=linux
+TARGETARCH?=amd64
 
-all: build
+TAG?=${shell git describe --tags --abbrev=7}
+GIT_COMMIT=${shell git rev-parse HEAD}
+ldflags="-X $(VERSION_PKG).Version=$(TAG) -X $(VERSION_PKG).Commit=${GIT_COMMIT}"
 
-help: ## Display this help.
-	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+.PHONY: all
+all: build-exporter build-skoop build-collector
 
+.PHONY: fmt
 fmt:
 	go fmt ./...
 
+.PHONY: vet
 vet: ## Run go vet against code.
 	go vet ./...
 
+.PHONY: build-exporter
 build-exporter:
-	go build -o inspector ./cmd/exporter/
+	CGO_ENABLED=0 go build -o bin/inspector -ldflags $(ldflags) ./cmd/exporter
 
-build: ## build kubeskoop image
+.PHONY: build-skoop
+build-skoop:
+	go build -o bin/skoop -ldflags $(ldflags) ./cmd/skoop
+
+.PHONY: build-collector
+build-collector:
+	GOOS=${TARGETOS} CGO_ENABLED=0 go build -o bin/pod-collector -ldflags $(ldflags) ./cmd/collector
+
+.PHONY: image
+image: ## build kubeskoop image
 	docker build -t $(SKOOP_REPO):$(TAG) .
 
-push: build ## push kubeskoop image
+.PHONY: push
+push: image ## push kubeskoop image
 	docker push $(SKOOP_REPO):$(TAG)

@@ -10,6 +10,8 @@ import (
 	"path"
 	"runtime"
 
+	"github.com/alibaba/kubeskoop/version"
+
 	pod_collector "github.com/alibaba/kubeskoop/pkg/skoop/collector/podcollector"
 
 	"k8s.io/apimachinery/pkg/util/json"
@@ -32,12 +34,20 @@ func main() {
 	}
 	var (
 		dumpPath, podNamespace, podName, runtimeEndpoint string
+		showVersion                                      bool
 	)
 	flag.StringVar(&dumpPath, "dump-path", "/data/collector.json", "Collector result path")
 	flag.StringVar(&podNamespace, "namespace", "", "pod namespace to collect")
 	flag.StringVar(&podName, "name", "", "pod name to collect, 'host' as host network namespace")
 	flag.StringVar(&runtimeEndpoint, "runtime-endpoint", "", "runtime socket addr to resolve pod info")
+	flag.BoolVar(&showVersion, "version", false, "show version")
 	flag.Parse()
+
+	if showVersion {
+		version.PrintVersion()
+		os.Exit(0)
+	}
+
 	c, err := pod_collector.NewCollector(podNamespace, podName, runtimeEndpoint)
 	if err != nil {
 		log.Fatalf("error init collector, %v", err)

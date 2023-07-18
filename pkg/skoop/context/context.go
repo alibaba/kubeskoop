@@ -14,6 +14,7 @@ const (
 	kubernetesClientKey     = "kubernetes_client_config"
 	kubernetesRestConfigKey = "kubernetes_rest_config"
 	uiConfigKey             = "ui_config"
+	miscConfigKey           = "misc_config"
 )
 
 type ConfigBinder interface {
@@ -39,13 +40,16 @@ func init() {
 	tc := &TaskConfig{}
 	cc := &ClusterConfig{}
 	uc := &UIConfig{}
+	mc := &MiscConfig{}
 	RegisterConfigBinder("Diagnose task", tc)
 	RegisterConfigBinder("Cluster config", cc)
 	RegisterConfigBinder("UI config", uc)
+	RegisterConfigBinder("Miscellaneous config", mc)
 
 	SkoopContext.Ctx.Store(taskConfigKey, tc)
 	SkoopContext.Ctx.Store(clusterConfigKey, cc)
 	SkoopContext.Ctx.Store(uiConfigKey, uc)
+	SkoopContext.Ctx.Store(miscConfigKey, mc)
 }
 
 var SkoopContext = &Context{
