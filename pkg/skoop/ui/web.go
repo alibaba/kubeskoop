@@ -23,6 +23,7 @@ var embeddedWebFiles embed.FS
 type uiArgs struct {
 	DiagnoseInfo string
 	GraphSvg     template.HTML
+	Cluster      template.JSStr
 	Nodes        template.JSStr
 	Edges        template.JSStr
 }
@@ -55,26 +56,33 @@ type edgeInfo struct {
 	Packet packet `json:"packet"`
 }
 
-type WebUI struct {
-	ctx      *context.Context
-	g        *Graphviz
-	p        *model.PacketPath
-	template *template.Template
-	address  string
+type clusterInfo struct {
+	SuspicionLevel string      `json:"suspicion_level"`
+	Suspicions     []suspicion `json:"suspicions"`
 }
 
-func NewWebUI(ctx *context.Context, p *model.PacketPath, address string) (*WebUI, error) {
+type WebUI struct {
+	ctx       *context.Context
+	g         *Graphviz
+	p         *model.PacketPath
+	globalSus []model.Suspicion
+	template  *template.Template
+	address   string
+}
+
+func NewWebUI(ctx *context.Context, globalSuspicions []model.Suspicion, p *model.PacketPath, address string) (*WebUI, error) {
 	g, err := NewGraphviz(p)
 	if err != nil {
 		return nil, err
 	}
 
 	ui := &WebUI{
-		ctx:      ctx,
-		p:        p,
-		g:        g,
-		template: template.New("kubeskoop"),
-		address:  address,
+		ctx:       ctx,
+		p:         p,
+		g:         g,
+		globalSus: globalSuspicions,
+		template:  template.New("kubeskoop"),
+		address:   address,
 	}
 	err = ui.loadTemplates()
 	if err != nil {
@@ -112,6 +120,30 @@ func (u *WebUI) handleUI(w http.ResponseWriter, _ *http.Request) {
 	svgString := string(svg)
 	args.GraphSvg = template.HTML(svgString)
 
+	suspicionLevel := model.SuspicionLevel(model.SuspicionLevelInfo)
+	var globalSuspicions []suspicion
+	for _, sus := range u.globalSus {
+		globalSuspicions = append(globalSuspicions, suspicion{
+			Level:   sus.Level.String(),
+			Message: sus.Message,
+		})
+		if suspicionLevel < sus.Level {
+			suspicionLevel = sus.Level
+		}
+	}
+
+	cluster := clusterInfo{
+		SuspicionLevel: suspicionLevel.String(),
+		Suspicions:     globalSuspicions,
+	}
+
+	jsonBytes, err := json.Marshal(cluster)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("error marshal node info: %s", err), http.StatusInternalServerError)
+		return
+	}
+	args.Cluster = template.JSStr(jsonBytes)
+
 	var nodes []nodeInfo
 	for _, node := range u.p.Nodes() {
 		n := nodeInfo{
@@ -130,7 +162,7 @@ func (u *WebUI) handleUI(w http.ResponseWriter, _ *http.Request) {
 
 		nodes = append(nodes, n)
 	}
-	jsonBytes, err := json.Marshal(nodes)
+	jsonBytes, err = json.Marshal(nodes)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("error marshal node info: %s", err), http.StatusInternalServerError)
 		return

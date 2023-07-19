@@ -47,7 +47,7 @@ func NewSkoopCmd() *cobra.Command {
 			}
 
 			if context.SkoopContext.UIConfig().HTTP {
-				klog.Fatalf("http server exited: %s", serveWebUI(packetPath))
+				klog.Fatalf("http server exited: %s", serveWebUI(globalSuspicion, packetPath))
 			}
 
 			if context.SkoopContext.UIConfig().Format != "" {
@@ -58,7 +58,7 @@ func NewSkoopCmd() *cobra.Command {
 						klog.Fatalf("save graph file error: %v", err)
 					}
 				case "json":
-					err = saveJSONFile(packetPath)
+					err = saveJSONFile(globalSuspicion, packetPath)
 					if err != nil {
 						klog.Fatalf("save json file error: %v", err)
 					}
@@ -137,8 +137,8 @@ func saveGraphFile(p *model.PacketPath) error {
 	return nil
 }
 
-func saveJSONFile(p *model.PacketPath) error {
-	formatter := ui.NewJSONFormatter(p)
+func saveJSONFile(globalSuspicions []model.Suspicion, p *model.PacketPath) error {
+	formatter := ui.NewJSONFormatter(globalSuspicions, p)
 	data, err := formatter.ToJSON()
 	if err != nil {
 		return err
@@ -166,8 +166,8 @@ func saveJSONFile(p *model.PacketPath) error {
 	return err
 }
 
-func serveWebUI(p *model.PacketPath) error {
-	web, err := ui.NewWebUI(context.SkoopContext, p, context.SkoopContext.UIConfig().HTTPAddress)
+func serveWebUI(globalSuspicions []model.Suspicion, p *model.PacketPath) error {
+	web, err := ui.NewWebUI(context.SkoopContext, globalSuspicions, p, context.SkoopContext.UIConfig().HTTPAddress)
 	if err != nil {
 		return err
 	}

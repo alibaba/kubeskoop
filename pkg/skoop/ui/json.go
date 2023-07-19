@@ -5,7 +5,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 )
 
-type DiagnoseSummaryNodeSuspicion struct {
+type DiagnoseSummarySuspicion struct {
 	Level   model.SuspicionLevel `json:"level"`
 	Message string               `json:"message"`
 }
@@ -17,7 +17,7 @@ type DiagnoseSummaryNodeAction struct {
 type DiagnoseSummaryNode struct {
 	ID         string                               `json:"id"`
 	Type       model.NetNodeType                    `json:"type"`
-	Suspicions []DiagnoseSummaryNodeSuspicion       `json:"suspicions"`
+	Suspicions []DiagnoseSummarySuspicion           `json:"suspicions"`
 	Actions    map[string]DiagnoseSummaryNodeAction `json:"actions"`
 }
 
@@ -39,17 +39,23 @@ type DiagnoseSummaryLink struct {
 	Packet               DiagnoseSummaryPacket `json:"packet"`
 }
 
+type DiagnoseSummaryCluster struct {
+	Suspicions []DiagnoseSummarySuspicion `json:"suspicions"`
+}
+
 type DiagnoseSummary struct {
-	Nodes []DiagnoseSummaryNode `json:"nodes"`
-	Links []DiagnoseSummaryLink `json:"links"`
+	Cluster DiagnoseSummaryCluster `json:"cluster"`
+	Nodes   []DiagnoseSummaryNode  `json:"nodes"`
+	Links   []DiagnoseSummaryLink  `json:"links"`
 }
 
 type JSONFormatter struct {
-	p *model.PacketPath
+	globalSuspicions []model.Suspicion
+	p                *model.PacketPath
 }
 
-func NewJSONFormatter(p *model.PacketPath) *JSONFormatter {
-	return &JSONFormatter{p: p}
+func NewJSONFormatter(globalSuspicions []model.Suspicion, p *model.PacketPath) *JSONFormatter {
+	return &JSONFormatter{globalSuspicions: globalSuspicions, p: p}
 }
 
 func (f *JSONFormatter) ToJSON() ([]byte, error) {
@@ -62,7 +68,16 @@ func (f *JSONFormatter) ToJSON() ([]byte, error) {
 }
 
 func (f *JSONFormatter) toSummary() (*DiagnoseSummary, error) {
-	summary := &DiagnoseSummary{}
+	summary := &DiagnoseSummary{
+		Cluster: DiagnoseSummaryCluster{Suspicions: []DiagnoseSummarySuspicion{}},
+	}
+
+	for _, sus := range f.globalSuspicions {
+		summary.Cluster.Suspicions = append(summary.Cluster.Suspicions, DiagnoseSummarySuspicion{
+			Level:   sus.Level,
+			Message: sus.Message,
+		})
+	}
 
 	for _, node := range f.p.Nodes() {
 		n := DiagnoseSummaryNode{
@@ -73,7 +88,7 @@ func (f *JSONFormatter) toSummary() (*DiagnoseSummary, error) {
 		}
 
 		for _, suspicion := range node.GetSuspicions() {
-			n.Suspicions = append(n.Suspicions, DiagnoseSummaryNodeSuspicion{
+			n.Suspicions = append(n.Suspicions, DiagnoseSummarySuspicion{
 				Level:   suspicion.Level,
 				Message: suspicion.Message,
 			})

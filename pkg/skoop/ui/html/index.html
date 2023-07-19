@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html>
-
 <head>
     <title>Skoop: {{.DiagnoseInfo}} </title>
 
@@ -22,6 +21,7 @@
         }
 
 
+        let cluster_info = JSON.parse('{{.Cluster}}')
         let node_info = JSON.parse('{{.Nodes}}')
         let edge_info = JSON.parse('{{.Edges}}')
 
@@ -42,14 +42,19 @@
             header.innerHTML = title
 
             let panel_info = side.querySelector(".side-panel-info")
-            let info_inner = ""
-            info.forEach(i => {
-                info_inner += `<div class="side-panel-info-item">
+            if (info.length !== 0) {
+                let info_inner = ""
+                info.forEach(i => {
+                    info_inner += `<div class="side-panel-info-item">
                         <div class="side-panel-info-item-name">${i[0]}</div>
                         <div class="side-panel-info-item-value">${i[1]}</div>
                     </div>`
-            });
-            panel_info.innerHTML = info_inner
+                });
+                panel_info.innerHTML = info_inner
+            } else {
+                panel_info.style.display = "none"
+            }
+
 
             let panel_suspicion = side.querySelector(".side-panel-suspicion")
             if (show_suspicions) {
@@ -101,6 +106,19 @@
         }
 
 
+        function applyCluster() {
+            cluster_suspicion = document.getElementById("cluster-suspicions")
+            cluster_suspicion.onclick = ev => {
+                showSlidePanel(`Cluster`, [], cluster_info.suspicions, true)
+            }
+
+            counter = `<span style="display: inline-block; text-align: center;"
+                             class="node-suspicion-counter color-${cluster_info.suspicion_level.toLowerCase()}">
+                                ${cluster_info.suspicions ? cluster_info.suspicions.length : 0}
+                       </span>`
+            cluster_suspicion.innerHTML += counter
+        }
+
         function applyNodes() {
             node_info.forEach(n => {
                 let node = document.getElementById(n.id)
@@ -136,6 +154,7 @@
 
         document.addEventListener("DOMContentLoaded", _ => {
             init()
+            applyCluster()
             applyNodes()
             applyEdges()
         })
@@ -211,7 +230,7 @@
             font-size: 12px;
             height: 16px;
             width: 16px;
-            border: 1px soild gray;
+            border: 1px gray;
             border-radius: 3px;
         }
 
@@ -329,12 +348,23 @@
             line-break: loose;
             font-size: 15px;
         }
+
+        #cluster-suspicions {
+            cursor: pointer;
+            margin-left: 10px;
+            padding: 3px;
+            border: 1px solid #fafafa;
+            border-radius: 7px;
+        }
     </style>
 </head>
 
 <body>
     <header class="skoop-header">
         <div id="title">Skoop {{.DiagnoseInfo}}</div>
+        <div id="cluster-suspicions">
+            <span>Cluster Suspicions</span>
+        </div>
     </header>
     <div id="diagnose-result">
         <div id="graph">{{.GraphSvg}}</div>
@@ -348,7 +378,6 @@
             <div class="side-panel-suspicion">
                 <div class="side-panel-suspicion-header">Suspicions:</div>
                 <div class="side-panel-suspicion-items">
-
                 </div>
             </div>
         </div>
