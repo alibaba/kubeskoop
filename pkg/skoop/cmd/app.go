@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/alibaba/kubeskoop/version"
+
 	"github.com/alibaba/kubeskoop/pkg/skoop/context"
 	"github.com/alibaba/kubeskoop/pkg/skoop/model"
 	"github.com/alibaba/kubeskoop/pkg/skoop/provider"
@@ -21,6 +23,10 @@ func NewSkoopCmd() *cobra.Command {
 		Use:  "skoop",
 		Long: "Skoop is an one-shot kubernetes network diagnose tool.",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
+			if context.SkoopContext.MiscConfig().Version {
+				version.PrintVersion()
+				os.Exit(0)
+			}
 			if err := context.SkoopContext.Validate(); err != nil {
 				return err
 			}
