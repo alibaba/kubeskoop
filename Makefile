@@ -30,11 +30,11 @@ build-exporter:
 
 .PHONY: build-skoop
 build-skoop:
-	go build -o bin/skoop -ldflags $(ldflags) ./cmd/skoop
+	CGO_ENABLED=0 go build -o bin/skoop -ldflags $(ldflags) ./cmd/skoop
 
 .PHONY: build-collector
 build-collector:
-	GOOS=${TARGETOS} CGO_ENABLED=0 go build -o bin/pod-collector -ldflags $(ldflags) ./cmd/collector
+	CGO_ENABLED=0 go build -o bin/pod-collector -ldflags $(ldflags) ./cmd/collector
 
 .PHONY: image
 image: ## build kubeskoop image

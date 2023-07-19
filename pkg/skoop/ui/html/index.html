@@ -87,7 +87,9 @@
         }
 
         function patchNodeInfo(elem, n) {
+            console.log(`patching ${n.id}`)
             let text = elem.querySelector("text")
+            console.log(`text: ${text}`)
             node_name = text.innerHTML
             // calculate x, y and width
             let ellipse = elem.querySelector("ellipse")
@@ -121,7 +123,7 @@
 
         function applyNodes() {
             node_info.forEach(n => {
-                let node = document.getElementById(n.id)
+                let node = document.getElementsByClassName(`node ${n.id}`)[0]
                 patchNodeInfo(node, n)
                 node.classList.add("node-" + n.suspicion_level.toLowerCase())
                 node.onclick = e => {
@@ -133,7 +135,7 @@
 
         function applyEdges() {
             edge_info.forEach(e => {
-                let edge = document.getElementById(e.id)
+                let edge = document.getElementsByClassName(`edge ${e.id}`)[0]
                 edge.onclick = ev => {
                     showSlidePanel(`Edge ${e.id}`, [
                         ["Edge ID", e.id],
@@ -178,6 +180,8 @@
         }
 
         #graph {
+            display: flex;
+            justify-content: center;
             max-width: 1800px;
             width: 100%;
             margin: auto;
@@ -205,12 +209,12 @@
         }
 
         .node:hover ellipse {
-            stroke-width: 2px;
+            stroke-width: 2px !important;
             transition: 200ms;
         }
 
         .edge:hover path {
-            stroke-width: 2px;
+            stroke-width: 2px !important;
             transition: 200ms;
         }
 
@@ -356,6 +360,10 @@
             border: 1px solid #fafafa;
             border-radius: 7px;
         }
+
+        .node-display .node-suspicion-counter {
+            margin-top: 3px;
+        }
     </style>
 </head>
 
@@ -367,7 +375,7 @@
         </div>
     </header>
     <div id="diagnose-result">
-        <div id="graph">{{.GraphSvg}}</div>
+        {{.GraphSvg}}
     </div>
     <div class="side" id="side">
         <div class="side-panel-mask"></div>

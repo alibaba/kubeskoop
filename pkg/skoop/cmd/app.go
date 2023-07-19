@@ -58,7 +58,7 @@ func NewSkoopCmd() *cobra.Command {
 
 			if context.SkoopContext.UIConfig().Format != "" {
 				switch context.SkoopContext.UIConfig().Format {
-				case "svg", "dot":
+				case "svg", "d2":
 					err = saveGraphFile(packetPath)
 					if err != nil {
 						klog.Fatalf("save graph file error: %v", err)
@@ -102,7 +102,7 @@ func NewSkoopCmd() *cobra.Command {
 }
 
 func saveGraphFile(p *model.PacketPath) error {
-	g, err := ui.NewGraphviz(p)
+	g, err := ui.NewD2(p)
 	if err != nil {
 		return err
 	}
@@ -114,8 +114,8 @@ func saveGraphFile(p *model.PacketPath) error {
 		if err != nil {
 			return err
 		}
-	case "dot":
-		data, err = g.ToDot()
+	case "d2":
+		data, err = g.ToD2()
 		if err != nil {
 			return err
 		}
