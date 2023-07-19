@@ -219,10 +219,12 @@ type flannelRoute struct {
 	ipCache           *k8s.IPCache
 	nodeInfoCache     map[string]*flannelNodeInfo
 	cniMode           FlannelBackendType
+	iface             string
 }
 
 func newFlannelRoute(parentRoute map[string]assertions.RouteAssertion, localPodCIDR *net.IPNet,
-	clusterCIDR *net.IPNet, localNetAssertion *assertions.NetstackAssertion, localNode *v1.Node, ipCache *k8s.IPCache, cniMode FlannelBackendType) *flannelRoute {
+	clusterCIDR *net.IPNet, localNetAssertion *assertions.NetstackAssertion, localNode *v1.Node, ipCache *k8s.IPCache,
+	cniMode FlannelBackendType, iface string) *flannelRoute {
 	route := &flannelRoute{
 		route:             newRoute(parentRoute),
 		localNetAssertion: localNetAssertion,
@@ -232,6 +234,7 @@ func newFlannelRoute(parentRoute map[string]assertions.RouteAssertion, localPodC
 		ipCache:           ipCache,
 		nodeInfoCache:     map[string]*flannelNodeInfo{},
 		cniMode:           cniMode,
+		iface:             iface,
 	}
 
 	return route
@@ -351,12 +354,19 @@ func (r *flannelRoute) getDstNodeInfo(nodeName string) (*flannelNodeInfo, error)
 		backendType = r.cniMode
 	}
 
+	if dev == nil {
+		dev = &netstack.Interface{
+			Name: r.iface,
+		}
+	}
+
 	route := assertions.RouteAssertion{}
 	if vtep != nil && !vtep.IsUnspecified() {
 		route.Gw = &vtep
-		if dev != nil {
-			route.Dev = &dev.Name
-		}
+	}
+
+	if dev != nil {
+		route.Dev = &dev.Name
 	}
 
 	info := &flannelNodeInfo{
@@ -913,7 +923,7 @@ func (h *flannelHost) initRoute() error {
 		return err
 	}
 
-	h.route = newFlannelRoute(routes, h.podCIDR, h.clusterCIDR, h.net, node, h.ipCache, h.cniMode)
+	h.route = newFlannelRoute(routes, h.podCIDR, h.clusterCIDR, h.net, node, h.ipCache, h.cniMode, h.iface)
 	return nil
 }
 
