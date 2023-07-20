@@ -1,123 +1,97 @@
 package ui
 
 import (
-	"bytes"
+	"context"
+	"fmt"
 	"strings"
 
 	"github.com/alibaba/kubeskoop/pkg/skoop/model"
-
-	graphviz "github.com/goccy/go-graphviz"
-	"github.com/goccy/go-graphviz/cgraph"
+	"oss.terrastruct.com/d2/d2layouts/d2dagrelayout"
+	"oss.terrastruct.com/d2/d2lib"
+	"oss.terrastruct.com/d2/d2renderers/d2svg"
+	"oss.terrastruct.com/d2/lib/textmeasure"
 )
 
 const (
-	GraphvizFormatDot = string(graphviz.XDOT)
-	GraphvizFormatSvg = string(graphviz.SVG)
+	graphSettings = `
+direction: right
+classes: {
+  node: {
+    shape: circle
+    style {
+      font-size: 10
+      stroke-width: 1
+	}
+  }
+
+  edge: {
+    style: {
+      font-size: 20 
+      font-color: black
+      italic: true
+      stroke-width: 1
+    }
+  }
+}
+`
 )
 
-type Graphviz struct {
-	g     *graphviz.Graphviz
-	graph *cgraph.Graph
+type D2 struct {
+	script string
 }
 
-func NewGraphviz(p *model.PacketPath) (*Graphviz, error) {
-	g := &Graphviz{
-		g: graphviz.New(),
-	}
-
-	graph, err := g.buildGraph(p)
+func NewD2(p *model.PacketPath) (*D2, error) {
+	script, err := buildGraphScriptV2(p)
 	if err != nil {
 		return nil, err
 	}
 
-	graph.SetNodeSeparator(2).SetRankDir(cgraph.LRRank)
-	g.graph = graph
-	return g, nil
+	d := &D2{
+		script: script,
+	}
+	return d, nil
+}
+
+func buildGraphScriptV2(p *model.PacketPath) (string, error) {
+	builder := strings.Builder{}
+
+	builder.WriteString(graphSettings)
+	for _, n := range p.Nodes() {
+		builder.WriteString(fmt.Sprintf("%q: %s { class: [node; %s] }\n", n.GetID(), trimID(n.GetID()), n.GetID()))
+	}
+
+	for _, l := range p.Links() {
+		builder.WriteString(fmt.Sprintf("%q->%q: %s { class: [edge; %s] }\n", l.Source.GetID(), l.Destination.GetID(), l.Type, l.GetID()))
+	}
+
+	return builder.String(), nil
+}
+
+func (d *D2) ToD2() ([]byte, error) {
+	return []byte(d.script), nil
+}
+
+func (d *D2) ToSvg() ([]byte, error) {
+	ruler, err := textmeasure.NewRuler()
+	if err != nil {
+		return nil, err
+	}
+	diag, _, err := d2lib.Compile(context.Background(), d.script, &d2lib.CompileOptions{
+		Layout: d2dagrelayout.DefaultLayout,
+		Ruler:  ruler,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	out, err := d2svg.Render(diag, &d2svg.RenderOpts{
+		Pad: d2svg.DEFAULT_PADDING,
+	})
+
+	return out, err
 }
 
 func trimID(id string) string {
 	ids := strings.Split(id, "/")
 	return ids[len(ids)-1]
-}
-
-func (g *Graphviz) buildGraph(p *model.PacketPath) (*cgraph.Graph, error) {
-	graph, err := g.g.Graph()
-	if err != nil {
-		return nil, err
-	}
-
-	getNode := func(netNode *model.NetNode) (*cgraph.Node, error) {
-		id := netNode.GetID()
-		n, err := graph.Node(id)
-		if err != nil {
-			return nil, err
-		}
-
-		if n != nil {
-			return n, nil
-		}
-
-		n, err = graph.CreateNode(id)
-		if err != nil {
-			return nil, err
-		}
-
-		n.SetID(id).SetLabel(trimID(id))
-		n.SetHeight(1.8).SetWidth(1.8).SetShape(cgraph.CircleShape)
-		n.SetFontSize(11)
-
-		return n, nil
-	}
-
-	_, err = getNode(p.GetOriginNode())
-	if err != nil {
-		return nil, err
-	}
-
-	for _, l := range p.Links() {
-		s, err := getNode(l.Source)
-		if err != nil {
-			return nil, err
-		}
-
-		d, err := getNode(l.Destination)
-		if err != nil {
-			return nil, err
-		}
-
-		edge, err := graph.CreateEdge(l.GetID(), s, d)
-		if err != nil {
-			return nil, err
-		}
-
-		action := l.Destination.ActionOf(l)
-		edge.SetID(l.GetID()).SetLabel(string(l.Type))
-
-		label := p.GetLinkLabel(l, action)
-		edge.Set("linklabels", label)
-
-		if action != nil && action.Type == model.ActionTypeServe {
-			edge.SetArrowHead(cgraph.DotArrow)
-		}
-	}
-
-	return graph, nil
-}
-
-func (g *Graphviz) To(format string) ([]byte, error) {
-	buf := bytes.Buffer{}
-	err := g.g.Render(g.graph, graphviz.Format(format), &buf)
-	if err != nil {
-		return nil, err
-	}
-
-	return buf.Bytes(), nil
-}
-
-func (g *Graphviz) ToDot() ([]byte, error) {
-	return g.To(GraphvizFormatDot)
-}
-
-func (g *Graphviz) ToSvg() ([]byte, error) {
-	return g.To(GraphvizFormatSvg)
 }

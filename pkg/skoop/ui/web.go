@@ -63,7 +63,7 @@ type clusterInfo struct {
 
 type WebUI struct {
 	ctx       *context.Context
-	g         *Graphviz
+	g         *D2
 	p         *model.PacketPath
 	globalSus []model.Suspicion
 	template  *template.Template
@@ -71,7 +71,7 @@ type WebUI struct {
 }
 
 func NewWebUI(ctx *context.Context, globalSuspicions []model.Suspicion, p *model.PacketPath, address string) (*WebUI, error) {
-	g, err := NewGraphviz(p)
+	g, err := NewD2(p)
 	if err != nil {
 		return nil, err
 	}

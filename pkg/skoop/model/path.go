@@ -64,7 +64,8 @@ type Link struct {
 }
 
 func (l Link) GetID() string {
-	return fmt.Sprintf("%s,%s,%s", l.Type, l.Source.GetID(), l.Destination.GetID())
+	return fmt.Sprintf("%s,%s,%s,%s", l.Type, l.Source.GetID(), l.Destination.GetID(),
+		fmt.Sprintf("%s:%d", l.Packet.Dst, l.Packet.Dport))
 }
 
 type PacketPath struct {
