@@ -70,7 +70,6 @@ func NewSkoopCmd() *cobra.Command {
 					}
 					return nil
 				}
-
 			} else {
 				fmt.Printf("Packet path:\n%+v\n", packetPath.Paths())
 			}

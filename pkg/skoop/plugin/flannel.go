@@ -6,6 +6,8 @@ import (
 	"net"
 	"strings"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +34,10 @@ type FlannelConfig struct {
 	Interface   string
 }
 
+var (
+	supportedFlannelBackendType = []string{"host-gw", "vxlan", "alloc"}
+)
+
 func (f *FlannelConfig) BindFlags(fs *pflag.FlagSet) {
 	fs.StringVarP(&f.BackendType, "flannel-backend-type", "", "",
 		"Backend type for flannel plugin, support host-gw,vxlan,alloc. If not set, it will auto detect from flannel config.")
@@ -46,6 +52,10 @@ func (f *FlannelConfig) BindFlags(fs *pflag.FlagSet) {
 }
 
 func (f *FlannelConfig) Validate() error {
+	if f.BackendType != "" && !slices.Contains(supportedFlannelBackendType, f.BackendType) {
+		return fmt.Errorf("unsupported flannel backed type %q, should be %s",
+			f.BackendType, strings.Join(supportedFlannelBackendType, ","))
+	}
 	return nil
 }
 

@@ -2,6 +2,9 @@ package context
 
 import (
 	"fmt"
+	"net"
+
+	"golang.org/x/exp/slices"
 
 	"github.com/alibaba/kubeskoop/pkg/skoop/model"
 
@@ -27,6 +30,28 @@ func (tc *TaskConfig) BindFlags(fs *pflag.FlagSet) {
 }
 
 func (tc *TaskConfig) Validate() error {
+	if tc.Source == "" || tc.Destination.Address == "" {
+		return fmt.Errorf("source or destination address cannot be empty")
+	}
+
+	if tc.Destination.Port <= 0 || tc.Destination.Port > 65535 {
+		return fmt.Errorf("a valid destination port should be provided")
+	}
+
+	ip := net.ParseIP(tc.Source)
+	if ip == nil || ip.To4() == nil {
+		return fmt.Errorf("source address should be a valid IPv4 address")
+	}
+
+	ip = net.ParseIP(tc.Destination.Address)
+	if ip == nil || ip.To4() == nil {
+		return fmt.Errorf("destination address should be a valid IPv4 address")
+	}
+
+	if !slices.Contains([]string{"tcp", "udp"}, tc.Protocol) {
+		return fmt.Errorf("protocol should be tcp,udp")
+	}
+
 	return nil
 }
 

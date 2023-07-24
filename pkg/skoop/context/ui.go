@@ -1,7 +1,11 @@
 package context
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/spf13/pflag"
+	"golang.org/x/exp/slices"
 )
 
 type UIConfig struct {
@@ -12,6 +16,10 @@ type UIConfig struct {
 	HTTPPort    uint
 }
 
+var (
+	supportedFormat = []string{"d2", "svg", "json"}
+)
+
 func (c *UIConfig) BindFlags(fs *pflag.FlagSet) {
 	fs.StringVarP(&c.Format, "format", "", "", "Output format of diagnose result, support d2/svg/json. If not set, only print simple path info on console.")
 	fs.StringVarP(&c.Output, "output", "", "", "Output file name, default is output.d2/svg/json in current work directory.")
@@ -20,6 +28,9 @@ func (c *UIConfig) BindFlags(fs *pflag.FlagSet) {
 }
 
 func (c *UIConfig) Validate() error {
+	if c.Format != "" && !slices.Contains(supportedFormat, c.Format) {
+		return fmt.Errorf("unsupported output format %q, should be %s", c.Format, strings.Join(supportedFormat, ","))
+	}
 	return nil
 }
 
