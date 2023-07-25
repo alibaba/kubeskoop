@@ -51,7 +51,7 @@ KubeSkoop是一个Kubernetes网络诊断工具。针对不同的网络插件和I
 通过`go install`来安装KubeSkoop的诊断客户端：
 
 ```shell
-go install github.com/alibaba/kubeskoop/cmd/skoop@latest
+go install github.com/alibaba/kubeskoop/cmd/skoop@main
 ```
 
 也可以使用`docker run` 执行`skoop`命令

@@ -48,7 +48,7 @@ You can view the full documentation from the [KubeSkoop.io](https://kubeskoop.io
 Through `go install` to install KubeSkoop cli：
 
 ```shell
-go install github.com/alibaba/kubeskoop/cmd/skoop@latest
+go install github.com/alibaba/kubeskoop/cmd/skoop@main
 ```
 
 You can also run `skoop` command via `docker run`:
