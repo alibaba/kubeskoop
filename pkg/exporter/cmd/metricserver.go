@@ -121,6 +121,8 @@ func (s *MServer) Collect(ch chan<- prometheus.Metric) {
 			}
 			slog.Ctx(s.ctx).Debug("collect metric", "pod", et.GetPodName(), "netns", nsinum, "metric", mname, "value", value)
 			labelValues := []string{nettop.GetNodeName(), et.GetPodNamespace(), et.GetPodName()}
+			// for legacy pod labels
+			labelValues = append(labelValues, labelValues...)
 			if s.config.Verbose {
 				if len(s.additionalLabels) > 0 {
 					for _, label := range s.additionalLabels {
@@ -244,17 +246,22 @@ func (s *MServer) collectWorkerSerial(ctx context.Context) error {
 	return nil
 }
 
+// inspector pod metrics common labels
+// {"node", "namespace", "pod"} will override by prometheus default configuration
+// refer to https://github.com/alibaba/kubeskoop/issues/77
+var defaultMetricLabels = []string{"target_node", "target_namespace", "target_pod", "node", "namespace", "pod"}
+
 func getDescOfMetric(mp, mname string) *prometheus.Desc {
 	return prometheus.NewDesc(
 		prometheus.BuildFQName("inspector", "pod", mname),
 		fmt.Sprintf("%s %s count in netns/pod", mp, mname),
-		[]string{"node", "namespace", "pod"},
+		defaultMetricLabels,
 		nil,
 	)
 }
 
 func getDescOfMetricVerbose(mp, mname string, additionalLabels []ExposeLabel) *prometheus.Desc {
-	labels := []string{"node", "namespace", "pod"}
+	labels := defaultMetricLabels
 	if len(additionalLabels) > 0 {
 		for _, label := range additionalLabels {
 			slog.Info("build metric description", "additional label", label)
