@@ -156,8 +156,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(inspector_pod_sockmem{node=~\"$node\"}) by (node)",
-          "legendFormat": "{{node}}",
+          "expr": "sum(inspector_pod_sockmem{target_node=~\"$node\"}) by (node)",
+          "legendFormat": "{{target_node}}",
           "range": true,
           "refId": "A"
         }
@@ -249,8 +249,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "rate(inspector_pod_packetloss_abnormal{node=~\"$node\"}[2m])",
-          "legendFormat": "{{pod}}/{{node}}",
+          "expr": "rate(inspector_pod_packetloss_abnormal{target_node=~\"$node\"}[2m])",
+          "legendFormat": "{{target_pod}}/{{target_node}}",
           "range": true,
           "refId": "A"
         }
@@ -342,8 +342,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "rate(inspector_pod_netdevrxbytes{pod=~\"$pod\"}[1m])",
-          "legendFormat": "{{pod}}/{{node}}",
+          "expr": "rate(inspector_pod_netdevrxbytes{target_pod=~\"$pod\"}[1m])",
+          "legendFormat": "{{target_pod}}/{{target_node}}",
           "range": true,
           "refId": "A"
         }
@@ -435,8 +435,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(inspector_pod_sockalloc{node=~\"$node\"}) by (node)",
-          "legendFormat": "{{node}}",
+          "expr": "sum(inspector_pod_sockalloc{target_node=~\"$node\"}) by (node)",
+          "legendFormat": "{{target_node}}",
           "range": true,
           "refId": "A"
         }
@@ -529,7 +529,7 @@
           },
           "editorMode": "code",
           "expr": "rate(inspector_pod_netdevtxerrors[1m])",
-          "legendFormat": "{{pod}}/{{node}}",
+          "legendFormat": "{{target_pod}}/{{target_node}}",
           "range": true,
           "refId": "A"
         }
@@ -621,8 +621,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "irate(inspector_pod_netdevtxbytes{pod=~\"$pod\"}[2m])",
-          "legendFormat": "{{pod}}/{{node}}",
+          "expr": "irate(inspector_pod_netdevtxbytes{target_pod=~\"$pod\"}[2m])",
+          "legendFormat": "{{target_pod}}/{{target_node}}",
           "range": true,
           "refId": "A"
         }
@@ -719,7 +719,7 @@
           "format": "heatmap",
           "instant": false,
           "interval": "",
-          "legendFormat": "{{pod}}/{{node}}",
+          "legendFormat": "{{target_pod}}/{{target_node}}",
           "range": true,
           "refId": "A"
         },
@@ -731,7 +731,7 @@
           "editorMode": "code",
           "expr": "rate(inspector_pod_netdevtxpackets[2m])",
           "hide": false,
-          "legendFormat": "{{pod}}/{{node}}",
+          "legendFormat": "{{target_pod}}/{{target_node}}",
           "range": true,
           "refId": "B"
         }
@@ -824,7 +824,7 @@
           },
           "editorMode": "code",
           "expr": "rate(inspector_pod_netdevrxerrors[1m])",
-          "legendFormat": "{{pod}}/{{node}}",
+          "legendFormat": "{{target_pod}}/{{target_node}}",
           "range": true,
           "refId": "A"
         }
@@ -929,8 +929,8 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum(rate(inspector_pod_tcpretranssegs{node=~\"$node\"}[1m])) by (node)",
-          "legendFormat": "{{node}}",
+          "expr": "sum(rate(inspector_pod_tcpretranssegs{target_node=~\"$node\"}[1m])) by (node)",
+          "legendFormat": "{{target_node}}",
           "range": true,
           "refId": "A"
         },
@@ -940,9 +940,9 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "rate(inspector_pod_tcpretranssegs{pod=~\"$pod\"}[1m])",
+          "expr": "rate(inspector_pod_tcpretranssegs{target_pod=~\"$pod\"}[1m])",
           "hide": false,
-          "legendFormat": "{{pod}}",
+          "legendFormat": "{{target_pod}}",
           "range": true,
           "refId": "B"
         }
@@ -1032,8 +1032,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(inspector_pod_tcpsummarytcpestablishedconn{node=~\"$node\"}) by (node)",
-          "legendFormat": "{{node}}",
+          "expr": "sum(inspector_pod_tcpsummarytcpestablishedconn{target_node=~\"$node\"}) by (node)",
+          "legendFormat": "{{target_node}}",
           "range": true,
           "refId": "A"
         },
@@ -1043,9 +1043,9 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "inspector_pod_tcpsummarytcpestablishedconn{pod=~\"$pod\"}",
+          "expr": "inspector_pod_tcpsummarytcpestablishedconn{target_pod=~\"$pod\"}",
           "hide": false,
-          "legendFormat": "{{pod}}/{{node}}",
+          "legendFormat": "{{target_pod}}/{{target_node}}",
           "range": true,
           "refId": "B"
         }
@@ -1138,8 +1138,8 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "increase(inspector_pod_tcpexttcptimeouts{pod=~\"$pod\"}[1m])",
-          "legendFormat": "{{pod}}/{{node}}",
+          "expr": "increase(inspector_pod_tcpexttcptimeouts{target_pod=~\"$pod\"}[1m])",
+          "legendFormat": "{{target_pod}}/{{target_node}}",
           "range": true,
           "refId": "A"
         }
@@ -1229,8 +1229,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "inspector_pod_tcpsummarytcptimewaitconn{pod=~\"$pod\"}",
-          "legendFormat": "{{pod}}/{{node}}",
+          "expr": "inspector_pod_tcpsummarytcptimewaitconn{target_pod=~\"$pod\"}",
+          "legendFormat": "{{target_pod}}/{{target_node}}",
           "range": true,
           "refId": "A"
         }
@@ -1321,8 +1321,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "rate(inspector_pod_tcpextlistenoverflows{pod=~\"$pod\"}[1m])",
-          "legendFormat": "{{pod}}/{{node}}",
+          "expr": "rate(inspector_pod_tcpextlistenoverflows{target_pod=~\"$pod\"}[1m])",
+          "legendFormat": "{{target_pod}}/{{target_node}}",
           "range": true,
           "refId": "A"
         }
@@ -1413,8 +1413,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "rate(inspector_pod_tcpextlistendrops{pod=~\"$pod\"}[1m])",
-          "legendFormat": "{{pod}}/{{node}}",
+          "expr": "rate(inspector_pod_tcpextlistendrops{target_pod=~\"$pod\"}[1m])",
+          "legendFormat": "{{target_pod}}/{{target_node}}",
           "range": true,
           "refId": "A"
         }
@@ -1518,8 +1518,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "rate(inspector_pod_socketlatencyread100ms{pod=~\"$pod\"}[1m])",
-          "legendFormat": "{{node}}",
+          "expr": "rate(inspector_pod_socketlatencyread100ms{target_pod=~\"$pod\"}[1m])",
+          "legendFormat": "{{target_node}}",
           "range": true,
           "refId": "A"
         }
@@ -1610,8 +1610,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "inspector_pod_tcpsummarytcptxqueue{pod=~\"$pod\"}",
-          "legendFormat": "{{pod}}/{{node}}",
+          "expr": "inspector_pod_tcpsummarytcptxqueue{target_pod=~\"$pod\"}",
+          "legendFormat": "{{target_pod}}/{{target_node}}",
           "range": true,
           "refId": "A"
         }
@@ -1702,8 +1702,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "inspector_pod_tcpsummarytcprxqueue{pod=~\"$pod\"}",
-          "legendFormat": "{{pod}}/{{node}}",
+          "expr": "inspector_pod_tcpsummarytcprxqueue{target_pod=~\"$pod\"}",
+          "legendFormat": "{{target_pod}}/{{target_node}}",
           "range": true,
           "refId": "A"
         }
@@ -1795,7 +1795,7 @@
           },
           "editorMode": "code",
           "expr": "rate(inspector_pod_kernellatency_rxslow{}[1m])",
-          "legendFormat": "{{pod}}/{{node}}",
+          "legendFormat": "{{target_pod}}/{{target_node}}",
           "range": true,
           "refId": "A"
         },
@@ -1807,7 +1807,7 @@
           "editorMode": "code",
           "expr": "rate(inspector_pod_kernellatency_txslow{}[1m])",
           "hide": false,
-          "legendFormat": "{{pod}}/{{node}}",
+          "legendFormat": "{{target_pod}}/{{target_node}}",
           "range": true,
           "refId": "B"
         }
@@ -1898,8 +1898,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "rate(inspector_pod_net_softirq_schedslow{node=~\"$node\"}[1m])",
-          "legendFormat": "{{node}}",
+          "expr": "rate(inspector_pod_net_softirq_schedslow{target_node=~\"$node\"}[1m])",
+          "legendFormat": "{{target_node}}",
           "range": true,
           "refId": "A"
         }
@@ -1990,8 +1990,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "rate(inspector_pod_net_softirq_schedslow100ms{node=~\"$node\"}[1m])",
-          "legendFormat": "{{node}}",
+          "expr": "rate(inspector_pod_net_softirq_schedslow100ms{target_node=~\"$node\"}[1m])",
+          "legendFormat": "{{target_node}}",
           "range": true,
           "refId": "A"
         }
@@ -2083,13 +2083,13 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "inspector_pod_virtcmdlatency{node=~\"$node\"}",
-          "legendFormat": "{{node}}/le {{le}}",
+          "expr": "inspector_pod_virtcmdlatency{target_node=~\"$node\"}",
+          "legendFormat": "{{target_node}}/le {{le}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Virtio command excute low",
+      "title": "Virtio command execute low",
       "type": "timeseries"
     },
     {
@@ -2175,8 +2175,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "rate(inspector_pod_ioioreadbytes{pod=~\"$pod\"}[1m])",
-          "legendFormat": "{{pod}}/{{node}}",
+          "expr": "rate(inspector_pod_ioioreadbytes{target_pod=~\"$pod\"}[1m])",
+          "legendFormat": "{{target_pod}}/{{target_node}}",
           "range": true,
           "refId": "A"
         }
@@ -2267,8 +2267,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "rate(inspector_pod_ioiowritebytes{pod=~\"$pod\"}[1m])",
-          "legendFormat": "{{pod}}/{{node}}",
+          "expr": "rate(inspector_pod_ioiowritebytes{target_pod=~\"$pod\"}[1m])",
+          "legendFormat": "{{target_pod}}/{{target_node}}",
           "range": true,
           "refId": "A"
         }
@@ -2359,8 +2359,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "rate(inspector_pod_ioiowritesyscall{pod=~\"$pod\"}[1m])",
-          "legendFormat": "W-{{pod}}/{{node}}",
+          "expr": "rate(inspector_pod_ioiowritesyscall{target_pod=~\"$pod\"}[1m])",
+          "legendFormat": "W-{{target_pod}}/{{target_node}}",
           "range": true,
           "refId": "A"
         },
@@ -2370,9 +2370,9 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "rate(inspector_pod_ioioreadsyscall{pod=~\"$pod\"}[1m])",
+          "expr": "rate(inspector_pod_ioioreadsyscall{target_pod=~\"$pod\"}[1m])",
           "hide": false,
-          "legendFormat": "R-{{pod}}/{{node}}",
+          "legendFormat": "R-{{target_pod}}/{{target_node}}",
           "range": true,
           "refId": "B"
         }
@@ -2476,8 +2476,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "rate(inspector_pod_udpindatagrams{pod=~\"$pod\"}[1m])",
-          "legendFormat": "{{pod}}/{{node}}",
+          "expr": "rate(inspector_pod_udpindatagrams{target_pod=~\"$pod\"}[1m])",
+          "legendFormat": "{{target_pod}}/{{target_node}}",
           "range": true,
           "refId": "A"
         }
@@ -2568,8 +2568,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "rate(inspector_pod_udpoutdatagrams{pod=~\"$pod\"}[1m])",
-          "legendFormat": "{{pod}}/{{node}}",
+          "expr": "rate(inspector_pod_udpoutdatagrams{target_pod=~\"$pod\"}[1m])",
+          "legendFormat": "{{target_pod}}/{{target_node}}",
           "range": true,
           "refId": "A"
         }
@@ -2660,8 +2660,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "inspector_pod_udprcvbuferrors{pod=~\"$pod\"}",
-          "legendFormat": "{{pod}}/{{node}}",
+          "expr": "inspector_pod_udprcvbuferrors{target_pod=~\"$pod\"}",
+          "legendFormat": "{{target_pod}}/{{target_node}}",
           "range": true,
           "refId": "A"
         }
@@ -2752,8 +2752,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "rate(inspector_pod_udpsndbuferrors{pod=~\"$pod\"}[1m])",
-          "legendFormat": "{{pod}}/{{node}}",
+          "expr": "rate(inspector_pod_udpsndbuferrors{target_pod=~\"$pod\"}[1m])",
+          "legendFormat": "{{target_pod}}/{{target_node}}",
           "range": true,
           "refId": "A"
         }
@@ -2845,8 +2845,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "rate(inspector_pod_udpnoports{pod=~\"$pod\"}[1m])",
-          "legendFormat": "{{pod}}/{{node}}",
+          "expr": "rate(inspector_pod_udpnoports{target_pod=~\"$pod\"}[1m])",
+          "legendFormat": "{{target_pod}}/{{target_node}}",
           "range": true,
           "refId": "A"
         }
@@ -2938,8 +2938,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "rate(inspector_pod_udpinerrors{pod=~\"$pod\"}[1m])",
-          "legendFormat": "{{pod}}/{{node}}",
+          "expr": "rate(inspector_pod_udpinerrors{target_pod=~\"$pod\"}[1m])",
+          "legendFormat": "{{target_pod}}/{{target_node}}",
           "range": true,
           "refId": "A"
         }
@@ -3043,8 +3043,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "inspector_pod_tcpexttcpabortonmemory{pod=~\"$pod\"}",
-          "legendFormat": "{{pod}}/{{node}}",
+          "expr": "inspector_pod_tcpexttcpabortonmemory{target_pod=~\"$pod\"}",
+          "legendFormat": "{{target_pod}}/{{target_node}}",
           "range": true,
           "refId": "A"
         }
@@ -3135,8 +3135,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "rate(inspector_pod_tcpexttcpabortontimeout{pod=~\"$pod\"}[1m])",
-          "legendFormat": "{{pod}}/{{node}}",
+          "expr": "rate(inspector_pod_tcpexttcpabortontimeout{target_pod=~\"$pod\"}[1m])",
+          "legendFormat": "{{target_pod}}/{{target_node}}",
           "range": true,
           "refId": "A"
         }
@@ -3227,8 +3227,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "inspector_pod_tcpexttcpabortonlinger{pod=~\"$pod\"}",
-          "legendFormat": "{{pod}}/{{node}}",
+          "expr": "inspector_pod_tcpexttcpabortonlinger{target_pod=~\"$pod\"}",
+          "legendFormat": "{{target_pod}}/{{target_node}}",
           "range": true,
           "refId": "A"
         }
@@ -3319,8 +3319,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "rate(inspector_pod_tcpexttcpabortonclose{pod=~\"$pod\"}[1m])",
-          "legendFormat": "{{pod}}/{{node}}",
+          "expr": "rate(inspector_pod_tcpexttcpabortonclose{target_pod=~\"$pod\"}[1m])",
+          "legendFormat": "{{target_pod}}/{{target_node}}",
           "range": true,
           "refId": "A"
         }
