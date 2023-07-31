@@ -39,7 +39,7 @@ spec:
               name: boot
           command: [btfhack, discover,-p ,/etc/net-exporter/btf/]
       containers:
-      - image: "registry.cn-hangzhou.aliyuncs.com/acs/kubeskoop-exporter:v0.0.1-g857c8be-aliyun"
+      - image: "kubeskoop/kubeskoop:latest"
         name: inspector
         env:
         - name: INSPECTOR_NODENAME
@@ -376,6 +376,12 @@ spec:
           - mountPath: /etc/grafana/provisioning/datasources
             name: grafana-datasources
             readOnly: false
+      - name: register-dashboard
+        image: kubeskoop/kubeskoop:latest
+        env:
+          - name: GRAFANA_PASSWORD
+            value: "kubeskoop"
+        command: ["/bin/grafana_dashboard.sh"]
       volumes:
         - name: grafana-storage
           emptyDir: {}
