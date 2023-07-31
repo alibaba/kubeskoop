@@ -70,8 +70,8 @@ I0118 11:43:23.383446    6280 web.go:97] http server listening on http://127.0.0
 或者通过`docker run`命令执行
 
 ```shell
-$ docker run -p 8080:8080 -v ~/.kube:/root/.kube kubeskoop/kubeskoop:latest skoop -s 172.18.0.4 -d 10.96.0.10 -p 53 --http # 执行诊断命令，通过src,dst指定源地址和目的地址，使用--http通过本地web服务展示诊断结果
-I0118 11:43:23.383446    6280 web.go:97] http server listening on http://127.0.0.1:8080 # 在诊断完成后，将会显示用于查看诊断结果的链接
+$ docker run -p 8080:8080 -v ~/.kube:/root/.kube kubeskoop/kubeskoop:latest skoop -s 172.18.0.4 -d 10.96.0.10 -p 53 --http --http-address 0.0.0.0:8080 # 执行诊断命令，通过src,dst指定源地址和目的地址，使用--http通过本地web服务展示诊断结果, 地址设置为0.0.0.0:8080
+I0118 11:43:23.383446    6280 web.go:97] http server listening on http://0.0.0.0:8080 # 在诊断完成后，将会显示用于查看诊断结果的链接
 ```
 
 通过浏览器打开`http://127.0.0.1:8080`后可以看到诊断结果：  
