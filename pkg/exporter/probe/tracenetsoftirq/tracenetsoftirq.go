@@ -91,6 +91,10 @@ func (p *NetSoftirqProbe) Close() error {
 }
 
 func (p *NetSoftirqProbe) Start(ctx context.Context) {
+	if p.enable {
+		return
+	}
+
 	p.once.Do(func() {
 		err := loadSync()
 		if err != nil {
@@ -99,6 +103,11 @@ func (p *NetSoftirqProbe) Start(ctx context.Context) {
 		}
 		p.enable = true
 	})
+
+	if !p.enable {
+		// if load failed, do not start process
+		return
+	}
 
 	reader, err := perf.NewReader(objs.bpfMaps.InspSoftirqEvents, int(unsafe.Sizeof(bpfInspSoftirqEventT{})))
 	if err != nil {

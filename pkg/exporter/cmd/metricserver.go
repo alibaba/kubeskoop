@@ -53,6 +53,7 @@ func NewMServer(ctx context.Context, config MetricConfig) *MServer {
 			continue
 		}
 		ms.probes[p] = mp
+		go mp.Start(ctx)
 		slog.Ctx(ctx).Debug("new mserver add subject", "subject", p)
 	}
 
@@ -73,7 +74,6 @@ func NewMServer(ctx context.Context, config MetricConfig) *MServer {
 			}
 
 		}
-
 	}
 	// start cache loop
 	slog.Ctx(ctx).Debug("new mserver start cache loop")
