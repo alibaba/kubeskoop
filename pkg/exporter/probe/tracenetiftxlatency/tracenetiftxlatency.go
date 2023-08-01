@@ -65,6 +65,10 @@ func (p *NetifTxlatencyProbe) Name() string {
 }
 
 func (p *NetifTxlatencyProbe) Start(ctx context.Context) {
+	if p.enable {
+		return
+	}
+
 	// 将eBPF程序进行link
 	p.once.Do(func() {
 		err := start()
