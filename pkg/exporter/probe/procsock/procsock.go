@@ -45,7 +45,7 @@ func (s *ProcSock) Start(_ context.Context) {
 
 func (s *ProcSock) Ready() bool {
 	// determine by if default snmp file was ready
-	if _, err := os.Stat("/proc/net/snmp"); os.IsNotExist(err) {
+	if _, err := os.Stat("/proc/net/sockstat"); os.IsNotExist(err) {
 		return false
 	}
 	return true

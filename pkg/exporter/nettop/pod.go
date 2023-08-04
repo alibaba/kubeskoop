@@ -44,7 +44,7 @@ func getPodMetas(client internalapi.RuntimeService) (map[string]podMeta, error) 
 	for _, sandbox := range listresponse {
 		status, err := client.PodSandboxStatus(sandbox.GetId(), true)
 		if err != nil {
-			logger.Debug("get pod sanbox %s status failed with %s", sandbox.GetId(), err)
+			logger.Debug("get pod sandbox %s status failed with %s", sandbox.GetId(), err)
 			continue
 		}
 		pm := podMeta{

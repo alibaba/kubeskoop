@@ -87,8 +87,8 @@ func (s *ProcTCP) Start(_ context.Context) {
 }
 
 func (s *ProcTCP) Ready() bool {
-	// determine by if default snmp file was ready
-	if _, err := os.Stat("/proc/net/netstat"); os.IsNotExist(err) {
+	// determine by if default tcp file was ready
+	if _, err := os.Stat("/proc/net/tcp"); os.IsNotExist(err) {
 		return false
 	}
 	return true

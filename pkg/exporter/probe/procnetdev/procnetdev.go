@@ -52,7 +52,7 @@ func (s *ProcNetdev) Start(_ context.Context) {
 
 func (s *ProcNetdev) Ready() bool {
 	// determine by if default snmp file was ready
-	if _, err := os.Stat("/proc/net/snmp"); os.IsNotExist(err) {
+	if _, err := os.Stat("/proc/net/dev"); os.IsNotExist(err) {
 		return false
 	}
 	return true
