@@ -18,13 +18,15 @@ var (
 
 	top              = metacache{}
 	runtimeEndpoints = []string{"/var/run/dockershim.sock", "/run/containerd/containerd.sock"}
+
+	sidecarEnabled bool
 )
 
 type metacache struct {
 	NodeMeta
 }
 
-func init() {
+func Init(sidecar bool) {
 	logger = slog.New(slog.NewJSONHandler(io.Discard))
 	top.NodeName = getNodeName()
 	kr, err := getKernelRelease()
@@ -33,14 +35,18 @@ func init() {
 	} else {
 		top.Kernel = kr
 	}
-	// use empty cri meta, fulfillize it when updated
-	c := &CriMeta{}
-	err = c.Update()
-	if err != nil {
-		logger.Warn("update cri meta failed %s", err.Error())
+	if !sidecar {
+		// use empty cri meta, fulfillize it when updated
+		c := &CriMeta{}
+		err = c.Update()
+		if err != nil {
+			logger.Warn("update cri meta failed %s", err.Error())
+		}
+
+		top.Crimeta = c
 	}
 
-	top.Crimeta = c
+	sidecarEnabled = sidecar
 }
 
 func getNodeName() string {

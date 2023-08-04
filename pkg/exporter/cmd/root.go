@@ -4,6 +4,8 @@ import (
 	"io"
 	"os"
 
+	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
+
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slog"
 )
@@ -14,6 +16,7 @@ var (
 		Use:   "inspector",
 		Short: "network inspection tool",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			nettop.Init(sidecar)
 			if debug {
 				opts := slog.HandlerOptions{
 					AddSource: true,
@@ -29,6 +32,7 @@ var (
 
 	debug   bool
 	verbose bool
+	sidecar bool
 )
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -45,4 +49,5 @@ func init() {
 
 	rootCmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "Enable debug log information")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable detail information")
+	rootCmd.PersistentFlags().BoolVarP(&sidecar, "sidecar", "", false, "use inspector for sidecar mode")
 }

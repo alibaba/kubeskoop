@@ -3,6 +3,7 @@ package nettop
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/patrickmn/go-cache"
@@ -70,6 +71,10 @@ func (e *Entity) GetLabel(labelkey string) (string, bool) {
 }
 
 func (e *Entity) GetPodName() string {
+	if env := os.Getenv("INSPECTOR_PODNAME"); env != "" {
+		return env
+	}
+
 	if e.netnsMeta.isHostNetwork {
 		return hostNetwork
 	}
@@ -82,6 +87,10 @@ func (e *Entity) GetPodName() string {
 }
 
 func (e *Entity) GetPodNamespace() string {
+	if env := os.Getenv("INSPECTOR_PODNAMESPACE"); env != "" {
+		return env
+	}
+
 	if e.netnsMeta.isHostNetwork {
 		return hostNetwork
 	}
@@ -267,25 +276,28 @@ func cacheNetTopology() error {
 
 	logger.Debug("finished get all nsfs mount point")
 
-	// get pod meta info
-	podMap, err := getPodMetas(rcrisvc)
-	if err != nil {
-		logger.Warn("get pod meta failed %s", err.Error())
-		return err
-	}
+	var podMap map[string]podMeta
+	if !sidecarEnabled {
+		// get pod meta info
+		podMap, err := getPodMetas(rcrisvc)
+		if err != nil {
+			logger.Warn("get pod meta failed %s", err.Error())
+			return err
+		}
 
-	// if use docker, get docker sandbox
-	if top.Crimeta.RuntimeName == "docker" {
-		for sandbox, pm := range podMap {
-			if pm.nspath == "" && pm.pid == 0 {
-				pid, err := getPidForContainerBySock(sandbox)
-				if err != nil {
-					logger.Warn("get docker container", "sandbox", sandbox, "err", err.Error())
-					continue
+		// if use docker, get docker sandbox
+		if top.Crimeta.RuntimeName == "docker" {
+			for sandbox, pm := range podMap {
+				if pm.nspath == "" && pm.pid == 0 {
+					pid, err := getPidForContainerBySock(sandbox)
+					if err != nil {
+						logger.Warn("get docker container", "sandbox", sandbox, "err", err.Error())
+						continue
+					}
+					pm.pid = pid
 				}
-				pm.pid = pid
+				podMap[sandbox] = pm
 			}
-			podMap[sandbox] = pm
 		}
 	}
 
