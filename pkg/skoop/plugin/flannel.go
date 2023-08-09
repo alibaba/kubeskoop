@@ -47,7 +47,7 @@ func (f *FlannelConfig) BindFlags(fs *pflag.FlagSet) {
 		"Pod MTU for flannel plugin. If not set, it will auto detect from flannel cni mode (1450 for vxlan, 1500 for others).")
 	fs.BoolVarP(&f.IPMasq, "flannel-ip-masq", "", true,
 		"Should do IP masquerade for flannel plugin.")
-	fs.StringVarP(&f.Interface, "flannel-host-interface", "", "eth0",
+	fs.StringVarP(&f.Interface, "flannel-host-interface", "", "",
 		"Host interface for flannel plugin.")
 }
 
@@ -472,6 +472,14 @@ func newFlannelHost(ipCache *k8s.IPCache, nodeInfo *k8s.NodeInfo, infraShim netw
 		ipMasq:           options.IPMasq,
 		gateway:          options.Gateway,
 		serviceProcessor: serviceProcessor,
+	}
+
+	if host.iface == "" {
+		host.iface = netstack.LookupDefaultIfaceName(nodeInfo.NetNSInfo.Interfaces)
+		if host.iface == "" {
+			return nil, fmt.Errorf("cannot lookup default host interface, please manually specify it via --flannel-host-interface")
+		}
+		klog.V(5).Infof("detected host interface %s on node %s", host.iface, host.nodeInfo.NodeName)
 	}
 
 	err = host.initRoute()
