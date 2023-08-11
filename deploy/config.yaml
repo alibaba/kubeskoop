@@ -1,0 +1,16 @@
+debugmode: true
+metric_config:
+  interval: 15
+  port: 9102
+  probes:
+  - netdev
+  - io
+  - sock
+  - tcpsummary
+  - tcp
+  - tcpext
+  - udp
+event_config:
+  port: 19102
+  loki_enable: false
+  loki_address: loki-service
