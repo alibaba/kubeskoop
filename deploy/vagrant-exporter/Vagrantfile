@@ -1,0 +1,35 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+MASTER_IP = "192.168.56.10"
+WORKER1_IP = "192.168.56.11"
+WORKER2_IP = "192.168.56.12"
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "debian/bullseye64"
+
+  boxes = [
+    { :name => "master", :ip => MASTER_IP, :cpus => 2, :memory => 2048 },
+    { :name => "worker1", :ip => WORKER1_IP, :cpus => 2, :memory => 2048 },
+    { :name => "worker2", :ip => WORKER2_IP, :cpus => 2, :memory => 2048 }
+  ]
+
+  boxes.each do |box|
+    config.vm.define box[:name] do |b|
+      b.vm.hostname = box[:name]
+      b.vm.network :private_network, ip: box[:ip]
+      b.vm.provider "virtualbox" do |vbox|
+        vbox.cpus = box[:cpus]
+        vbox.memory = box[:memory]
+      end
+      b.vm.provision "shell", path: "./scripts/common.sh", env: {:ALIYUN_MIRROR => "1", :NODE_IP => box[:ip]}
+      if /^master.*/.match? b.vm.hostname
+        b.vm.provision "shell", path: "./scripts/init-master.sh", env: {:MASTER_IP => box[:ip]}
+        b.vm.network :forwarded_port, guest: 30157, host: 8080
+      end
+      if /^worker.*/.match? b.vm.hostname
+        b.vm.provision "shell", path: "./scripts/init-worker.sh"
+      end
+    end
+  end
+ end
