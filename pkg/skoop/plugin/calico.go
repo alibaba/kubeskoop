@@ -8,6 +8,8 @@ import (
 	"net"
 	"strings"
 
+	"k8s.io/klog/v2"
+
 	"github.com/spf13/pflag"
 
 	"github.com/alibaba/kubeskoop/pkg/skoop/assertions"
@@ -33,7 +35,7 @@ type CalicoConfig struct {
 }
 
 func (c *CalicoConfig) BindFlags(fs *pflag.FlagSet) {
-	fs.StringVarP(&c.Interface, "calico-host-interface", "", "eth0",
+	fs.StringVarP(&c.Interface, "calico-host-interface", "", "",
 		"Host interface for calico plugin.")
 	fs.IntVarP(&c.PodMTU, "calico-pod-mtu", "", 1500,
 		"Pod MTU for calico plugin. Pod interface MTU in BGP mode.")
@@ -330,6 +332,13 @@ func newCalicoHost(ipCache *k8s.IPCache, nodeInfo *k8s.NodeInfo, infraShim netwo
 		net:              assertion,
 		k8s:              k8sAssertion,
 		infraShim:        infraShim,
+	}
+	if host.iface == "" {
+		host.iface = netstack.LookupDefaultIfaceName(nodeInfo.NetNSInfo.Interfaces)
+		if host.iface == "" {
+			return nil, fmt.Errorf("cannot lookup default host interface, please manually specify it via --calico-host-interface")
+		}
+		klog.V(5).Infof("detected host interface %s on node %s", host.iface, host.nodeInfo.NodeName)
 	}
 
 	err := host.initRoute()
