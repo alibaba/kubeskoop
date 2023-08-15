@@ -25,7 +25,6 @@ union addr {
     u64 d1;
     u64 d2;
   } v6addr;
-  u64 pad[2];
 } __attribute__((packed));
 
 struct skb_meta {
