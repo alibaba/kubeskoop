@@ -279,7 +279,7 @@ func cacheNetTopology() error {
 	var podMap map[string]podMeta
 	if !sidecarEnabled {
 		// get pod meta info
-		podMap, err := getPodMetas(rcrisvc)
+		podMap, err = getPodMetas(rcrisvc)
 		if err != nil {
 			logger.Warn("get pod meta failed %s", err.Error())
 			return err
