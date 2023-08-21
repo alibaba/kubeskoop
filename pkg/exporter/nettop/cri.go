@@ -60,6 +60,19 @@ type remoteRuntimeService struct {
 }
 
 func getCriClient(eps []string) (internalapi.RuntimeService, string, error) {
+	if sock, ok := os.LookupEnv("RUNTIME_SOCK"); ok {
+		if _, err := os.Stat(sock); os.IsNotExist(err) {
+			return nil, "", fmt.Errorf("cannot find cri sock %s", sock)
+		}
+		logger.Debug("try to connect crisock", "candidate", sock)
+		client, err := NewRemoteRuntimeService(sock, 10*time.Second)
+		if err != nil {
+			logger.Warn("try to connect crisock", "candidate", sock, "err", err)
+			return nil, "", fmt.Errorf("connect cri sock %s error: %s", sock, err.Error())
+		}
+		return client, sock, nil
+	}
+
 	for _, candidate := range eps {
 		if _, err := os.Stat(candidate); os.IsNotExist(err) {
 			continue
