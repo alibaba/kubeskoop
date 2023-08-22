@@ -17,7 +17,7 @@ var (
 	logger *slog.Logger
 
 	top              = metacache{}
-	runtimeEndpoints = []string{"/var/run/dockershim.sock", "/run/containerd/containerd.sock"}
+	runtimeEndpoints = []string{"/var/run/dockershim.sock", "/run/containerd/containerd.sock", "/run/k3s/containerd/containerd.sock"}
 
 	sidecarEnabled bool
 )
