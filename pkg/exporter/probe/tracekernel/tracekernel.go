@@ -229,7 +229,19 @@ func loadSync() error {
 
 	// 获取Loaded的程序/map的fd信息
 	if err := loadBpfObjects(&objs, &opts); err != nil {
-		return fmt.Errorf("loading objects: %v", err)
+		if strings.Contains(err.Error(), "no BTF found for kernel") {
+			_BpfBytes, err = bpfutil.CompileBPF("kernellatency")
+			if err != nil {
+				return err
+			}
+			opts.Programs.KernelTypes = nil
+			err = loadBpfObjects(&objs, &opts)
+			if err != nil {
+				return err
+			}
+		} else {
+			return fmt.Errorf("loading objects: %v", err)
+		}
 	}
 
 	progrcv, err := link.Kprobe(HOOK_IPRCV, objs.KlatencyIpRcv, &link.KprobeOptions{})

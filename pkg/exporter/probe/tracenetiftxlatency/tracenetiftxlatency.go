@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"math/bits"
+	"strings"
 	"sync"
 	"unsafe"
 
@@ -220,7 +221,19 @@ func start() error {
 	// 获取Loaded的程序/map的fd信息
 	objs := bpfObjects{}
 	if err := loadBpfObjects(&objs, &opts); err != nil {
-		return fmt.Errorf("loading objects: %v", err)
+		if strings.Contains(err.Error(), "no BTF found for kernel") {
+			_BpfBytes, err = bpfutil.CompileBPF("netiftxlatency")
+			if err != nil {
+				return err
+			}
+			opts.Programs.KernelTypes = nil
+			err = loadBpfObjects(&objs, &opts)
+			if err != nil {
+				return err
+			}
+		} else {
+			return fmt.Errorf("loading objects: %v", err)
+		}
 	}
 
 	// 执行link操作，保存rawfd

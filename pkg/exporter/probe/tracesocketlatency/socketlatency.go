@@ -246,7 +246,19 @@ func loadSync() error {
 
 	// Load pre-compiled programs and maps into the kernel.
 	if err := loadBpfObjects(&objs, &opts); err != nil {
-		return fmt.Errorf("loading objects: %s", err.Error())
+		if strings.Contains(err.Error(), "no BTF found for kernel") {
+			_BpfBytes, err = bpfutil.CompileBPF("socketlatency")
+			if err != nil {
+				return err
+			}
+			opts.Programs.KernelTypes = nil
+			err = loadBpfObjects(&objs, &opts)
+			if err != nil {
+				return err
+			}
+		} else {
+			return fmt.Errorf("loading objects: %v", err)
+		}
 	}
 
 	linkcreate, err := link.Kprobe("inet_ehash_nolisten", objs.SockCreate, nil)

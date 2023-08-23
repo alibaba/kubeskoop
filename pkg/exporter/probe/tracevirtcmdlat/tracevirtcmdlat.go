@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"unsafe"
 
@@ -187,7 +188,19 @@ func loadSync() error {
 
 	// Load pre-compiled programs and maps into the kernel.
 	if err := loadBpfObjects(&objs, &opts); err != nil {
-		return fmt.Errorf("loading objects: %s", err.Error())
+		if strings.Contains(err.Error(), "no BTF found for kernel") {
+			_BpfBytes, err = bpfutil.CompileBPF("virtcmdlatency")
+			if err != nil {
+				return err
+			}
+			opts.Programs.KernelTypes = nil
+			err = loadBpfObjects(&objs, &opts)
+			if err != nil {
+				return err
+			}
+		} else {
+			return fmt.Errorf("loading objects: %v", err)
+		}
 	}
 
 	linkentry, err := link.Kprobe(fn, objs.TraceVirtcmd, &link.KprobeOptions{})

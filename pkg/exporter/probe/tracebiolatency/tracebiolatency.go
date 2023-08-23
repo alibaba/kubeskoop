@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"unsafe"
 
@@ -158,7 +159,19 @@ func start() error {
 	objs := bpfObjects{}
 	// Load pre-compiled programs and maps into the kernel.
 	if err := loadBpfObjects(&objs, &opts); err != nil {
-		return fmt.Errorf("loading objects: %s", err.Error())
+		if strings.Contains(err.Error(), "no BTF found for kernel") {
+			_BpfBytes, err = bpfutil.CompileBPF("tracebiolatency")
+			if err != nil {
+				return err
+			}
+			opts.Programs.KernelTypes = nil
+			err = loadBpfObjects(&objs, &opts)
+			if err != nil {
+				return err
+			}
+		} else {
+			return fmt.Errorf("loading objects: %v", err)
+		}
 	}
 
 	linkcreate, err := link.Kprobe("blk_account_io_start", objs.BiolatStart, nil)
