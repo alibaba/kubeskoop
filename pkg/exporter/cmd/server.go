@@ -13,8 +13,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	"golang.org/x/exp/slog"
-
 	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
 	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
@@ -41,7 +39,7 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			insp := &inspServer{
 				v:   *viper.New(),
-				ctx: log.NewContext(context.Background(), slog.Default()),
+				ctx: log.NewContext(context.Background(), log.Default()),
 			}
 
 			insp.v.SetConfigFile(configPath)
@@ -56,13 +54,13 @@ var (
 					AddSource: true,
 					Level:     log.DebugLevel,
 				}
-				insp.ctx = log.NewContext(context.Background(), slog.New(opts.NewJSONHandler(os.Stdout)))
+				insp.ctx = log.NewContext(context.Background(), log.New(opts.NewJSONHandler(os.Stdout)))
 			} else {
 				opts := log.HandlerOptions{
 					AddSource: false,
 					Level:     log.InfoLevel,
 				}
-				insp.ctx = log.NewContext(context.Background(), slog.New(opts.NewJSONHandler(os.Stdout)))
+				insp.ctx = log.NewContext(context.Background(), log.New(opts.NewJSONHandler(os.Stdout)))
 			}
 
 			// nolint
