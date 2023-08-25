@@ -10,7 +10,6 @@ metric_config:
   - tcp
   - tcpext
   - udp
-  - flow
 event_config:
   port: 19102
   loki_enable: false
