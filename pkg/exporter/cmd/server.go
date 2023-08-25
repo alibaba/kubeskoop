@@ -17,6 +17,9 @@ import (
 	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
 	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
 
+	_ "net/http"       //for golangci-lint
+	_ "net/http/pprof" //for golangci-lint once more
+
 	gops "github.com/google/gops/agent"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -24,7 +27,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"golang.org/x/exp/slog"
+	log "golang.org/x/exp/slog"
 	"google.golang.org/grpc"
 )
 
@@ -36,28 +39,28 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			insp := &inspServer{
 				v:   *viper.New(),
-				ctx: slog.NewContext(context.Background(), slog.Default()),
+				ctx: log.NewContext(context.Background(), log.Default()),
 			}
 
 			insp.v.SetConfigFile(configPath)
 			err := insp.MergeConfig()
 			if err != nil {
-				slog.Ctx(insp.ctx).Info("merge config", "err", err)
+				log.Ctx(insp.ctx).Info("merge config", "err", err)
 				return
 			}
 
 			if insp.config.DebugMode {
-				opts := slog.HandlerOptions{
+				opts := log.HandlerOptions{
 					AddSource: true,
-					Level:     slog.DebugLevel,
+					Level:     log.DebugLevel,
 				}
-				insp.ctx = slog.NewContext(context.Background(), slog.New(opts.NewJSONHandler(os.Stderr)))
+				insp.ctx = log.NewContext(context.Background(), log.New(opts.NewJSONHandler(os.Stdout)))
 			} else {
-				opts := slog.HandlerOptions{
+				opts := log.HandlerOptions{
 					AddSource: false,
-					Level:     slog.InfoLevel,
+					Level:     log.InfoLevel,
 				}
-				insp.ctx = slog.NewContext(context.Background(), slog.New(opts.NewJSONHandler(os.Stderr)))
+				insp.ctx = log.NewContext(context.Background(), log.New(opts.NewJSONHandler(os.Stdout)))
 			}
 
 			// nolint
@@ -73,7 +76,7 @@ var (
 			// block here
 			err = insp.start()
 			if err != nil {
-				slog.Ctx(insp.ctx).Info("start server", "err", err)
+				log.Ctx(insp.ctx).Info("start server", "err", err)
 				return
 			}
 		},
@@ -126,17 +129,17 @@ func (i *inspServer) MergeConfig() error {
 	err := i.v.ReadInConfig()
 	if err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			slog.Ctx(i.ctx).Info("validate config", "path", configPath, "err", err)
+			log.Ctx(i.ctx).Info("validate config", "path", configPath, "err", err)
 			return errors.Wrapf(err, "no such config")
 		}
-		slog.Ctx(i.ctx).Info("validate config", "err", err)
+		log.Ctx(i.ctx).Info("validate config", "err", err)
 		return err
 	}
 
 	cfg := &inspServerConfig{}
 	err = i.v.Unmarshal(cfg)
 	if err != nil {
-		slog.Ctx(i.ctx).Info("validate unmarshal config", "err", err)
+		log.Ctx(i.ctx).Info("validate unmarshal config", "err", err)
 		return err
 	}
 
@@ -147,7 +150,7 @@ func (i *inspServer) MergeConfig() error {
 
 func (i *inspServer) start() error {
 	if err := gops.Listen(gops.Options{}); err != nil {
-		slog.Ctx(i.ctx).Info("start gops", "err", err)
+		log.Ctx(i.ctx).Info("start gops", "err", err)
 	}
 
 	go func() {
@@ -173,10 +176,10 @@ func (i *inspServer) start() error {
 			http.Handle("/internal", promhttp.HandlerFor(reg, promhttp.HandlerOpts{Registry: reg}))
 		}
 		listenaddr := fmt.Sprintf(":%d", i.config.Mconfig.Port)
-		slog.Ctx(i.ctx).Info("inspector start metric server", "listenaddr", listenaddr)
+		log.Ctx(i.ctx).Info("inspector start metric server", "listenaddr", listenaddr)
 		srv := &http.Server{Addr: listenaddr}
 		if err := srv.ListenAndServe(); err != nil {
-			slog.Ctx(i.ctx).Info("inspector start metric server", "err", err, "listenaddr", listenaddr)
+			log.Ctx(i.ctx).Info("inspector start metric server", "err", err, "listenaddr", listenaddr)
 		}
 	}()
 
@@ -186,13 +189,13 @@ func (i *inspServer) start() error {
 		proto.RegisterInspectorServer(s, e)
 		listener, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", i.config.Econfig.Port))
 		if err != nil {
-			slog.Ctx(i.ctx).Warn("inspector start event server", "port", i.config.Econfig.Port, "err", err)
+			log.Ctx(i.ctx).Warn("inspector start event server", "port", i.config.Econfig.Port, "err", err)
 			return
 		}
-		slog.Ctx(i.ctx).Info("inspector eserver serve", "port", i.config.Econfig.Port)
+		log.Ctx(i.ctx).Info("inspector eserver serve", "port", i.config.Econfig.Port)
 		// grpc server block there, handle it with goroutine
 		if err := s.Serve(listener); err != nil {
-			slog.Ctx(i.ctx).Warn("inspector eserver serve", "port", i.config.Econfig.Port, "err", err)
+			log.Ctx(i.ctx).Warn("inspector eserver serve", "port", i.config.Econfig.Port, "err", err)
 			return
 		}
 	}()
@@ -202,7 +205,7 @@ func (i *inspServer) start() error {
 }
 
 func WaitSignals(ctx context.Context, sgs ...os.Signal) {
-	slog.Ctx(ctx).Info("keep running and start waiting for signals")
+	log.Ctx(ctx).Info("keep running and start waiting for signals")
 	s := make(chan os.Signal, 1)
 	signal.Notify(s, sgs...)
 	<-s

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/alibaba/kubeskoop/pkg/exporter/probe/flow"
 	"github.com/alibaba/kubeskoop/pkg/exporter/probe/nlconntrack"
 	"github.com/alibaba/kubeskoop/pkg/exporter/probe/nlqdisc"
 	"github.com/alibaba/kubeskoop/pkg/exporter/probe/procfd"
@@ -50,6 +51,7 @@ func init() {
 	availmprobes["ipvs"] = procipvs.GetProbe()
 	availmprobes["qdisc"] = nlqdisc.GetProbe()
 	availmprobes["fd"] = procfd.GetProbe()
+	availmprobes["flow"] = flow.GetProbe()
 }
 
 func ListMetricProbes() (probelist []string) {

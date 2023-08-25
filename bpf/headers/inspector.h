@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
 // +build ignore
 
+#include <bpf/bpf_endian.h>
 #include "bpf_core_read.h"
 #include "bpf_helpers.h"
 #include "bpf_tracing.h"
@@ -18,6 +19,14 @@
 #define USER_STACKID_FLAGS (0 | BPF_F_FAST_STACK_CMP | BPF_F_USER_STACK)
 
 #define PERF_MAX_STACK_DEPTH		32
+
+struct flow_tuple_4 {
+    unsigned char proto;
+    u32 src;
+    u32 dst;
+    u16 sport;
+    u16 dport;
+};
 
 union addr {
   u32 v4addr;
@@ -99,6 +108,56 @@ static __always_inline u32 get_netns(struct sk_buff *skb) {
   }
 
   return netns;
+}
+
+static __always_inline int set_flow_tuple4(struct __sk_buff *skb, struct flow_tuple_4 *tuple){
+	void *data = (void *)(long)skb->data;
+	struct ethhdr *eth = data;
+	void *data_end = (void *)(long)skb->data_end;
+	u16 l4_off = 0;
+	const char fmt[] = "source port %d\n";
+	//u16 bytes = 0;
+
+	if (data + sizeof(*eth) > data_end)
+		return -1;
+
+    if (eth->h_proto == bpf_htons(ETH_P_IP)) {
+        struct iphdr *iph = data + sizeof(*eth);
+
+        if (data + sizeof(*eth) + sizeof(*iph) > data_end)
+            return -1;
+
+        tuple->src = iph->saddr;
+        tuple->dst = iph->daddr;
+        tuple->proto = iph->protocol;
+
+        l4_off = sizeof(*eth) + iph->ihl * 4;
+
+        if (iph->protocol == IPPROTO_TCP){
+            struct tcphdr *tcph = data + l4_off;
+
+            if (data + l4_off + sizeof(*tcph) > data_end)
+                return -1;
+
+            tuple->sport = tcph->source;
+            tuple->dport = tcph->dest;
+            //bytes = tcph->doff * 4;
+        }else if(iph->protocol == IPPROTO_UDP){
+            struct udphdr *udph = data + l4_off;
+            if(data + l4_off + sizeof(*udph) > data_end)
+                return -1;
+
+            tuple->sport = udph->source;
+            tuple->dport = udph->dest;
+            //bytes = tcph->len;
+        }
+
+
+    } else if (eth->h_proto == bpf_htons(ETH_P_IPV6)) {
+        //not supported yet
+    }
+
+    return 0;
 }
 
 static __always_inline void set_tuple(struct sk_buff *skb, struct tuple *tpl) {

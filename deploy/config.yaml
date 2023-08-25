@@ -1,4 +1,4 @@
-debugmode: true
+debugmode: false
 metric_config:
   interval: 15
   port: 9102

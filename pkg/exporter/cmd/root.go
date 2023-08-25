@@ -23,7 +23,7 @@ var (
 					Level:     slog.DebugLevel,
 				}
 
-				slog.SetDefault(slog.New(opts.NewJSONHandler(os.Stderr)))
+				slog.SetDefault(slog.New(opts.NewTextHandler(os.Stdout)))
 			} else {
 				slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard)))
 			}
