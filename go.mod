@@ -6,7 +6,7 @@ require (
 	github.com/alibabacloud-go/darabonba-openapi v0.2.1
 	github.com/alibabacloud-go/darabonba-openapi/v2 v2.0.2
 	github.com/alibabacloud-go/ecs-20140526/v2 v2.1.3
-	github.com/alibabacloud-go/slb-20140515/v4 v4.0.2
+	github.com/alibabacloud-go/slb-20140515/v4 v4.0.4
 	github.com/alibabacloud-go/tea v1.1.20
 	github.com/alibabacloud-go/vpc-20160428/v2 v2.0.15
 	github.com/bastjan/netstat v1.0.0
@@ -67,7 +67,7 @@ require (
 	github.com/alibabacloud-go/endpoint-util v1.1.0 // indirect
 	github.com/alibabacloud-go/openapi-util v0.1.0 // indirect
 	github.com/alibabacloud-go/tea-utils v1.4.5 // indirect
-	github.com/alibabacloud-go/tea-utils/v2 v2.0.1 // indirect
+	github.com/alibabacloud-go/tea-utils/v2 v2.0.4 // indirect
 	github.com/alibabacloud-go/tea-xml v1.1.2 // indirect
 	github.com/aliyun/credentials-go v1.1.2 // indirect
 	github.com/andybalholm/cascadia v1.3.1 // indirect
