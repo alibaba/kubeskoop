@@ -13,8 +13,10 @@ import (
 )
 
 const (
-	BTFPATH      = "/etc/net-exporter/"
-	bpfSharePath = "/etc/net-exporter/btf/"
+	kernelBTFPath     = "/sys/kernel/btf/vmlinux"
+	BTFPATH           = "/etc/net-exporter/"
+	bpfSharePath      = "/etc/net-exporter/btf/"
+	userCustomBtfPath = "/etc/net-exporter/custom_btf/"
 )
 
 var (
@@ -50,16 +52,27 @@ func KernelRelease() (string, error) {
 
 // LoadBTFSpecOrNil once error occurs in load process, return nil and use system raw spec instead
 func LoadBTFSpecOrNil() *btf.Spec {
-	btffile, err := findBTFFileWithPath(BTFPATH)
-	if btffile == "" || err != nil {
-		slog.Default().Info("load btf file", "path", BTFPATH, "err", err)
-		btffile, err = findBTFFileWithPath(bpfSharePath)
-		if btffile == "" || err != nil {
-			slog.Default().Info("load btf file", "path", bpfSharePath, "err", err)
+	var (
+		btffile string
+		err     error
+	)
+	if _, err = os.Stat(kernelBTFPath); err == nil {
+		btffile = kernelBTFPath
+	} else if os.IsNotExist(err) {
+		for _, btfPath := range []string{BTFPATH, bpfSharePath, userCustomBtfPath} {
+			btffile, err = findBTFFileWithPath(btfPath)
+			if err == nil {
+				break
+			}
+			slog.Default().Debug("cannot found expect btf file", "err", err)
 		}
+	} else {
+		slog.Default().Error("error stat /sys/kernel/btf/vmlinux path", err)
+		return nil
 	}
 
-	if btffile == "" {
+	if btffile == "" || err != nil {
+		slog.Default().Warn("load btf file", "paths", []string{BTFPATH, bpfSharePath, userCustomBtfPath}, "err", err)
 		return nil
 	}
 
@@ -70,10 +83,6 @@ func LoadBTFSpecOrNil() *btf.Spec {
 	}
 	slog.Default().Info("btf file loaded", "file", btffile)
 	return spec
-}
-
-func FindBTF(path string) (string, error) {
-	return findBTFFileWithPath(path)
 }
 
 func findBTFFileWithPath(path string) (string, error) {
