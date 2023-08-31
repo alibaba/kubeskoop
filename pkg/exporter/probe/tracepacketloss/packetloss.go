@@ -48,7 +48,7 @@ var (
 	tcprcvSymbol    = "tcp_v4_rcv"
 	tcpdorcvSymbol  = "tcp_v4_do_rcv"
 
-	probe  = &PacketLossProbe{}
+	probe  = &PacketLossProbe{enabledProbes: map[proto.ProbeType]bool{}}
 	objs   = bpfObjects{}
 	links  = []link.Link{}
 	events = []string{PACKETLOSS}
@@ -94,10 +94,11 @@ func GetProbe() *PacketLossProbe {
 }
 
 type PacketLossProbe struct {
-	enable bool
-	sub    chan<- proto.RawEvent
-	once   sync.Once
-	mtx    sync.Mutex
+	enable        bool
+	sub           chan<- proto.RawEvent
+	once          sync.Once
+	mtx           sync.Mutex
+	enabledProbes map[proto.ProbeType]bool
 }
 
 func (p *PacketLossProbe) Name() string {
@@ -120,14 +121,27 @@ func (p *PacketLossProbe) GetMetricNames() []string {
 	return res
 }
 
-func (p *PacketLossProbe) Close() error {
-	if p.enable {
-		for _, link := range links {
-			link.Close()
-		}
-		links = []link.Link{}
+func (p *PacketLossProbe) Close(probeType proto.ProbeType) error {
+	if !p.enable {
+		return nil
 	}
 
+	if _, ok := p.enabledProbes[probeType]; !ok {
+		return nil
+	}
+	if len(p.enabledProbes) > 1 {
+		delete(p.enabledProbes, probeType)
+		return nil
+	}
+
+	for _, link := range links {
+		link.Close()
+	}
+	links = []link.Link{}
+	p.enable = false
+	p.once = sync.Once{}
+
+	delete(p.enabledProbes, probeType)
 	return nil
 }
 
@@ -215,8 +229,9 @@ func (p *PacketLossProbe) Collect(ctx context.Context) (map[string]map[uint32]ui
 	return resMap, nil
 }
 
-func (p *PacketLossProbe) Start(ctx context.Context) {
+func (p *PacketLossProbe) Start(ctx context.Context, probeType proto.ProbeType) {
 	if p.enable {
+		p.enabledProbes[probeType] = true
 		return
 	}
 
@@ -233,6 +248,7 @@ func (p *PacketLossProbe) Start(ctx context.Context) {
 		// if load failed, do not start process
 		return
 	}
+	p.enabledProbes[probeType] = true
 
 	reader, err := perf.NewReader(objs.bpfMaps.InspPlEvent, int(unsafe.Sizeof(bpfInspPlEventT{})))
 	if err != nil {

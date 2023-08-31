@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
+
 	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 
 	"golang.org/x/exp/slog"
@@ -80,11 +82,11 @@ func GetProbe() *ProcSNMP {
 type ProcSNMP struct {
 }
 
-func (s *ProcSNMP) Close() error {
+func (s *ProcSNMP) Close(_ proto.ProbeType) error {
 	return nil
 }
 
-func (s *ProcSNMP) Start(_ context.Context) {
+func (s *ProcSNMP) Start(_ context.Context, _ proto.ProbeType) {
 }
 
 func (s *ProcSNMP) Ready() bool {

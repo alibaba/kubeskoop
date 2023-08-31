@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
+
 	"io"
 	"os"
 	"strconv"
@@ -36,11 +38,11 @@ func GetProbe() *ProcSock {
 	return probe
 }
 
-func (s *ProcSock) Close() error {
+func (s *ProcSock) Close(_ proto.ProbeType) error {
 	return nil
 }
 
-func (s *ProcSock) Start(_ context.Context) {
+func (s *ProcSock) Start(_ context.Context, _ proto.ProbeType) {
 }
 
 func (s *ProcSock) Ready() bool {

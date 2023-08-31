@@ -36,7 +36,7 @@ const (
 var (
 	ModuleName = "insp_tcpreset" // nolint
 	objs       = bpfObjects{}
-	probe      = &TCPResetProbe{once: sync.Once{}, mtx: sync.Mutex{}}
+	probe      = &TCPResetProbe{once: sync.Once{}, mtx: sync.Mutex{}, enabledProbes: map[proto.ProbeType]bool{}}
 	links      = []link.Link{}
 
 	events = []string{TCPRESET_NOSOCK, TCPRESET_ACTIVE, TCPRESET_PROCESS, TCPRESET_RECEIVE}
@@ -47,10 +47,11 @@ func GetProbe() *TCPResetProbe {
 }
 
 type TCPResetProbe struct {
-	enable bool
-	sub    chan<- proto.RawEvent
-	once   sync.Once
-	mtx    sync.Mutex
+	enable        bool
+	sub           chan<- proto.RawEvent
+	once          sync.Once
+	mtx           sync.Mutex
+	enabledProbes map[proto.ProbeType]bool
 }
 
 func (p *TCPResetProbe) Name() string {
@@ -65,14 +66,27 @@ func (p *TCPResetProbe) GetEventNames() []string {
 	return events
 }
 
-func (p *TCPResetProbe) Close() error {
-	if p.enable {
-		for _, link := range links {
-			link.Close()
-		}
-		links = []link.Link{}
+func (p *TCPResetProbe) Close(probeType proto.ProbeType) error {
+	if !p.enable {
+		return nil
 	}
 
+	if _, ok := p.enabledProbes[probeType]; !ok {
+		return nil
+	}
+	if len(p.enabledProbes) > 1 {
+		delete(p.enabledProbes, probeType)
+		return nil
+	}
+
+	for _, link := range links {
+		link.Close()
+	}
+	links = []link.Link{}
+	p.enable = false
+	p.once = sync.Once{}
+
+	delete(p.enabledProbes, probeType)
 	return nil
 }
 
@@ -84,7 +98,12 @@ func (p *TCPResetProbe) Register(receiver chan<- proto.RawEvent) error {
 	return nil
 }
 
-func (p *TCPResetProbe) Start(ctx context.Context) {
+func (p *TCPResetProbe) Start(ctx context.Context, probeType proto.ProbeType) {
+	if p.enable {
+		p.enabledProbes[probeType] = true
+		return
+	}
+
 	p.once.Do(func() {
 		err := loadSync()
 		if err != nil {
@@ -98,6 +117,7 @@ func (p *TCPResetProbe) Start(ctx context.Context) {
 		// if load failed, do not start process
 		return
 	}
+	p.enabledProbes[probeType] = true
 
 	reader, err := perf.NewReader(objs.bpfMaps.InspTcpresetEvents, int(unsafe.Sizeof(bpfInspTcpresetEventT{})))
 	if err != nil {

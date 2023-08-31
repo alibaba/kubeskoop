@@ -34,7 +34,7 @@ const (
 var (
 	ModuleName = "insp_netiftxlat" // nolint
 
-	probe      = &NetifTxlatencyProbe{once: sync.Once{}}
+	probe      = &NetifTxlatencyProbe{once: sync.Once{}, enabledProbes: map[proto.ProbeType]bool{}}
 	links      = []link.Link{}
 	events     = []string{"TXLAT_QDISC_100MS", "TXLAT_NETDEV_100MS"}
 	metrics    = []string{TXLAT_QDISC_SLOW, TXLAT_NETDEV_SLOW}
@@ -54,18 +54,20 @@ func init() {
 }
 
 type NetifTxlatencyProbe struct {
-	enable bool
-	once   sync.Once
-	sub    chan<- proto.RawEvent
-	mtx    sync.Mutex
+	enable        bool
+	once          sync.Once
+	sub           chan<- proto.RawEvent
+	mtx           sync.Mutex
+	enabledProbes map[proto.ProbeType]bool
 }
 
 func (p *NetifTxlatencyProbe) Name() string {
 	return ModuleName
 }
 
-func (p *NetifTxlatencyProbe) Start(ctx context.Context) {
+func (p *NetifTxlatencyProbe) Start(ctx context.Context, probeType proto.ProbeType) {
 	if p.enable {
+		p.enabledProbes[probeType] = true
 		return
 	}
 
@@ -80,9 +82,10 @@ func (p *NetifTxlatencyProbe) Start(ctx context.Context) {
 	})
 
 	if !p.enable {
-		// if load failed, do nat start process
+		// if load failed, do not start process
 		return
 	}
+	p.enabledProbes[probeType] = true
 
 	slog.Debug("start probe", "module", ModuleName)
 	if perfReader == nil {
@@ -152,18 +155,31 @@ func (p *NetifTxlatencyProbe) Ready() bool {
 	return p.enable
 }
 
-func (p *NetifTxlatencyProbe) Close() error {
-	if p.enable {
-		for _, link := range links {
-			link.Close()
-		}
-		links = []link.Link{}
-	}
-
+func (p *NetifTxlatencyProbe) Close(probeType proto.ProbeType) error {
 	if perfReader != nil {
 		perfReader.Close()
 		perfReader = nil
 	}
+
+	if !p.enable {
+		return nil
+	}
+
+	if _, ok := p.enabledProbes[probeType]; !ok {
+		return nil
+	}
+	if len(p.enabledProbes) > 1 {
+		delete(p.enabledProbes, probeType)
+		return nil
+	}
+
+	for _, link := range links {
+		link.Close()
+	}
+	links = []link.Link{}
+	p.enable = false
+	p.once = sync.Once{}
+	metricsMap = map[string]map[uint32]uint64{}
 
 	return nil
 }

@@ -39,7 +39,7 @@ func GetProbe() proto.MetricProbe {
 	return probe
 
 }
-func (f *Probe) Start(_ context.Context) {
+func (f *Probe) Start(_ context.Context, _ proto.ProbeType) {
 	log.Info("flow probe starting...")
 
 	eth0, err := netlink.LinkByName(dev)
@@ -197,7 +197,7 @@ func replaceQdisc(link netlink.Link) error {
 	return netlink.QdiscReplace(qdisc)
 }
 
-func (f *Probe) Close() error {
+func (f *Probe) Close(_ proto.ProbeType) error {
 	if f.enable {
 		return bpfObjs.Close()
 	}

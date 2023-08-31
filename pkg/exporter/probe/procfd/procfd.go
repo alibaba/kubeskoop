@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
+
 	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 
 	"golang.org/x/exp/slog"
@@ -28,11 +30,11 @@ func GetProbe() *ProcFD {
 	return probe
 }
 
-func (s *ProcFD) Close() error {
+func (s *ProcFD) Close(_ proto.ProbeType) error {
 	return nil
 }
 
-func (s *ProcFD) Start(_ context.Context) {
+func (s *ProcFD) Start(_ context.Context, _ proto.ProbeType) {
 }
 
 func (s *ProcFD) Ready() bool {

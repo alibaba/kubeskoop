@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
+
 	"io"
 	"os"
 	"strconv"
@@ -39,11 +41,11 @@ func GetProbe() *ProcSoftnet {
 	return probe
 }
 
-func (s *ProcSoftnet) Close() error {
+func (s *ProcSoftnet) Close(_ proto.ProbeType) error {
 	return nil
 }
 
-func (s *ProcSoftnet) Start(_ context.Context) {
+func (s *ProcSoftnet) Start(_ context.Context, _ proto.ProbeType) {
 }
 
 func (s *ProcSoftnet) Ready() bool {

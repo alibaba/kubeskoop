@@ -6,6 +6,13 @@ import (
 
 //go:generate protoc --go_out=. ./inspector.proto
 
+type ProbeType string
+
+var (
+	ProbeTypeMetrics ProbeType = "metrics"
+	ProbeTypeEvent   ProbeType = "event"
+)
+
 type RawEvent struct {
 	Netns     uint32
 	EventType string
@@ -13,8 +20,8 @@ type RawEvent struct {
 }
 
 type Probe interface {
-	Start(ctx context.Context)
-	Close() error
+	Start(ctx context.Context, probeType ProbeType)
+	Close(probeType ProbeType) error
 	Ready() bool
 	Name() string
 }

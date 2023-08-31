@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
+
 	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 
 	"github.com/prometheus/procfs"
@@ -43,11 +45,11 @@ func GetProbe() *ProcNetdev {
 	return probe
 }
 
-func (s *ProcNetdev) Close() error {
+func (s *ProcNetdev) Close(_ proto.ProbeType) error {
 	return nil
 }
 
-func (s *ProcNetdev) Start(_ context.Context) {
+func (s *ProcNetdev) Start(_ context.Context, _ proto.ProbeType) {
 }
 
 func (s *ProcNetdev) Ready() bool {

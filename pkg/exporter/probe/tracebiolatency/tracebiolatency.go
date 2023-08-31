@@ -61,12 +61,14 @@ func (p *BiolatencyProbe) Ready() bool {
 	return p.enable
 }
 
-func (p *BiolatencyProbe) Close() error {
+func (p *BiolatencyProbe) Close(_ proto.ProbeType) error {
 	if p.enable {
 		for _, link := range links {
 			link.Close()
 		}
 		links = []link.Link{}
+		p.enable = false
+		p.once = sync.Once{}
 	}
 
 	if perfReader != nil {
@@ -81,7 +83,7 @@ func (p *BiolatencyProbe) GetEventNames() []string {
 	return events
 }
 
-func (p *BiolatencyProbe) Start(ctx context.Context) {
+func (p *BiolatencyProbe) Start(ctx context.Context, _ proto.ProbeType) {
 	p.once.Do(func() {
 		err := start()
 		if err != nil {
@@ -92,7 +94,7 @@ func (p *BiolatencyProbe) Start(ctx context.Context) {
 	})
 
 	if !p.enable {
-		// if load failed, do nat start process
+		// if load failed, do not start process
 		return
 	}
 
