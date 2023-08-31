@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/cilium/ebpf"
+	"github.com/hashicorp/golang-lru/v2/expirable"
 )
 
 type KernelSymbol struct {
@@ -78,8 +79,14 @@ func GetSymByPt(addr string) (*KernelSymbol, error) {
 	return nil, errors.New("addr not found")
 }
 
+var locationCache = expirable.NewLRU[uint64, KernelSymbol](100, nil, 0)
+
 // GetSymPtFromBpfLocation return symbol struct/offset/error with bpf location
 func GetSymPtFromBpfLocation(pt uint64) (*KernelSymbol, error) {
+	sym, ok := locationCache.Get(pt)
+	if ok {
+		return &sym, nil
+	}
 	if pt > kallsyms[len(kallsyms)-1].start {
 		return nil, errors.New("addr out of range")
 	}
@@ -93,6 +100,7 @@ func GetSymPtFromBpfLocation(pt uint64) (*KernelSymbol, error) {
 				offset:     int(pt - kallsyms[idx].start),
 				module:     kallsyms[idx].module,
 			}
+			locationCache.Add(pt, ks)
 			return &ks, nil
 		}
 	}
