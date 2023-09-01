@@ -9,6 +9,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
 )
 
 const maxBufferSize = 1024 * 1024
@@ -52,11 +54,11 @@ func (p *ProcIPVS) Name() string {
 	return ModuleName
 }
 
-func (p *ProcIPVS) Close() error {
+func (p *ProcIPVS) Close(_ proto.ProbeType) error {
 	return nil
 }
 
-func (p *ProcIPVS) Start(_ context.Context) {
+func (p *ProcIPVS) Start(_ context.Context, _ proto.ProbeType) {
 }
 
 func (p *ProcIPVS) Ready() bool {

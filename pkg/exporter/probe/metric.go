@@ -43,7 +43,7 @@ func init() {
 	availmprobes["socketlatency"] = tracesocketlatency.GetProbe()
 	availmprobes["packetloss"] = tracepacketloss.GetProbe()
 	availmprobes["net_softirq"] = tracenetsoftirq.GetProbe()
-	availmprobes["netiftxlat"] = tracenetif.GetProbe()
+	availmprobes["netiftxlatency"] = tracenetif.GetProbe()
 	availmprobes["kernellatency"] = tracekernel.GetProbe()
 	availmprobes["tcpsummary"] = proctcpsummary.GetProbe()
 	availmprobes["virtcmdlatency"] = tracevirtcmdlat.GetProbe()

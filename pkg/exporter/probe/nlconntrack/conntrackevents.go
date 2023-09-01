@@ -58,7 +58,7 @@ func (p *Probe) Ready() bool {
 	return true
 }
 
-func (p *Probe) Close() error {
+func (p *Probe) Close(_ proto.ProbeType) error {
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
 
@@ -71,8 +71,7 @@ func (p *Probe) GetEventNames() []string {
 	return events
 }
 
-func (p *Probe) Start(ctx context.Context) {
-
+func (p *Probe) Start(ctx context.Context, _ proto.ProbeType) {
 	p.mtx.Lock()
 	p.enable = true
 	p.mtx.Unlock()

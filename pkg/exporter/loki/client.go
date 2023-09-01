@@ -95,6 +95,12 @@ func (i *Ingester) Name() string {
 	return i.name
 }
 
+func (i *Ingester) Close() error {
+	i.quit <- struct{}{}
+	i.waitGroup.Wait()
+	return nil
+}
+
 type Ingester struct {
 	name      string
 	PushURL   string

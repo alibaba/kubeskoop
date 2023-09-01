@@ -14,6 +14,7 @@ require (
 	github.com/cilium/ebpf v0.9.3
 	github.com/containerd/containerd v1.6.15
 	github.com/docker/docker v20.10.22+incompatible
+	github.com/fsnotify/fsnotify v1.6.0
 	github.com/golang/snappy v0.0.4
 	github.com/google/gops v0.3.26
 	github.com/google/uuid v1.3.0
@@ -100,7 +101,6 @@ require (
 	github.com/emicklei/go-restful v2.11.2-0.20200112161605-a7c079c43d51+incompatible // indirect
 	github.com/emicklei/go-restful/v3 v3.9.0 // indirect
 	github.com/fatih/color v1.13.0 // indirect
-	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-openapi/jsonpointer v0.19.6 // indirect
 	github.com/go-openapi/jsonreference v0.20.1 // indirect

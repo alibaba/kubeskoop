@@ -10,6 +10,8 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
+
 	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 
 	"github.com/mdlayher/netlink"
@@ -69,7 +71,7 @@ func (p *Probe) Name() string {
 	return ModuleName
 }
 
-func (p *Probe) Start(_ context.Context) {
+func (p *Probe) Start(_ context.Context, _ proto.ProbeType) {
 }
 
 func (p *Probe) Ready() bool {
@@ -96,7 +98,7 @@ func (p *Probe) GetMetricNames() []string {
 	return res
 }
 
-func (p *Probe) Close() error {
+func (p *Probe) Close(_ proto.ProbeType) error {
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
 

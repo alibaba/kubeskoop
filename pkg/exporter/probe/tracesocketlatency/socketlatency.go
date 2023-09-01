@@ -55,7 +55,7 @@ const (
 )
 
 var (
-	probe  = &SocketLatencyProbe{once: sync.Once{}, mtx: sync.Mutex{}}
+	probe  = &SocketLatencyProbe{once: sync.Once{}, mtx: sync.Mutex{}, enabledProbes: map[proto.ProbeType]bool{}}
 	objs   = bpfObjects{}
 	links  = []link.Link{}
 	events = []string{SOCKETLAT_READSLOW, SOCKETLAT_SENDSLOW}
@@ -68,10 +68,11 @@ func GetProbe() *SocketLatencyProbe {
 }
 
 type SocketLatencyProbe struct {
-	enable bool
-	sub    chan<- proto.RawEvent
-	once   sync.Once
-	mtx    sync.Mutex
+	enable        bool
+	sub           chan<- proto.RawEvent
+	once          sync.Once
+	mtx           sync.Mutex
+	enabledProbes map[proto.ProbeType]bool
 }
 
 func (p *SocketLatencyProbe) Name() string {
@@ -86,14 +87,27 @@ func (p *SocketLatencyProbe) GetEventNames() []string {
 	return events
 }
 
-func (p *SocketLatencyProbe) Close() error {
-	if p.enable {
-		for _, link := range links {
-			link.Close()
-		}
-		links = []link.Link{}
+func (p *SocketLatencyProbe) Close(probeType proto.ProbeType) error {
+	if !p.enable {
+		return nil
 	}
 
+	if _, ok := p.enabledProbes[probeType]; !ok {
+		return nil
+	}
+	if len(p.enabledProbes) > 1 {
+		delete(p.enabledProbes, probeType)
+		return nil
+	}
+
+	for _, link := range links {
+		link.Close()
+	}
+	links = []link.Link{}
+	p.enable = false
+	p.once = sync.Once{}
+
+	delete(p.enabledProbes, probeType)
 	return nil
 }
 
@@ -113,9 +127,10 @@ func (p *SocketLatencyProbe) Register(receiver chan<- proto.RawEvent) error {
 	return nil
 }
 
-func (p *SocketLatencyProbe) Start(ctx context.Context) {
+func (p *SocketLatencyProbe) Start(ctx context.Context, probeType proto.ProbeType) {
 	// metric and events both start probe
 	if p.enable {
+		p.enabledProbes[probeType] = true
 		return
 	}
 	p.once.Do(func() {
@@ -128,9 +143,10 @@ func (p *SocketLatencyProbe) Start(ctx context.Context) {
 	})
 
 	if !p.enable {
-		// if load failed, do nat start process
+		// if load failed, do not start process
 		return
 	}
+	p.enabledProbes[probeType] = true
 
 	p.startEventPoll(ctx)
 }

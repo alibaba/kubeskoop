@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
+
 	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 
 	"golang.org/x/exp/slog"
@@ -103,11 +105,11 @@ func GetProbe() *ProcNetstat {
 	return probe
 }
 
-func (s *ProcNetstat) Close() error {
+func (s *ProcNetstat) Close(_ proto.ProbeType) error {
 	return nil
 }
 
-func (s *ProcNetstat) Start(_ context.Context) {
+func (s *ProcNetstat) Start(_ context.Context, _ proto.ProbeType) {
 }
 
 func (s *ProcNetstat) Ready() bool {

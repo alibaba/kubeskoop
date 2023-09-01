@@ -30,7 +30,7 @@ const (
 
 var (
 	ModuleName = "insp_netsoftirq" // nolint
-	probe      = &NetSoftirqProbe{once: sync.Once{}, mtx: sync.Mutex{}}
+	probe      = &NetSoftirqProbe{once: sync.Once{}, mtx: sync.Mutex{}, enabledProbes: map[proto.ProbeType]bool{}}
 	objs       = bpfObjects{}
 	links      = []link.Link{}
 	metricsMap = map[string]map[uint32]uint64{}
@@ -52,10 +52,11 @@ func init() {
 }
 
 type NetSoftirqProbe struct {
-	enable bool
-	sub    chan<- proto.RawEvent
-	once   sync.Once
-	mtx    sync.Mutex
+	enable        bool
+	sub           chan<- proto.RawEvent
+	once          sync.Once
+	mtx           sync.Mutex
+	enabledProbes map[proto.ProbeType]bool
 }
 
 func (p *NetSoftirqProbe) Name() string {
@@ -75,23 +76,37 @@ func (p *NetSoftirqProbe) GetMetricNames() []string {
 }
 
 func (p *NetSoftirqProbe) Collect(_ context.Context) (map[string]map[uint32]uint64, error) {
-
 	return metricsMap, nil
 }
 
-func (p *NetSoftirqProbe) Close() error {
-	if p.enable {
-		for _, link := range links {
-			link.Close()
-		}
-		links = []link.Link{}
+func (p *NetSoftirqProbe) Close(probeType proto.ProbeType) error {
+	if !p.enable {
+		return nil
 	}
 
+	if _, ok := p.enabledProbes[probeType]; !ok {
+		return nil
+	}
+	if len(p.enabledProbes) > 1 {
+		delete(p.enabledProbes, probeType)
+		return nil
+	}
+
+	for _, link := range links {
+		link.Close()
+	}
+	links = []link.Link{}
+	p.enable = false
+	p.once = sync.Once{}
+	metricsMap = map[string]map[uint32]uint64{}
+
+	delete(p.enabledProbes, probeType)
 	return nil
 }
 
-func (p *NetSoftirqProbe) Start(ctx context.Context) {
+func (p *NetSoftirqProbe) Start(ctx context.Context, probeType proto.ProbeType) {
 	if p.enable {
+		p.enabledProbes[probeType] = true
 		return
 	}
 
@@ -108,6 +123,7 @@ func (p *NetSoftirqProbe) Start(ctx context.Context) {
 		// if load failed, do not start process
 		return
 	}
+	p.enabledProbes[probeType] = true
 
 	reader, err := perf.NewReader(objs.bpfMaps.InspSoftirqEvents, int(unsafe.Sizeof(bpfInspSoftirqEventT{})))
 	if err != nil {

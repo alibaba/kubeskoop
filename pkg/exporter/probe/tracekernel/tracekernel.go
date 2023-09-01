@@ -46,7 +46,7 @@ const (
 
 var (
 	ModuleName = "insp_kernellatency" // nolint
-	probe      = &KernelLatencyProbe{once: sync.Once{}, mtx: sync.Mutex{}}
+	probe      = &KernelLatencyProbe{once: sync.Once{}, mtx: sync.Mutex{}, enabledProbes: map[proto.ProbeType]bool{}}
 	objs       = bpfObjects{}
 	links      = []link.Link{}
 
@@ -66,10 +66,11 @@ func init() {
 }
 
 type KernelLatencyProbe struct {
-	enable bool
-	sub    chan<- proto.RawEvent
-	once   sync.Once
-	mtx    sync.Mutex
+	enable        bool
+	sub           chan<- proto.RawEvent
+	once          sync.Once
+	mtx           sync.Mutex
+	enabledProbes map[proto.ProbeType]bool
 }
 
 func (p *KernelLatencyProbe) Name() string {
@@ -84,14 +85,28 @@ func (p *KernelLatencyProbe) GetEventNames() []string {
 	return events
 }
 
-func (p *KernelLatencyProbe) Close() error {
-	if p.enable {
-		for _, link := range links {
-			link.Close()
-		}
-		links = []link.Link{}
+func (p *KernelLatencyProbe) Close(probeType proto.ProbeType) error {
+	if !p.enable {
+		return nil
 	}
 
+	if _, ok := p.enabledProbes[probeType]; !ok {
+		return nil
+	}
+	if len(p.enabledProbes) > 1 {
+		delete(p.enabledProbes, probeType)
+		return nil
+	}
+
+	for _, link := range links {
+		link.Close()
+	}
+	links = []link.Link{}
+	p.enable = false
+	p.once = sync.Once{}
+	metricsMap = map[string]map[uint32]uint64{}
+
+	delete(p.enabledProbes, probeType)
 	return nil
 }
 
@@ -111,10 +126,12 @@ func (p *KernelLatencyProbe) Collect(_ context.Context) (map[string]map[uint32]u
 	return metricsMap, nil
 }
 
-func (p *KernelLatencyProbe) Start(ctx context.Context) {
+func (p *KernelLatencyProbe) Start(ctx context.Context, probeType proto.ProbeType) {
 	if p.enable {
+		p.enabledProbes[probeType] = true
 		return
 	}
+
 	p.once.Do(func() {
 		err := loadSync()
 		if err != nil {
@@ -125,9 +142,10 @@ func (p *KernelLatencyProbe) Start(ctx context.Context) {
 	})
 
 	if !p.enable {
-		// if load failed, do nat start process
+		// if load failed, do not start process
 		return
 	}
+	p.enabledProbes[probeType] = true
 
 	go p.startRX(ctx)
 	// go p.startTX(ctx)

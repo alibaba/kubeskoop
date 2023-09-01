@@ -3,6 +3,9 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"sync"
+
+	"github.com/samber/lo"
 
 	"strings"
 	"time"
@@ -34,16 +37,12 @@ var (
 func NewMServer(ctx context.Context, config MetricConfig) *MServer {
 	ms := &MServer{
 		ctx:         ctx,
+		mtx:         sync.Mutex{},
 		descs:       make(map[string]*prometheus.Desc),
 		config:      config,
 		probes:      make(map[string]proto.MetricProbe),
 		metricCache: cache.New(3*cacheUpdateInterval, 10*cacheUpdateInterval),
-	}
-
-	if len(config.Probes) == 0 {
-		// if no probes configured, keep loop channel empty
-		slog.Ctx(ctx).Info("new mserver with no probe required")
-		return ms
+		loopctrl:    make(chan struct{}),
 	}
 
 	for _, p := range config.Probes {
@@ -53,7 +52,7 @@ func NewMServer(ctx context.Context, config MetricConfig) *MServer {
 			continue
 		}
 		ms.probes[p] = mp
-		go mp.Start(ctx)
+		go mp.Start(ctx, proto.ProbeTypeMetrics)
 		slog.Ctx(ctx).Debug("new mserver add subject", "subject", p)
 	}
 
@@ -77,7 +76,6 @@ func NewMServer(ctx context.Context, config MetricConfig) *MServer {
 	}
 	// start cache loop
 	slog.Ctx(ctx).Debug("new mserver start cache loop")
-	ms.loopctrl = make(chan struct{})
 	go ms.collectLoop(ctx, cacheUpdateInterval, ms.loopctrl)
 
 	return ms
@@ -85,6 +83,7 @@ func NewMServer(ctx context.Context, config MetricConfig) *MServer {
 
 type MServer struct {
 	ctx              context.Context
+	mtx              sync.Mutex
 	descs            map[string]*prometheus.Desc
 	config           MetricConfig
 	metricCache      *cache.Cache
@@ -104,7 +103,61 @@ func (s *MServer) Close() {
 	}
 }
 
+func (s *MServer) Reload(config MetricConfig) error {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+
+	enabled := lo.Keys(s.probes)
+	toClose, toStart := lo.Difference(enabled, config.Probes)
+	slog.Ctx(s.ctx).Info("reload metric probes", "close", toClose, "enable", toStart)
+
+	for _, n := range toClose {
+		p, ok := s.probes[n]
+		if !ok {
+			slog.Ctx(s.ctx).Warn("probe not found in enabled probes, skip.", "probe", n)
+			continue
+		}
+
+		err := p.Close(proto.ProbeTypeMetrics)
+		if err != nil {
+			slog.Ctx(s.ctx).Warn("close probe error", "probe", n, "err", err)
+			continue
+		}
+		delete(s.probes, n)
+	}
+
+	for _, n := range toStart {
+		p := probe.GetProbe(n)
+		if p == nil {
+			slog.Ctx(s.ctx).Info("get metric probe nil", "probe", n)
+			continue
+		}
+		s.probes[n] = p
+		go p.Start(s.ctx, proto.ProbeTypeMetrics)
+		slog.Ctx(s.ctx).Debug("new mserver add subject", "subject", n)
+	}
+
+	for sub, mp := range s.probes {
+		mnames := mp.GetMetricNames()
+		for _, mname := range mnames {
+			if !strings.HasPrefix(mname, sub) {
+				continue
+			}
+			if s.config.Verbose {
+				s.descs[mname] = getDescOfMetricVerbose(sub, mname, s.additionalLabels)
+			} else {
+				s.descs[mname] = getDescOfMetric(sub, mname)
+			}
+		}
+	}
+
+	s.config = config
+	return nil
+}
+
 func (s *MServer) Collect(ch chan<- prometheus.Metric) {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
 	slog.Ctx(s.ctx).Debug("metric server collect request in", "metric count", len(s.descs))
 	for mname, desc := range s.descs {
 		data, err := s.collectOnceCache(s.ctx, mname)
@@ -204,6 +257,11 @@ func (s *MServer) collectLoop(ctx context.Context, interval time.Duration, stopc
 
 // collectWorkerSerial collect metric data in serial
 func (s *MServer) collectWorkerSerial(ctx context.Context) error {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+	if len(s.probes) == 0 {
+		return nil
+	}
 	slog.Ctx(s.ctx).Debug("collect worker serial start")
 	workdone := make(chan struct{})
 	cstart := time.Now()

@@ -13,6 +13,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/fsnotify/fsnotify"
+
 	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
 	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
@@ -68,10 +70,14 @@ var (
 			defer nettop.StopCache()
 
 			// config hot reload process
-			// insp.v.OnConfigChange(func(e fsnotify.Event) {
-
-			// })
-			// insp.v.WatchConfig()
+			insp.v.OnConfigChange(func(e fsnotify.Event) {
+				log.Ctx(insp.ctx).Info("Start reload config")
+				if err := insp.reload(); err != nil {
+					log.Ctx(insp.ctx).Warn("Reload config error", "err", err)
+				}
+				log.Ctx(insp.ctx).Info("Config reload succeed.")
+			})
+			insp.v.WatchConfig()
 
 			// block here
 			err = insp.start()
@@ -120,9 +126,11 @@ type EventConfig struct {
 }
 
 type inspServer struct {
-	v      viper.Viper
-	config inspServerConfig
-	ctx    context.Context
+	v       viper.Viper
+	config  inspServerConfig
+	ctx     context.Context
+	mserver *MServer
+	eserver *EServer
 }
 
 func (i *inspServer) MergeConfig() error {
@@ -148,22 +156,43 @@ func (i *inspServer) MergeConfig() error {
 	return nil
 }
 
+func (i *inspServer) reload() error {
+	cfg := inspServerConfig{}
+	err := i.v.Unmarshal(&cfg)
+	if err != nil {
+		return err
+	}
+
+	err = i.mserver.Reload(cfg.Mconfig)
+	if err != nil {
+		return fmt.Errorf("reload metric server error: %s", err)
+	}
+
+	err = i.eserver.Reload(cfg.Econfig)
+	if err != nil {
+		return fmt.Errorf("reload event server error: %s", err)
+	}
+
+	i.config = cfg
+	return nil
+}
+
 func (i *inspServer) start() error {
 	if err := gops.Listen(gops.Options{}); err != nil {
 		log.Ctx(i.ctx).Info("start gops", "err", err)
 	}
 
 	go func() {
-		ms := NewMServer(i.ctx, i.config.Mconfig)
-		defer ms.Close()
+		i.mserver = NewMServer(i.ctx, i.config.Mconfig)
+		defer i.mserver.Close()
 
 		r := prometheus.NewRegistry()
-		r.MustRegister(ms)
+		r.MustRegister(i.mserver)
 		handler := promhttp.HandlerFor(prometheus.Gatherers{
 			r,
 		}, promhttp.HandlerOpts{})
 		http.Handle("/metrics", handler)
-		http.Handle("/", http.HandlerFunc(defaulPage))
+		http.Handle("/", http.HandlerFunc(defaultPage))
 		http.Handle("/config", http.HandlerFunc(i.configPage))
 		http.Handle("/status", http.HandlerFunc(status))
 		if i.config.DebugMode {
@@ -185,8 +214,8 @@ func (i *inspServer) start() error {
 
 	go func() {
 		s := grpc.NewServer()
-		e := NewEServer(i.ctx, i.config.Econfig)
-		proto.RegisterInspectorServer(s, e)
+		i.eserver = NewEServer(i.ctx, i.config.Econfig)
+		proto.RegisterInspectorServer(s, i.eserver)
 		listener, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", i.config.Econfig.Port))
 		if err != nil {
 			log.Ctx(i.ctx).Warn("inspector start event server", "port", i.config.Econfig.Port, "err", err)
@@ -211,7 +240,7 @@ func WaitSignals(ctx context.Context, sgs ...os.Signal) {
 	<-s
 }
 
-func defaulPage(w http.ResponseWriter, _ *http.Request) {
+func defaultPage(w http.ResponseWriter, _ *http.Request) {
 	// nolint
 	w.Write([]byte(`<html>
 		<head><title>Net Exporter</title></head>

@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
+
 	"io"
 	"net"
 	"os"
@@ -79,11 +81,11 @@ func GetProbe() *ProcTCP {
 	return probe
 }
 
-func (s *ProcTCP) Close() error {
+func (s *ProcTCP) Close(_ proto.ProbeType) error {
 	return nil
 }
 
-func (s *ProcTCP) Start(_ context.Context) {
+func (s *ProcTCP) Start(_ context.Context, _ proto.ProbeType) {
 }
 
 func (s *ProcTCP) Ready() bool {

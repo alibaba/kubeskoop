@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
+
 	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 
 	"github.com/prometheus/procfs"
@@ -35,11 +37,11 @@ func GetProbe() *ProcIO {
 	return probe
 }
 
-func (s *ProcIO) Close() error {
+func (s *ProcIO) Close(_ proto.ProbeType) error {
 	return nil
 }
 
-func (s *ProcIO) Start(_ context.Context) {
+func (s *ProcIO) Start(_ context.Context, _ proto.ProbeType) {
 }
 
 func (s *ProcIO) Ready() bool {

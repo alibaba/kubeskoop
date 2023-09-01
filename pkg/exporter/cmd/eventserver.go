@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/samber/lo"
+
 	"sync"
 	"time"
 
@@ -19,28 +21,26 @@ import (
 
 type EServer struct {
 	proto.UnimplementedInspectorServer
-	probes  map[string]proto.EventProbe
-	cpool   map[string]chan<- proto.RawEvent
-	mtx     sync.Mutex
-	ctx     context.Context
-	control chan struct{}
-	config  EventConfig
+	probes       map[string]proto.EventProbe
+	subscribers  map[string]chan<- proto.RawEvent
+	mtx          sync.Mutex
+	ctx          context.Context
+	control      chan struct{}
+	config       EventConfig
+	eventChan    chan proto.RawEvent
+	lokiDatach   chan proto.RawEvent
+	lokiIngester *lokiwrapper.Ingester
 }
 
 func NewEServer(ctx context.Context, config EventConfig) *EServer {
 	es := &EServer{
-		probes:  make(map[string]proto.EventProbe),
-		cpool:   make(map[string]chan<- proto.RawEvent),
-		config:  config,
-		mtx:     sync.Mutex{},
-		ctx:     ctx,
-		control: make(chan struct{}),
-	}
-
-	if len(config.Probes) == 0 {
-		// if no probes configured, keep loop channel empty
-		slog.Ctx(ctx).Info("new eserver with no probe required")
-		return es
+		probes:      make(map[string]proto.EventProbe),
+		subscribers: make(map[string]chan<- proto.RawEvent),
+		config:      config,
+		mtx:         sync.Mutex{},
+		ctx:         ctx,
+		control:     make(chan struct{}),
+		eventChan:   make(chan proto.RawEvent),
 	}
 
 	for _, p := range config.Probes {
@@ -50,28 +50,126 @@ func NewEServer(ctx context.Context, config EventConfig) *EServer {
 			continue
 		}
 		es.probes[p] = ep
-		go ep.Start(ctx)
+		err := ep.Register(es.eventChan)
+		if err != nil {
+			slog.Ctx(ctx).Warn("probe register failed", "probe", p)
+			continue
+		}
+		go ep.Start(ctx, proto.ProbeTypeEvent)
 		slog.Ctx(ctx).Debug("eserver start", "subject", p)
 	}
 
 	// start cache loop
-	slog.Ctx(ctx).Debug("new eserver start cache loop")
+	slog.Ctx(ctx).Debug("new eserver start dispatch loop")
 	go es.dispatcher(ctx, es.control)
 
-	// handle grafana loki ingester preparation
-	if config.LokiEnable && config.LokiAddress != "" {
-		datach := make(chan proto.RawEvent)
-		ingester, err := lokiwrapper.NewLokiIngester(ctx, config.LokiAddress, nettop.GetNodeName())
-		if err != nil {
-			slog.Ctx(ctx).Info("new loki ingester", "err", err, "client", ingester.Name())
-		} else {
-			es.subscribe(ingester.Name(), datach)
-			go ingester.Watch(ctx, datach)
-		}
+	err := es.enableLoki()
+	if err != nil {
+		slog.Ctx(ctx).Warn("enable loki failed", "err", err)
+	}
+	return es
+}
 
+func (e *EServer) enableLoki() error {
+	if e.lokiIngester != nil {
+		return nil
 	}
 
-	return es
+	// handle grafana loki ingester preparation
+	if e.config.LokiEnable && e.config.LokiAddress != "" {
+		slog.Ctx(e.ctx).Debug("enabling loki ingester", "address", e.config.LokiAddress)
+		datach := make(chan proto.RawEvent)
+		ingester, err := lokiwrapper.NewLokiIngester(e.ctx, e.config.LokiAddress, nettop.GetNodeName())
+		if err != nil {
+			slog.Ctx(e.ctx).Info("new loki ingester", "err", err, "client", ingester.Name())
+		} else {
+			e.subscribe(ingester.Name(), datach)
+			go ingester.Watch(e.ctx, datach)
+		}
+		e.lokiDatach = datach
+		e.lokiIngester = ingester
+	}
+
+	return nil
+}
+
+func (e *EServer) disableLoki() error {
+	if e.lokiIngester == nil {
+		return nil
+	}
+
+	slog.Ctx(e.ctx).Debug("disabling loki ingester")
+	e.unsubscribe(e.lokiIngester.Name())
+
+	err := e.lokiIngester.Close()
+	if err != nil {
+		return err
+	}
+
+	close(e.lokiDatach)
+	e.lokiIngester = nil
+	e.lokiDatach = nil
+	return nil
+}
+
+func (e *EServer) Reload(config EventConfig) error {
+	enabled := lo.Keys(e.probes)
+	toClose, toStart := lo.Difference(enabled, config.Probes)
+	slog.Ctx(e.ctx).Info("reload event probes", "close", toClose, "enable", toStart)
+
+	for _, n := range toClose {
+		p, ok := e.probes[n]
+		if !ok {
+			slog.Ctx(e.ctx).Warn("probe not found in enabled probes, skip.", "probe", n)
+			continue
+		}
+
+		err := p.Close(proto.ProbeTypeEvent)
+		if err != nil {
+			slog.Ctx(e.ctx).Warn("close probe error", "probe", n, "err", err)
+			continue
+		}
+
+		// clear event channel
+		err = p.Register(nil)
+		if err != nil {
+			slog.Ctx(e.ctx).Warn("unregister probe error", "probe", n, "err", err)
+			continue
+		}
+
+		delete(e.probes, n)
+	}
+
+	for _, n := range toStart {
+		p := probe.GetEventProbe(n)
+		if p == nil {
+			slog.Ctx(e.ctx).Info("get event probe nil", "probe", p)
+			continue
+		}
+		e.probes[n] = p
+		go p.Start(e.ctx, proto.ProbeTypeEvent)
+		slog.Ctx(e.ctx).Debug("eserver start", "subject", p)
+
+		err := p.Register(e.eventChan)
+		if err != nil {
+			slog.Ctx(e.ctx).Info("register receiver", "probe", p, "err", err)
+			continue
+		}
+	}
+
+	e.config = config
+
+	if config.LokiEnable {
+		if err := e.enableLoki(); err != nil {
+			slog.Ctx(e.ctx).Warn("enable loki error", "err", err)
+		}
+	} else {
+		if err := e.disableLoki(); err != nil {
+			slog.Ctx(e.ctx).Warn("disable loki error", "err", err)
+		}
+	}
+
+	return nil
 }
 
 func (e *EServer) WatchEvent(_ *proto.WatchRequest, srv proto.Inspector_WatchEventServer) error {
@@ -109,35 +207,23 @@ func (e *EServer) subscribe(client string, ch chan<- proto.RawEvent) {
 	e.mtx.Lock()
 	defer e.mtx.Unlock()
 
-	e.cpool[client] = ch
+	e.subscribers[client] = ch
 }
 
 func (e *EServer) unsubscribe(client string) {
 	e.mtx.Lock()
 	defer e.mtx.Unlock()
 
-	delete(e.cpool, client)
+	delete(e.subscribers, client)
 }
 
 func (e *EServer) dispatcher(ctx context.Context, stopc chan struct{}) {
-	pbs := e.probes
-	receiver := make(chan proto.RawEvent)
-	for p, pb := range pbs {
-		err := pb.Register(receiver)
-		if err != nil {
-			slog.Ctx(ctx).Info("register receiver", "probe", p, "err", err)
-			continue
-		}
-	}
-
-	slog.Ctx(ctx).Debug("dispatcher", "probes", pbs)
 	for {
 		select {
-
 		case <-stopc:
-			slog.Ctx(ctx).Debug("dispatcher exit of sop signal", "probes", pbs)
+			slog.Ctx(ctx).Debug("event dispatcher exited because of stop signal")
 			return
-		case evt := <-receiver:
+		case evt := <-e.eventChan:
 			err := e.broadcast(evt)
 			if err != nil {
 				slog.Ctx(ctx).Info("dispatcher broadcast", "err", err, "event", evt)
@@ -149,7 +235,7 @@ func (e *EServer) dispatcher(ctx context.Context, stopc chan struct{}) {
 }
 
 func (e *EServer) broadcast(evt proto.RawEvent) error {
-	pbs := e.cpool
+	pbs := e.subscribers
 
 	ctx, cancelf := context.WithTimeout(e.ctx, 5*time.Second)
 	defer cancelf()

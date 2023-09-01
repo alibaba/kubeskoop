@@ -158,7 +158,7 @@ func (e *Entity) GetPids() []int {
 }
 
 func StartCache(ctx context.Context) error {
-	slog.Ctx(ctx).Info("nettop cache loop statrt", "interval", cacheUpdateInterval)
+	slog.Ctx(ctx).Info("nettop cache loop start", "interval", cacheUpdateInterval)
 	return cacheDaemonLoop(ctx, control)
 }
 
