@@ -8,7 +8,7 @@ data:
       verbose: {{ .Values.config.metricLabelVerbose }}
       expose_labels:
       {{- with .Values.expose_labels }}
-        {{- toYaml . | nindent 8 }} 
+        {{- toYaml . | nindent 8 }}
       {{- end }}
       probes:{{- range .Values.config.metricProbes }}
       - {{ . }}{{- end }}
@@ -21,4 +21,4 @@ data:
 kind: ConfigMap
 metadata:
   name: kubeskoop-config
-  namespace: {{ .Values.namespace }}
+  namespace: {{ .Release.Namespace }}

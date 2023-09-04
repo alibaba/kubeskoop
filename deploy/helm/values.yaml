@@ -1,21 +1,19 @@
-image:
-  repository: "registry.cn-hangzhou.aliyuncs.com/acs/kubeskoop-exporter"
-  repositoryPre: "registry.cn-hangzhou.aliyuncs.com/build-test/kubeskoop-exporter"
-  pullPolicy: IfNotPresent
-  # Overrides the image tag whose default is the chart appVersion.
-  tag: "v0.0.1-g857c8be-aliyun"
-
-initcontainer:
-  tag: latest
-  pullPolicy: Always
-  repository: registry.cn-hangzhou.aliyuncs.com/acs/btfhack
-
 name: kubeskoop-exporter
-namespace: kubeskoop
 debugMode: false
 runtimeEndpoint: /run/containerd/containerd.sock
 appName: kubeskoop-exporter
-preRelease: false
+
+image:
+  repository: kubeskoop/kubeskoop
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: latest
+  imagePullPolicy: Always
+
+initContainer:
+  enabled: true
+  repository: registry.cn-hangzhou.aliyuncs.com/acs/btfhack
+  tag: latest
+  imagePullPolicy: Always
 
 expose_labels:
   - source: ip
@@ -24,7 +22,7 @@ expose_labels:
     type: label
     replace: component
 
-resources: 
+resources:
   limits:
     cpu: 500m
     memory: 1024Mi
@@ -33,15 +31,31 @@ resources:
     memory: 1024Mi
 
 config:
-  enableEventServer: true
   enableMetricServer: true
-  remoteLokiAddress: "loki-service.skoop.svc.cluster.local"
   metricLabelVerbose: true
   metricCacheInterval: 15
   metricServerPort: 9102
-  metricProbes: ["netdev", "io","socketlatency","packetloss","net_softirq","tcpext","tcpsummary","tcp","sock","softnet","udp","virtcmdlatency","kernellatency"]
-  eventProbes: ["tcpreset","packetloss"] 
+  metricProbes:
+  - netdev
+  - io
+  - socketlatency
+  - packetloss
+  - net_softirq
+  - tcpext
+  - tcpsummary
+  - tcp
+  - sock
+  - softnet
+  - udp
+  - virtcmdlatency
+  - kernellatency
+
+  enableEventServer: true
   eventServerPort: 19102
+  remoteLokiAddress: loki-service.skoop.svc.cluster.local
+  eventProbes:
+  - tcpreset
+  - packetloss
 
 nodeSelector: {}
-  
+tolerations: {}
