@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: {{ .Values.name }}
-  namespace: {{ .Values.namespace }}
+  namespace: {{ .Release.Namespace }}
   labels:
     app: {{ .Values.appName }}
 spec:
@@ -24,50 +24,63 @@ spec:
       hostPID: true
       hostIPC: true
       dnsPolicy: ClusterFirstWithHostNet
+      {{- if .Values.initContainer.enabled }}
       initContainers:
         - name: preparels
-
-          image: "{{ .Values.initcontainer.repository }}:{{ .Values.initcontainer.tag }}"
+          image: {{ .Values.initContainer.repository }}:{{ .Values.initContainer.tag }}
+          imagePullPolicy: {{ .Values.initContainer.imagePullPolicy }}
           volumeMounts:
             - name: bpfdir
               mountPath: /etc/net-exporter/btf
             - mountPath: /boot/
               name: boot
-          command: [btfhack, discover,-p ,/etc/net-exporter/btf/]
+          command:
+            - btfhack
+            - discover
+            - -p
+            - /etc/net-exporter/btf/
+      {{- end }}
       containers:
-      - image:  "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-        name: inspector
-        env:
-        - name: INSPECTOR_NODENAME
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.nodeName
-        volumeMounts:
-          - name: configvolume
-            mountPath: /etc/config/
-          - name: bpfdir
-            mountPath: /etc/net-exporter/btf
-          - name: procfs
-            mountPath: /proc
-          - mountPath: /run/containerd/containerd.sock
-            name: runtimeendpoint
-          - mountPath: /var/run/
-            name: rundir
-          - mountPath: /sys/fs/bpf
-            name: bpfmap
-            mountPropagation: HostToContainer
-          - mountPath: /sys/kernel/debug
-            name: bpfdebugfs
-            mountPropagation: HostToContainer
-          - mountPath: /etc/node-hostname
-            name: hostname
-        command: [/bin/inspector,server]
-        securityContext:
-          privileged: true
-        resources:
-          {{- toYaml .Values.resources | nindent 10 }}
+        - name: inspector
+          image:  {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.imagePullPolicy }}
+          env:
+          - name: INSPECTOR_NODENAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          volumeMounts:
+            - name: configvolume
+              mountPath: /etc/config/
+            - name: bpfdir
+              mountPath: /etc/net-exporter/btf
+            - name: procfs
+              mountPath: /proc
+            - mountPath: /run/containerd/containerd.sock
+              name: runtimeendpoint
+            - mountPath: /var/run/
+              name: rundir
+            - mountPath: /sys/fs/bpf
+              name: bpfmap
+              mountPropagation: HostToContainer
+            - mountPath: /sys/kernel/debug
+              name: bpfdebugfs
+              mountPropagation: HostToContainer
+            - mountPath: /etc/node-hostname
+              name: hostname
+          command:
+            - /bin/inspector
+            - server
+          securityContext:
+            privileged: true
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       volumes:

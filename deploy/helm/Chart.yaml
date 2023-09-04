@@ -2,12 +2,12 @@ apiVersion: v1
 name: kubeskoop-exporter
 description: A Helm chart for KubeSkoop Exporter
 type: application
-version: 0.1.1
-appVersion: 0.1.1
+version: 0.2.0
+appVersion: 0.1.0
 icon: https://img.shields.io/github/v/tag/alibaba/kubeskoop
 keywords:
-  - skoop
-  - skoop-exporter
+  - kubeskoop
+  - kubeskoop-exporter
 home: https://github.com/alibaba/kubeskoop
-sources: 
+sources:
   - https://github.com/alibaba/kubeskoop
