@@ -87,25 +87,43 @@ func GetSymPtFromBpfLocation(pt uint64) (*KernelSymbol, error) {
 	if ok {
 		return &sym, nil
 	}
-	if pt > kallsyms[len(kallsyms)-1].start {
-		return nil, errors.New("addr out of range")
-	}
-
-	for idx := range kallsyms {
-		if kallsyms[idx].start <= pt && kallsyms[idx+1].start > pt {
-			ks := KernelSymbol{
-				start:      kallsyms[idx].start,
-				symboltype: kallsyms[idx].symbol,
-				symbol:     kallsyms[idx].symbol,
-				offset:     int(pt - kallsyms[idx].start),
-				module:     kallsyms[idx].module,
-			}
-			locationCache.Add(pt, ks)
-			return &ks, nil
+	// since getAllSyms is already sorted, we can do a binary search here
+	var i, j, mid int
+	var midVal uint64
+	j = len(kallsyms) - 1
+	found := -1
+	for i < j {
+		mid = i + (j-i)/2
+		midVal = kallsyms[mid].start
+		if pt < midVal {
+			j = mid
+		} else if pt > midVal {
+			i = mid + 1
+		} else {
+			found = mid
+			break
 		}
 	}
-
-	return nil, errors.New("addr not found")
+	if found == -1 {
+		if i >= 1 && pt > kallsyms[i-1].start && pt < kallsyms[i].start {
+			found = i - 1
+		}
+		if pt >= kallsyms[i].start {
+			found = i
+		}
+	}
+	if found == -1 {
+		return nil, errors.New("addr not found")
+	}
+	ks := KernelSymbol{
+		start:      kallsyms[found].start,
+		symboltype: kallsyms[found].symbol,
+		symbol:     kallsyms[found].symbol,
+		offset:     int(pt - kallsyms[found].start),
+		module:     kallsyms[found].module,
+	}
+	locationCache.Add(pt, ks)
+	return &ks, nil
 }
 
 func getAllSyms() error {
