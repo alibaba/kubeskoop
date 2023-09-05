@@ -1,10 +1,10 @@
-# Skoop exporter
+# KubeSkoop exporter
 
-## INSTALL
+## INSTALLATION
 
 ```shell
 # Add KubeSkoop charts repo
-helm repo add kubeskoop https://github.com/alibaba/kubeskoop/charts
+helm repo add kubeskoop https://kubeskoop.github.io
 
 # You need to update helm repo info for the first time.
 helm repo update

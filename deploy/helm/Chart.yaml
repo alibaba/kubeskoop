@@ -1,13 +1,25 @@
 apiVersion: v1
 name: kubeskoop-exporter
-description: A Helm chart for KubeSkoop Exporter
+description: Promtheus exporter and kernel tracing for OS metrics in kubernetes, with pluggable metric collectors and kernel eBPF tracers.
 type: application
+annotations:
+  category: Analytics
+  licenses: Apache-2.0
 version: 0.2.0
 appVersion: 0.1.0
 icon: https://img.shields.io/github/v/tag/alibaba/kubeskoop
 keywords:
   - kubeskoop
   - kubeskoop-exporter
+  - kubernetes
+  - prometheus
+  - eBPF
+  - ebpf
+  - monitoring
 home: https://github.com/alibaba/kubeskoop
 sources:
   - https://github.com/alibaba/kubeskoop
+  - https://kubeskoop.io/
+maintainers:
+- name: KubeSkoop
+  url: https://kubeskoop.io/
