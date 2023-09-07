@@ -2,93 +2,67 @@ package procnetdev
 
 import (
 	"context"
-	"fmt"
-	"os"
-	"strings"
-	"sync"
-
-	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
 
 	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
-
+	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
 	"github.com/prometheus/procfs"
-	"golang.org/x/exp/slog"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
-	ModuleName = "procnetdev" // nolint
+	probeName = "netdev" // nolint
 
-	RxBytes   = "RxBytes"
-	RxErrors  = "RxErrors"
-	TxBytes   = "TxBytes"
-	TxErrors  = "TxErrors"
-	RxPackets = "RxPackets"
-	RxDropped = "RxDropped"
-	TxPackets = "TxPackets"
-	TxDropped = "TxDropped"
+	RxBytes   = "rxbytes"
+	RxErrors  = "rxerrors"
+	TxBytes   = "txbytes"
+	TxErrors  = "txerrors"
+	RxPackets = "rxpackets"
+	RxDropped = "rxdropped"
+	TxPackets = "txpackets"
+	TxDropped = "txdropped"
 )
 
 var (
-	once  = sync.Once{}
-	probe *ProcNetdev
-
 	NetdevMetrics = []string{RxBytes, RxErrors, TxBytes, TxErrors, RxPackets, RxDropped, TxPackets, TxDropped}
 )
+
+func init() {
+	probe.MustRegisterMetricsProbe(probeName, netdevProbeCreator)
+}
+
+func netdevProbeCreator(_ map[string]interface{}) (probe.MetricsProbe, error) {
+	p := &ProcNetdev{}
+
+	batchMetrics := probe.NewLegacyBatchMetrics(probeName, NetdevMetrics, p.CollectOnce)
+
+	return probe.NewMetricsProbe(probeName, p, batchMetrics), nil
+}
 
 type ProcNetdev struct {
 }
 
-func GetProbe() *ProcNetdev {
-	once.Do(func() {
-		probe = &ProcNetdev{}
-	})
-	return probe
-}
-
-func (s *ProcNetdev) Close(_ proto.ProbeType) error {
+func (s *ProcNetdev) Start(_ context.Context) error {
 	return nil
 }
 
-func (s *ProcNetdev) Start(_ context.Context, _ proto.ProbeType) {
+func (s *ProcNetdev) Stop(_ context.Context) error {
+	return nil
 }
 
-func (s *ProcNetdev) Ready() bool {
-	// determine by if default snmp file was ready
-	if _, err := os.Stat("/proc/net/dev"); os.IsNotExist(err) {
-		return false
-	}
-	return true
-}
-
-func (s *ProcNetdev) Name() string {
-	return ModuleName
-}
-
-func (s *ProcNetdev) GetMetricNames() []string {
-	res := []string{}
-	for _, m := range NetdevMetrics {
-		res = append(res, metricUniqueID("netdev", m))
-	}
-	return res
-}
-
-func (s *ProcNetdev) Collect(ctx context.Context) (map[string]map[uint32]uint64, error) {
+func (s *ProcNetdev) CollectOnce() (map[string]map[uint32]uint64, error) {
 	ets := nettop.GetAllEntity()
 	if len(ets) == 0 {
-		slog.Ctx(ctx).Info("collect", "mod", ModuleName, "ignore", "no entity found")
+		log.Errorf("%s error, no entity found", probeName)
 	}
-	return collect(ctx, ets)
+	return collect(ets)
 }
 
-func metricUniqueID(subject string, m string) string {
-	return fmt.Sprintf("%s%s", subject, strings.ToLower(m))
-}
-
-func collect(_ context.Context, nslist []*nettop.Entity) (map[string]map[uint32]uint64, error) {
+func collect(nslist []*nettop.Entity) (map[string]map[uint32]uint64, error) {
 	resMap := make(map[string]map[uint32]uint64)
-	for _, mname := range NetdevMetrics {
-		resMap[metricUniqueID("netdev", mname)] = map[uint32]uint64{}
+	for _, m := range NetdevMetrics {
+		resMap[m] = make(map[uint32]uint64)
 	}
+
 	netdev := getAllNetdev(nslist)
 
 	for nsid := range netdev {
@@ -96,20 +70,16 @@ func collect(_ context.Context, nslist []*nettop.Entity) (map[string]map[uint32]
 			continue
 		}
 
-		for _, mname := range NetdevMetrics {
-			resMap[metricUniqueID("netdev", mname)][nsid] = 0
-		}
-
 		for devname, devstat := range netdev[nsid] {
 			if devname != "lo" {
-				resMap[metricUniqueID("netdev", RxBytes)][nsid] += devstat.RxBytes
-				resMap[metricUniqueID("netdev", RxErrors)][nsid] += devstat.RxErrors
-				resMap[metricUniqueID("netdev", TxBytes)][nsid] += devstat.TxBytes
-				resMap[metricUniqueID("netdev", TxErrors)][nsid] += devstat.TxErrors
-				resMap[metricUniqueID("netdev", RxPackets)][nsid] += devstat.RxPackets
-				resMap[metricUniqueID("netdev", TxPackets)][nsid] += devstat.TxPackets
-				resMap[metricUniqueID("netdev", RxDropped)][nsid] += devstat.RxDropped
-				resMap[metricUniqueID("netdev", TxDropped)][nsid] += devstat.TxDropped
+				resMap[RxBytes][nsid] += devstat.RxBytes
+				resMap[RxErrors][nsid] += devstat.RxErrors
+				resMap[TxBytes][nsid] += devstat.TxBytes
+				resMap[TxErrors][nsid] += devstat.TxErrors
+				resMap[RxPackets][nsid] += devstat.RxPackets
+				resMap[TxPackets][nsid] += devstat.TxPackets
+				resMap[RxDropped][nsid] += devstat.RxDropped
+				resMap[TxDropped][nsid] += devstat.TxDropped
 			}
 		}
 	}

@@ -6,70 +6,61 @@ import (
 	"os"
 	"strings"
 
-	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
+	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
+	log "k8s.io/klog/v2"
 
 	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
-
-	"golang.org/x/exp/slog"
 )
 
 const (
-	ModuleName = "Procfd" // nolint
+	probeName = "fd"
 )
 
 var (
-	probe = &ProcFD{}
-
-	FDMetrics = []string{"OpenFd", "OpenSocket"}
+	OpenFD     = "openfd"
+	OpenSocket = "opensocket"
+	FDMetrics  = []string{OpenFD, OpenSocket}
 )
+
+func init() {
+	probe.MustRegisterMetricsProbe(probeName, fdProbeCreator)
+}
+
+func fdProbeCreator(_ map[string]interface{}) (probe.MetricsProbe, error) {
+	p := &ProcFD{}
+
+	batchMetrics := probe.NewLegacyBatchMetrics(probeName, FDMetrics, p.CollectOnce)
+
+	return probe.NewMetricsProbe(probeName, p, batchMetrics), nil
+}
 
 type ProcFD struct {
 }
 
-func GetProbe() *ProcFD {
-	return probe
-}
-
-func (s *ProcFD) Close(_ proto.ProbeType) error {
+func (s *ProcFD) Start(_ context.Context) error {
 	return nil
 }
 
-func (s *ProcFD) Start(_ context.Context, _ proto.ProbeType) {
+func (s *ProcFD) Stop(_ context.Context) error {
+	return nil
 }
 
-func (s *ProcFD) Ready() bool {
-	return true
-}
-
-func (s *ProcFD) Name() string {
-	return ModuleName
-}
-
-func (s *ProcFD) GetMetricNames() []string {
-	res := []string{}
-	for _, m := range FDMetrics {
-		res = append(res, metricUniqueID("fd", m))
-	}
-	return res
-}
-
-func (s *ProcFD) Collect(ctx context.Context) (map[string]map[uint32]uint64, error) {
+func (s *ProcFD) CollectOnce() (map[string]map[uint32]uint64, error) {
 	ets := nettop.GetAllEntity()
 	if len(ets) == 0 {
-		slog.Ctx(ctx).Info("collect", "mod", ModuleName, "ignore", "no entity found")
+		log.Warningf("procfd: no entity found")
+		return map[string]map[uint32]uint64{}, nil
 	}
 	return getAllProcessFd(ets)
 }
 
-func metricUniqueID(subject string, m string) string {
-	return fmt.Sprintf("%s%s", subject, strings.ToLower(m))
-}
-
 func getAllProcessFd(nslist []*nettop.Entity) (map[string]map[uint32]uint64, error) {
 	resMap := make(map[string]map[uint32]uint64)
-	for _, metricname := range FDMetrics {
-		resMap[metricUniqueID("fd", metricname)] = map[uint32]uint64{}
+
+	for _, m := range FDMetrics {
+		resMap[m] = make(map[uint32]uint64)
 	}
+
 	for _, nslogic := range nslist {
 		nsprocfd := map[string]struct{}{}
 		nsprocfsock := map[string]struct{}{}
@@ -86,8 +77,8 @@ func getAllProcessFd(nslist []*nettop.Entity) (map[string]map[uint32]uint64, err
 				}
 			}
 		}
-		resMap[metricUniqueID("fd", "OpenFd")][uint32(nslogic.GetNetns())] = uint64(len(nsprocfd))
-		resMap[metricUniqueID("fd", "OpenSocket")][uint32(nslogic.GetNetns())] = uint64(len(nsprocfsock))
+		resMap[OpenFD][uint32(nslogic.GetNetns())] = uint64(len(nsprocfd))
+		resMap[OpenSocket][uint32(nslogic.GetNetns())] = uint64(len(nsprocfsock))
 	}
 	return resMap, nil
 }

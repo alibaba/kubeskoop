@@ -2,20 +2,18 @@ package nettop
 
 import (
 	fmt "fmt"
-	"io"
 	"os"
 	"strings"
 	"unsafe"
 
-	"golang.org/x/exp/slog"
+	log "github.com/sirupsen/logrus"
+
 	"golang.org/x/sys/unix"
 )
 
 //go:generate protoc --go_out=. ./libnettop.proto
 
 var (
-	logger *slog.Logger
-
 	top              = metacache{}
 	runtimeEndpoints = []string{"/var/run/dockershim.sock", "/run/containerd/containerd.sock", "/run/k3s/containerd/containerd.sock"}
 
@@ -27,11 +25,10 @@ type metacache struct {
 }
 
 func Init(sidecar bool) {
-	logger = slog.New(slog.NewJSONHandler(io.Discard))
 	top.NodeName = getNodeName()
 	kr, err := getKernelRelease()
 	if err != nil {
-		logger.Warn("failed to get node kernel info %s", err.Error())
+		log.Errorf("failed to get node kernel info %v", err)
 	} else {
 		top.Kernel = kr
 	}
@@ -40,7 +37,7 @@ func Init(sidecar bool) {
 		c := &CriMeta{}
 		err = c.Update()
 		if err != nil {
-			logger.Warn("update cri meta failed %s", err.Error())
+			log.Errorf("update cri meta failed %v", err)
 		}
 
 		top.Crimeta = c

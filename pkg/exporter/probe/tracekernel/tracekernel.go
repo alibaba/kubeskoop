@@ -9,17 +9,19 @@ import (
 	"math/bits"
 	"strings"
 	"sync"
+	"time"
 	"unsafe"
 
-	"github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
-	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
+	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
+	"github.com/alibaba/kubeskoop/pkg/exporter/util"
+	log "github.com/sirupsen/logrus"
 
+	"github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
 	"github.com/cilium/ebpf/ringbuf"
 	"github.com/cilium/ebpf/rlimit"
-	"golang.org/x/exp/slog"
 )
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -cflags $BPF_CFLAGS -type insp_kl_event_t  bpf ../../../../bpf/kernellatency.c -- -I../../../../bpf/headers -D__TARGET_ARCH_x86
@@ -42,153 +44,188 @@ const (
 	TXKERNEL_SLOW_METRIC      = "kernellatency_txslow"
 	RXKERNEL_SLOW100MS_METRIC = "kernellatency_rxslow100ms"
 	TXKERNEL_SLOW100MS_METRIC = "kernellatency_txslow100ms"
+
+	probeTypeEvent   = 0
+	probeTypeMetrics = 1
 )
 
 var (
-	ModuleName = "insp_kernellatency" // nolint
-	probe      = &KernelLatencyProbe{once: sync.Once{}, mtx: sync.Mutex{}, enabledProbes: map[proto.ProbeType]bool{}}
-	objs       = bpfObjects{}
-	links      = []link.Link{}
-
-	events     = []string{RXKERNEL_SLOW, TXKERNEL_SLOW}
-	metrics    = []string{RXKERNEL_SLOW_METRIC, RXKERNEL_SLOW100MS_METRIC, TXKERNEL_SLOW_METRIC, TXKERNEL_SLOW100MS_METRIC}
-	metricsMap = map[string]map[uint32]uint64{}
+	metrics      = []string{RXKERNEL_SLOW_METRIC, RXKERNEL_SLOW100MS_METRIC, TXKERNEL_SLOW_METRIC, TXKERNEL_SLOW100MS_METRIC}
+	probeName    = "kernellatency"
+	latencyProbe = &kernelLatencyProbe{
+		metricsMap: make(map[string]map[uint32]uint64),
+	}
 )
 
-func GetProbe() *KernelLatencyProbe {
-	return probe
-}
-
 func init() {
-	for m := range metrics {
-		metricsMap[metrics[m]] = map[uint32]uint64{}
+	probe.MustRegisterMetricsProbe(probeName, metricsProbeCreator)
+	probe.MustRegisterEventProbe(probeName, eventProbeCreator)
+}
+
+func metricsProbeCreator(_ map[string]interface{}) (probe.MetricsProbe, error) {
+	p := &metricsProbe{}
+	batchMetrics := probe.NewLegacyBatchMetrics(probeName, metrics, p.CollectOnce)
+
+	return probe.NewMetricsProbe(probeName, p, batchMetrics), nil
+}
+
+func eventProbeCreator(sink chan<- *probe.Event, _ map[string]interface{}) (probe.EventProbe, error) {
+	p := &eventProbe{
+		sink: sink,
 	}
+	return probe.NewEventProbe(probeName, p), nil
 }
 
-type KernelLatencyProbe struct {
-	enable        bool
-	sub           chan<- proto.RawEvent
-	once          sync.Once
-	mtx           sync.Mutex
-	enabledProbes map[proto.ProbeType]bool
+type metricsProbe struct {
 }
 
-func (p *KernelLatencyProbe) Name() string {
-	return ModuleName
+func (p *metricsProbe) Start(ctx context.Context) error {
+	return latencyProbe.start(ctx, probe.ProbeTypeMetrics)
 }
 
-func (p *KernelLatencyProbe) Ready() bool {
-	return p.enable
+func (p *metricsProbe) Stop(ctx context.Context) error {
+	return latencyProbe.stop(ctx, probe.ProbeTypeMetrics)
 }
 
-func (p *KernelLatencyProbe) GetEventNames() []string {
-	return events
+func (p *metricsProbe) CollectOnce() (map[string]map[uint32]uint64, error) {
+	return latencyProbe.copyMetricsMap(), nil
 }
 
-func (p *KernelLatencyProbe) Close(probeType proto.ProbeType) error {
-	if !p.enable {
-		return nil
+type eventProbe struct {
+	sink chan<- *probe.Event
+}
+
+func (e *eventProbe) Start(ctx context.Context) error {
+	err := latencyProbe.start(ctx, probe.ProbeTypeEvent)
+	if err != nil {
+		return err
 	}
 
-	if _, ok := p.enabledProbes[probeType]; !ok {
-		return nil
-	}
-	if len(p.enabledProbes) > 1 {
-		delete(p.enabledProbes, probeType)
-		return nil
+	latencyProbe.sink = e.sink
+	return nil
+}
+
+func (e *eventProbe) Stop(ctx context.Context) error {
+	return latencyProbe.stop(ctx, probe.ProbeTypeEvent)
+}
+
+type kernelLatencyProbe struct {
+	objs        bpfObjects
+	links       []link.Link
+	sink        chan<- *probe.Event
+	refcnt      [2]int
+	lock        sync.Mutex
+	perfReader  *perf.Reader
+	metricsMap  map[string]map[uint32]uint64
+	metricsLock sync.RWMutex
+}
+
+func (p *kernelLatencyProbe) stop(_ context.Context, probeType probe.Type) error {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	if p.refcnt[probeType] == 0 {
+		return fmt.Errorf("probe %s never start", probeType)
 	}
 
-	for _, link := range links {
+	p.refcnt[probeType]--
+	if p.totalReferenceCountLocked() == 0 {
+		return p.cleanup()
+	}
+	return nil
+}
+
+func (p *kernelLatencyProbe) cleanup() error {
+	if p.perfReader != nil {
+		p.perfReader.Close()
+	}
+
+	for _, link := range p.links {
 		link.Close()
 	}
-	links = []link.Link{}
-	p.enable = false
-	p.once = sync.Once{}
-	metricsMap = map[string]map[uint32]uint64{}
 
-	delete(p.enabledProbes, probeType)
-	return nil
-}
+	p.links = nil
 
-func (p *KernelLatencyProbe) Register(receiver chan<- proto.RawEvent) error {
-	p.mtx.Lock()
-	defer p.mtx.Unlock()
-	p.sub = receiver
+	p.objs.Close()
 
 	return nil
 }
 
-func (p *KernelLatencyProbe) GetMetricNames() []string {
-	return metrics
+func (p *kernelLatencyProbe) copyMetricsMap() map[string]map[uint32]uint64 {
+	p.metricsLock.RLock()
+	defer p.metricsLock.RUnlock()
+	return probe.CopyLegacyMetricsMap(p.metricsMap)
 }
 
-func (p *KernelLatencyProbe) Collect(_ context.Context) (map[string]map[uint32]uint64, error) {
-	return metricsMap, nil
-}
-
-func (p *KernelLatencyProbe) Start(ctx context.Context, probeType proto.ProbeType) {
-	if p.enable {
-		p.enabledProbes[probeType] = true
-		return
+func (p *kernelLatencyProbe) totalReferenceCountLocked() int {
+	var c int
+	for _, n := range p.refcnt {
+		c += n
 	}
+	return c
+}
 
-	p.once.Do(func() {
-		err := loadSync()
-		if err != nil {
-			slog.Ctx(ctx).Warn("start", "module", ModuleName, "err", err)
-			return
+func (p *kernelLatencyProbe) start(_ context.Context, probeType probe.Type) (err error) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	p.refcnt[probeType]++
+	if p.totalReferenceCountLocked() == 1 {
+		if err = p.loadAndAttachBPF(); err != nil {
+			log.Errorf("%s failed load and attach bpf, err: %v", probeName, err)
+			_ = p.cleanup()
+			return fmt.Errorf("%s failed load bpf: %w", probeName, err)
 		}
-		p.enable = true
-	})
 
-	if !p.enable {
-		// if load failed, do not start process
-		return
+		p.perfReader, err = perf.NewReader(p.objs.bpfMaps.InspKlatencyEvent, int(unsafe.Sizeof(bpfInspKlEventT{})))
+		if err != nil {
+			log.Errorf("%s failed create perf reader, err: %v", probeName, err)
+			_ = p.cleanup()
+			return fmt.Errorf("%s failed create bpf reader: %w", probeName, err)
+		}
+
+		go p.perfLoop()
 	}
-	p.enabledProbes[probeType] = true
 
-	go p.startRX(ctx)
-	// go p.startTX(ctx)
+	return nil
 }
 
-func (p *KernelLatencyProbe) updateMetrics(netns uint32, metric string) {
-	p.mtx.Lock()
-	defer p.mtx.Unlock()
-	if _, ok := metricsMap[metric]; ok {
-		metricsMap[metric][netns]++
+func (p *kernelLatencyProbe) updateMetrics(netns uint32, metrics string) {
+	p.metricsLock.Lock()
+	defer p.metricsLock.Unlock()
+	if _, ok := p.metricsMap[metrics]; !ok {
+		p.metricsMap[metrics] = make(map[uint32]uint64)
 	}
+
+	p.metricsMap[metrics][netns]++
 }
 
-func (p *KernelLatencyProbe) startRX(ctx context.Context) {
-	reader, err := perf.NewReader(objs.bpfMaps.InspKlatencyEvent, int(unsafe.Sizeof(bpfInspKlEventT{})))
-	if err != nil {
-		slog.Ctx(ctx).Warn("start new perf reader", "module", ModuleName, "err", err)
-		return
-	}
-
+func (p *kernelLatencyProbe) perfLoop() {
 	for {
-		record, err := reader.Read()
+		record, err := p.perfReader.Read()
 		if err != nil {
 			if errors.Is(err, ringbuf.ErrClosed) {
-				slog.Ctx(ctx).Info("received signal, exiting..", "module", ModuleName)
+				log.Errorf("%s received signal, exiting..", probeName)
 				return
 			}
-			slog.Ctx(ctx).Info("reading from reader", "module", ModuleName, "err", err)
+			log.Warnf("%s failed reading from reader, err: %v", probeName, err)
 			continue
 		}
 
 		if record.LostSamples != 0 {
-			slog.Ctx(ctx).Info("Perf event ring buffer full", "module", ModuleName, "drop samples", record.LostSamples)
+			log.Warnf("%s perf event ring buffer full, drop: %d", probeName, record.LostSamples)
 			continue
 		}
 
 		var event bpfInspKlEventT
 		if err := binary.Read(bytes.NewBuffer(record.RawSample), binary.LittleEndian, &event); err != nil {
-			slog.Ctx(ctx).Info("parsing event", "module", ModuleName, "err", err)
+			log.Errorf("%s failed parsing event, err: %v", probeName, err)
 			continue
 		}
-		rawevt := proto.RawEvent{
-			Netns: event.SkbMeta.Netns,
+
+		netns := event.SkbMeta.Netns
+		evt := &probe.Event{
+			Timestamp: time.Now().UnixNano(),
+			Labels:    probe.LagacyEventLabels(netns),
 		}
 		/*
 		   #define RX_KLATENCY 1
@@ -197,7 +234,7 @@ func (p *KernelLatencyProbe) startRX(ctx context.Context) {
 		tuple := fmt.Sprintf("protocol=%s saddr=%s sport=%d daddr=%s dport=%d ", bpfutil.GetProtoStr(event.Tuple.L4Proto), bpfutil.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Saddr))), bits.ReverseBytes16(event.Tuple.Sport), bpfutil.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Daddr))), bits.ReverseBytes16(event.Tuple.Dport))
 		switch event.Direction {
 		case 1:
-			rawevt.EventType = RXKERNEL_SLOW
+			evt.Type = RXKERNEL_SLOW
 			latency := []string{fmt.Sprintf("latency:%s", bpfutil.GetHumanTimes(event.Latency))}
 			if event.Point2 > event.Point1 {
 				latency = append(latency, fmt.Sprintf("PREROUTING:%s", bpfutil.GetHumanTimes(event.Point2-event.Point1)))
@@ -208,10 +245,10 @@ func (p *KernelLatencyProbe) startRX(ctx context.Context) {
 			if event.Point4 > event.Point3 && event.Point3 != 0 {
 				latency = append(latency, fmt.Sprintf("LOCAL_IN:%s", bpfutil.GetHumanTimes(event.Point4-event.Point3)))
 			}
-			rawevt.EventBody = fmt.Sprintf("%s %s", tuple, strings.Join(latency, " "))
-			p.updateMetrics(rawevt.Netns, RXKERNEL_SLOW_METRIC)
+			evt.Message = fmt.Sprintf("%s %s", tuple, strings.Join(latency, " "))
+			p.updateMetrics(netns, RXKERNEL_SLOW_METRIC)
 		case 2:
-			rawevt.EventType = TXKERNEL_SLOW
+			evt.Type = TXKERNEL_SLOW
 			latency := []string{fmt.Sprintf("latency=%s", bpfutil.GetHumanTimes(event.Latency))}
 			if event.Point3 > event.Point1 && event.Point1 != 0 {
 				latency = append(latency, fmt.Sprintf("LOCAL_OUT=%s", bpfutil.GetHumanTimes(event.Point3-event.Point1)))
@@ -219,21 +256,21 @@ func (p *KernelLatencyProbe) startRX(ctx context.Context) {
 			if event.Point4 > event.Point3 && event.Point3 != 0 {
 				latency = append(latency, fmt.Sprintf("POSTROUTING=%s", bpfutil.GetHumanTimes(event.Point4-event.Point3)))
 			}
-			rawevt.EventBody = fmt.Sprintf("%s %s", tuple, strings.Join(latency, " "))
-			p.updateMetrics(rawevt.Netns, TXKERNEL_SLOW_METRIC)
+			evt.Message = fmt.Sprintf("%s %s", tuple, strings.Join(latency, " "))
+			p.updateMetrics(netns, TXKERNEL_SLOW_METRIC)
 		default:
-			slog.Ctx(ctx).Info("parsing event", "module", ModuleName, "ignore", event)
+			log.Infof("%s failed parsing event %s, ignore", probeName, util.ToJSONString(evt))
 			continue
 		}
 
-		if p.sub != nil {
-			slog.Ctx(ctx).Debug("broadcast event", "module", ModuleName)
-			p.sub <- rawevt
+		if p.sink != nil {
+			log.Debugf("%s sink event %s", probeName, util.ToJSONString(evt))
+			p.sink <- evt
 		}
 	}
 }
 
-func loadSync() error {
+func (p *kernelLatencyProbe) loadAndAttachBPF() error {
 	// 准备动作
 	if err := rlimit.RemoveMemlock(); err != nil {
 		return err
@@ -246,69 +283,69 @@ func loadSync() error {
 	}
 
 	// 获取Loaded的程序/map的fd信息
-	if err := loadBpfObjects(&objs, &opts); err != nil {
+	if err := loadBpfObjects(&p.objs, &opts); err != nil {
 		return fmt.Errorf("loading objects: %v", err)
 	}
 
-	progrcv, err := link.Kprobe(HOOK_IPRCV, objs.KlatencyIpRcv, &link.KprobeOptions{})
+	progrcv, err := link.Kprobe(HOOK_IPRCV, p.objs.KlatencyIpRcv, &link.KprobeOptions{})
 	if err != nil {
 		return fmt.Errorf("link HOOK_IPRCV: %s", err.Error())
 	}
-	links = append(links, progrcv)
+	p.links = append(p.links, progrcv)
 
-	progrcvfin, err := link.Kprobe(HOOK_IPRCVFIN, objs.KlatencyIpRcvFinish, &link.KprobeOptions{})
+	progrcvfin, err := link.Kprobe(HOOK_IPRCVFIN, p.objs.KlatencyIpRcvFinish, &link.KprobeOptions{})
 	if err != nil {
 		return fmt.Errorf("link HOOK_IPRCVFIN: %s", err.Error())
 	}
-	links = append(links, progrcvfin)
+	p.links = append(p.links, progrcvfin)
 
-	proglocal, err := link.Kprobe(HOOK_IPLOCAL, objs.KlatencyIpLocalDeliver, &link.KprobeOptions{})
+	proglocal, err := link.Kprobe(HOOK_IPLOCAL, p.objs.KlatencyIpLocalDeliver, &link.KprobeOptions{})
 	if err != nil {
 		return fmt.Errorf("link HOOK_IPRCV: %s", err.Error())
 	}
-	links = append(links, proglocal)
+	p.links = append(p.links, proglocal)
 
-	proglocalfin, err := link.Kprobe(HOOK_IPLOCALFIN, objs.KlatencyIpLocalDeliverFinish, &link.KprobeOptions{})
+	proglocalfin, err := link.Kprobe(HOOK_IPLOCALFIN, p.objs.KlatencyIpLocalDeliverFinish, &link.KprobeOptions{})
 	if err != nil {
 		return fmt.Errorf("link HOOK_IPLOCALFIN: %s", err.Error())
 	}
-	links = append(links, proglocalfin)
+	p.links = append(p.links, proglocalfin)
 
-	progxmit, err := link.Kprobe(HOOK_IPXMIT, objs.KlatencyIpQueueXmit, &link.KprobeOptions{})
+	progxmit, err := link.Kprobe(HOOK_IPXMIT, p.objs.KlatencyIpQueueXmit, &link.KprobeOptions{})
 	if err != nil {
 		return fmt.Errorf("link HOOK_IPXMIT: %s", err.Error())
 	}
-	links = append(links, progxmit)
+	p.links = append(p.links, progxmit)
 
-	proglocalout, err := link.Kprobe(HOOK_IPLOCALOUT, objs.KlatencyIpLocal, &link.KprobeOptions{})
+	proglocalout, err := link.Kprobe(HOOK_IPLOCALOUT, p.objs.KlatencyIpLocal, &link.KprobeOptions{})
 	if err != nil {
 		return fmt.Errorf("link HOOK_IPLOCALOUT: %s", err.Error())
 	}
-	links = append(links, proglocalout)
+	p.links = append(p.links, proglocalout)
 
-	progoutput, err := link.Kprobe(HOOK_IPOUTPUT, objs.KlatencyIpOutput, &link.KprobeOptions{})
+	progoutput, err := link.Kprobe(HOOK_IPOUTPUT, p.objs.KlatencyIpOutput, &link.KprobeOptions{})
 	if err != nil {
 		return fmt.Errorf("link HOOK_IPOUTPUT: %s", err.Error())
 	}
-	links = append(links, progoutput)
+	p.links = append(p.links, progoutput)
 
-	progfin, err := link.Kprobe(HOOK_IPOUTPUTFIN, objs.KlatencyIpFinishOutput2, &link.KprobeOptions{})
+	progfin, err := link.Kprobe(HOOK_IPOUTPUTFIN, p.objs.KlatencyIpFinishOutput2, &link.KprobeOptions{})
 	if err != nil {
 		return fmt.Errorf("link HOOK_IPOUTPUTFIN: %s", err.Error())
 	}
-	links = append(links, progfin)
+	p.links = append(p.links, progfin)
 
-	progkfree, err := link.Kprobe("kfree_skb", objs.ReportKfree, &link.KprobeOptions{})
+	progkfree, err := link.Kprobe("kfree_skb", p.objs.ReportKfree, &link.KprobeOptions{})
 	if err != nil {
 		return fmt.Errorf("link kfree_skb: %s", err.Error())
 	}
-	links = append(links, progkfree)
+	p.links = append(p.links, progkfree)
 
-	progconsume, err := link.Kprobe("consume_skb", objs.ReportConsume, &link.KprobeOptions{})
+	progconsume, err := link.Kprobe("consume_skb", p.objs.ReportConsume, &link.KprobeOptions{})
 	if err != nil {
 		return fmt.Errorf("link consume_skb: %s", err.Error())
 	}
-	links = append(links, progconsume)
+	p.links = append(p.links, progconsume)
 
 	return nil
 }

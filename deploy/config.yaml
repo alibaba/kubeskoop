@@ -1,16 +1,27 @@
-debugmode: false
-metric_config:
-  interval: 15
-  port: 9102
+debugmode: true
+port: 10080
+metrics:
   probes:
-  - netdev
-  - io
-  - sock
-  - tcpsummary
-  - tcp
-  - tcpext
-  - udp
-event_config:
-  port: 19102
-  loki_enable: false
-  loki_address: loki-service
+  - name: conntrack
+  - name: qdisc
+  - name: netdev
+  - name: io
+  - name: sock
+  - name: tcpsummary
+  - name: tcp
+  - name: tcpext
+  - name: udp
+  - name: kernellatency
+  - name: packetloss
+event:
+  probes:
+  - name: biolatency
+  - name: kernellatency
+  - name: packetloss
+  - name: tcpreset
+  sinks:
+  - name: stderr
+  - name: file
+    args:
+      path: /tmp/exporter.json
+

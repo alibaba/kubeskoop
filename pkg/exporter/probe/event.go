@@ -1,50 +1,57 @@
 package probe
 
 import (
-	"github.com/alibaba/kubeskoop/pkg/exporter/probe/tracebiolatency"
-	"github.com/alibaba/kubeskoop/pkg/exporter/probe/tracekernel"
-	tracenetif "github.com/alibaba/kubeskoop/pkg/exporter/probe/tracenetiftxlatency"
-	"github.com/alibaba/kubeskoop/pkg/exporter/probe/tracenetsoftirq"
-	"github.com/alibaba/kubeskoop/pkg/exporter/probe/tracepacketloss"
-	"github.com/alibaba/kubeskoop/pkg/exporter/probe/tracesocketlatency"
-	"github.com/alibaba/kubeskoop/pkg/exporter/probe/tracetcpreset"
-	"github.com/alibaba/kubeskoop/pkg/exporter/probe/tracevirtcmdlat"
-	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
+	"fmt"
+
+	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
+	"golang.org/x/exp/slog"
 )
 
 var (
-	availeprobes map[string]proto.EventProbe
+	availableEventProbe = make(map[string]EventProbeCreator)
 )
 
-func init() {
+type EventProbeCreator func(sink chan<- *Event, args map[string]interface{}) (EventProbe, error)
 
-	availeprobes = map[string]proto.EventProbe{}
-
-	availeprobes["netiftxlatency"] = tracenetif.GetProbe()
-	availeprobes["biolatency"] = tracebiolatency.GetProbe()
-	availeprobes["net_softirq"] = tracenetsoftirq.GetProbe()
-	availeprobes["tcpreset"] = tracetcpreset.GetProbe()
-	availeprobes["kernellatency"] = tracekernel.GetProbe()
-	availeprobes["packetloss"] = tracepacketloss.GetProbe()
-	availeprobes["socketlatency"] = tracesocketlatency.GetProbe()
-	availeprobes["virtcmdlatency"] = tracevirtcmdlat.GetProbe()
-}
-
-func GetEventProbe(subject string) proto.EventProbe {
-	if p, ok := availeprobes[subject]; ok {
-		return p
+func MustRegisterEventProbe(name string, creator EventProbeCreator) {
+	if _, ok := availableEventProbe[name]; ok {
+		panic(fmt.Errorf("duplicated event probe %s", name))
 	}
 
-	return nil
+	availableEventProbe[name] = creator
 }
 
-func ListEvents() map[string][]string {
-	em := make(map[string][]string)
+func NewEventProbe(name string, simpleProbe SimpleProbe) EventProbe {
+	return NewProbe(name, simpleProbe)
+}
 
-	for p, ep := range availeprobes {
-		enames := ep.GetEventNames()
-		em[p] = append(em[p], enames...)
+func CreateEventProbe(name string, sink chan<- *Event, _ interface{}) (EventProbe, error) {
+	creator, ok := availableEventProbe[name]
+	if !ok {
+		return nil, fmt.Errorf("undefined probe %s", name)
 	}
 
-	return em
+	//TODO reflect creator's arguments
+	return creator(sink, nil)
+}
+
+func ListEventProbes() []string {
+	var ret []string
+	for key := range availableEventProbe {
+		ret = append(ret, key)
+	}
+	return ret
+}
+
+func EventMetaByNetNS(netns int) []Label {
+	et, err := nettop.GetEntityByNetns(netns)
+	if err != nil {
+		slog.Info("nettop get entity", "err", err, "netns", netns)
+		return nil
+	}
+	return []Label{
+		{Name: "pod", Value: et.GetPodName()},
+		{Name: "namespace", Value: et.GetPodNamespace()},
+		{Name: "node", Value: nettop.GetNodeName()},
+	}
 }

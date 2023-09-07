@@ -7,16 +7,15 @@ import (
 	"math"
 	"net"
 	"strings"
-	"sync"
 	"syscall"
 
-	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
+	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
 
 	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 
 	"github.com/mdlayher/netlink"
 	"github.com/mdlayher/netlink/nlenc"
-	"golang.org/x/exp/slog"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -44,92 +43,63 @@ const (
 )
 
 var (
-	ModuleName = "insp_qdisc"
+	probeName = "qdisc"
 
-	Bytes      = "Bytes"
-	Packets    = "Packets"
-	Drops      = "Drops"
-	Qlen       = "Qlen"
-	Backlog    = "Backlog"
-	Overlimits = "Overlimits"
+	Bytes      = "bytes"
+	Packets    = "packets"
+	Drops      = "drops"
+	Qlen       = "qlen"
+	Backlog    = "backlog"
+	Overlimits = "overlimits"
 
-	QdiscMetrics = []string{Bytes, Packets, Drops, Qlen, Backlog, Overlimits}
-
-	probe = &Probe{mtx: sync.Mutex{}}
+	qdiscMetrics = []string{Bytes, Packets, Drops, Qlen, Backlog, Overlimits}
 )
 
-type Probe struct {
-	enable bool
-	mtx    sync.Mutex
+func init() {
+	probe.MustRegisterMetricsProbe(probeName, qdiscProbeCreator)
 }
 
-func GetProbe() *Probe {
-	return probe
+func qdiscProbeCreator(_ map[string]interface{}) (probe.MetricsProbe, error) {
+	p := &Probe{}
+
+	batchMetrics := probe.NewLegacyBatchMetrics(probeName, qdiscMetrics, p.CollectOnce)
+
+	return probe.NewMetricsProbe(probeName, p, batchMetrics), nil
 }
 
-func (p *Probe) Name() string {
-	return ModuleName
-}
+type Probe struct{}
 
-func (p *Probe) Start(_ context.Context, _ proto.ProbeType) {
-}
-
-func (p *Probe) Ready() bool {
-	fd, err := nettop.GetHostnetworkNetnsFd()
-	if err != nil {
-		slog.Default().Warn("status not ready", "err", err, "module", ModuleName)
-		return false
-	}
-	c, err := getConn(fd)
-	if err != nil {
-		slog.Default().Warn("status not ready", "err", err, "module", ModuleName)
-		return false
-	}
-	defer c.Close()
-
-	return true
-}
-
-func (p *Probe) GetMetricNames() []string {
-	res := []string{}
-	for _, m := range QdiscMetrics {
-		res = append(res, metricUniqueID("qdisc", m))
-	}
-	return res
-}
-
-func (p *Probe) Close(_ proto.ProbeType) error {
-	p.mtx.Lock()
-	defer p.mtx.Unlock()
-
-	p.enable = false
-
+func (p *Probe) Start(_ context.Context) error {
 	return nil
 }
 
-func (p *Probe) Collect(ctx context.Context) (map[string]map[uint32]uint64, error) {
+func (p *Probe) Stop(_ context.Context) error {
+	return nil
+}
+
+func (p *Probe) CollectOnce() (map[string]map[uint32]uint64, error) {
 	resMap := make(map[string]map[uint32]uint64)
-	for _, metric := range QdiscMetrics {
-		resMap[metricUniqueID("qdisc", metric)] = make(map[uint32]uint64)
+	for _, metric := range qdiscMetrics {
+		resMap[metric] = make(map[uint32]uint64)
 	}
 
 	ets := nettop.GetAllEntity()
 	for _, et := range ets {
-		stats, err := getQdiscStats(ctx, et)
+		stats, err := getQdiscStats(et)
 		if err != nil {
-			slog.Ctx(ctx).Info("get qdisc stats", "err", err, "module", ModuleName)
+			log.Errorf("%s failed get qdisc stats: %v", probeName, err)
 			continue
 		}
 
 		for _, stat := range stats {
 			// only care about eth0/eth1...
 			if strings.HasPrefix(stat.IfaceName, "eth") {
-				resMap[metricUniqueID("qdisc", Bytes)][uint32(et.GetNetns())] += stat.Bytes
-				resMap[metricUniqueID("qdisc", Packets)][uint32(et.GetNetns())] += uint64(stat.Packets)
-				resMap[metricUniqueID("qdisc", Drops)][uint32(et.GetNetns())] += uint64(stat.Drops)
-				resMap[metricUniqueID("qdisc", Qlen)][uint32(et.GetNetns())] += uint64(stat.Qlen)
-				resMap[metricUniqueID("qdisc", Backlog)][uint32(et.GetNetns())] += uint64(stat.Backlog)
-				resMap[metricUniqueID("qdisc", Overlimits)][uint32(et.GetNetns())] += uint64(stat.Overlimits)
+				resMap[Bytes][uint32(et.GetNetns())] += stat.Bytes
+				resMap[Packets][uint32(et.GetNetns())] += uint64(stat.Packets)
+				resMap[Drops][uint32(et.GetNetns())] += uint64(stat.Drops)
+				resMap[Qlen][uint32(et.GetNetns())] += uint64(stat.Qlen)
+				resMap[Backlog][uint32(et.GetNetns())] += uint64(stat.Backlog)
+				resMap[Overlimits][uint32(et.GetNetns())] += uint64(stat.Overlimits)
 			}
 		}
 	}
@@ -137,7 +107,7 @@ func (p *Probe) Collect(ctx context.Context) (map[string]map[uint32]uint64, erro
 	return resMap, nil
 }
 
-func getQdiscStats(ctx context.Context, entity *nettop.Entity) ([]QdiscInfo, error) {
+func getQdiscStats(entity *nettop.Entity) ([]QdiscInfo, error) {
 	fd, err := entity.GetNetNsFd()
 	if err != nil {
 		return nil, err
@@ -166,7 +136,7 @@ func getQdiscStats(ctx context.Context, entity *nettop.Entity) ([]QdiscInfo, err
 	for _, msg := range msgs {
 		m, err := parseMessage(msg)
 		if err != nil {
-			slog.Ctx(ctx).Info("parse qdisc msg", "err", err, "msg", msg, "module", ModuleName)
+			log.Errorf("failed parse qdisc msg, nlmsg: %v, err: %v", msg, err)
 			continue
 		}
 		res = append(res, m)
@@ -405,8 +375,4 @@ func parseMessage(msg netlink.Message) (QdiscInfo, error) {
 	}
 
 	return m, err
-}
-
-func metricUniqueID(subject string, m string) string {
-	return fmt.Sprintf("%s%s", subject, strings.ToLower(m))
 }

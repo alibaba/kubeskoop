@@ -2,7 +2,8 @@ package nettop
 
 import (
 	"encoding/json"
-	"errors"
+
+	log "github.com/sirupsen/logrus"
 
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -28,7 +29,7 @@ type InfoSpec struct {
 
 func getPodMetas(client internalapi.RuntimeService) (map[string]podMeta, error) {
 	if client == nil {
-		return nil, errors.New("not in cloudnative environment")
+		return nil, nil
 	}
 	// only list live pods
 	filter := runtimeapi.PodSandboxFilter{
@@ -44,7 +45,7 @@ func getPodMetas(client internalapi.RuntimeService) (map[string]podMeta, error) 
 	for _, sandbox := range listresponse {
 		status, err := client.PodSandboxStatus(sandbox.GetId(), true)
 		if err != nil {
-			logger.Debug("get pod sandbox %s status failed with %s", sandbox.GetId(), err)
+			log.Debugf("get pod sandbox %s status failed with %s", sandbox.GetId(), err)
 			continue
 		}
 		pm := podMeta{
@@ -65,7 +66,7 @@ func getPodMetas(client internalapi.RuntimeService) (map[string]podMeta, error) 
 			infospec := InfoSpec{}
 			err := json.Unmarshal([]byte(info), &infospec)
 			if err != nil {
-				logger.Warn("parse info spec %s failed with %s", pm.name, err)
+				log.Warnf("parse info spec %s failed with %v", pm.name, err)
 				continue
 			}
 			pm.pid = infospec.Pid

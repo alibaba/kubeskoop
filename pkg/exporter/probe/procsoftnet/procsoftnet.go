@@ -5,13 +5,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
+	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
 
 	"io"
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 
@@ -19,80 +18,61 @@ import (
 )
 
 const (
-	SNProcessed = "Processed"
-	SNDropped   = "Dropped"
+	SNProcessed = "processed"
+	SNDropped   = "dropped"
 
-	ModuleName = "procsoftnet"
+	probeName = "softnet"
 )
 
 var (
-	SoftnetMetrics = []string{SNProcessed, SNDropped}
-	once           = sync.Once{}
-	probe          *ProcSoftnet
+	softnetMetrics = []string{SNProcessed, SNDropped}
 )
+
+func init() {
+	probe.MustRegisterMetricsProbe(probeName, softNetProbeCreator)
+}
+
+func softNetProbeCreator(_ map[string]interface{}) (probe.MetricsProbe, error) {
+	p := &ProcSoftnet{}
+
+	batchMetrics := probe.NewLegacyBatchMetrics(probeName, softnetMetrics, p.CollectOnce)
+
+	return probe.NewMetricsProbe(probeName, p, batchMetrics), nil
+}
 
 type ProcSoftnet struct {
 }
 
-func GetProbe() *ProcSoftnet {
-	once.Do(func() {
-		probe = &ProcSoftnet{}
-	})
-	return probe
-}
-
-func (s *ProcSoftnet) Close(_ proto.ProbeType) error {
+func (s *ProcSoftnet) Start(_ context.Context) error {
 	return nil
 }
 
-func (s *ProcSoftnet) Start(_ context.Context, _ proto.ProbeType) {
+func (s *ProcSoftnet) Stop(_ context.Context) error {
+	return nil
 }
 
-func (s *ProcSoftnet) Ready() bool {
-	if _, err := os.Stat("/proc/net/softnet_stat"); os.IsNotExist(err) {
-		return false
-	}
-	return true
-}
-
-func (s *ProcSoftnet) Name() string {
-	return ModuleName
-}
-
-func (s *ProcSoftnet) GetMetricNames() []string {
-	res := []string{}
-	for _, m := range SoftnetMetrics {
-		res = append(res, metricUniqueID("softnet", m))
-	}
-	return res
-}
-
-func (s *ProcSoftnet) Collect(ctx context.Context) (map[string]map[uint32]uint64, error) {
+func (s *ProcSoftnet) CollectOnce() (map[string]map[uint32]uint64, error) {
 	ets := nettop.GetAllEntity()
 	if len(ets) == 0 {
-		slog.Ctx(ctx).Info("collect", "mod", ModuleName, "ignore", "no entity found")
+		slog.Info("collect", "mod", probeName, "ignore", "no entity found")
 	}
-	return collect(ctx, ets)
+	return collect(ets)
 }
 
-func metricUniqueID(subject string, m string) string {
-	return fmt.Sprintf("%s%s", subject, strings.ToLower(m))
-}
-
-func collect(_ context.Context, nslist []*nettop.Entity) (map[string]map[uint32]uint64, error) {
+func collect(nslist []*nettop.Entity) (map[string]map[uint32]uint64, error) {
 	resMap := make(map[string]map[uint32]uint64)
 
-	for idx := range SoftnetMetrics {
-		resMap[metricUniqueID("softnet", SoftnetMetrics[idx])] = map[uint32]uint64{}
+	for _, m := range softnetMetrics {
+		resMap[m] = map[uint32]uint64{}
 	}
 
-	for idx := range nslist {
-		stat, err := getSoftnetStatByPid(uint32(nslist[idx].GetPid()))
+	for _, ns := range nslist {
+		stat, err := getSoftnetStatByPid(uint32(ns.GetPid()))
 		if err != nil {
 			continue
 		}
-		for indx := range SoftnetMetrics {
-			resMap[metricUniqueID("softnet", SoftnetMetrics[indx])][uint32(nslist[idx].GetNetns())] = stat[SoftnetMetrics[indx]]
+		for _, m := range softnetMetrics {
+			resMap[m][uint32(ns.GetNetns())] = stat[m]
 		}
 	}
 	return resMap, nil
@@ -118,9 +98,9 @@ func getSoftnetStatByPid(pid uint32) (map[string]uint64, error) {
 	}
 
 	res := map[string]uint64{}
-	for idx := range sns {
-		res[SNProcessed] += uint64(sns[idx].Processed)
-		res[SNDropped] += uint64(sns[idx].Dropped)
+	for _, ns := range sns {
+		res[SNProcessed] += uint64(ns.Processed)
+		res[SNDropped] += uint64(ns.Dropped)
 	}
 
 	return res, nil

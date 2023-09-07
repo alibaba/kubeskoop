@@ -3,67 +3,63 @@ package procnetstat
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
 	"strconv"
 	"strings"
 
-	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
+	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
-
-	"golang.org/x/exp/slog"
 )
 
 const (
-	ModuleName = "procnetstat" // nolint
+	probeName = "tcpext" // nolint
 
-	ProtocolTCPExt = "TcpExt"
+	ProtocolTCPExt = "tcpext"
 
-	TCPActiveOpens     = "ActiveOpens"
-	TCPPassiveOpens    = "PassiveOpens"
-	TCPRetransSegs     = "RetransSegs"
-	TCPListenDrops     = "ListenDrops"
-	TCPListenOverflows = "ListenOverflows"
-	TCPSynRetrans      = "TCPSynRetrans"
-	TCPFastRetrans     = "TCPFastRetrans"
-	TCPRetransFail     = "TCPRetransFail"
-	TCPTimeouts        = "TCPTimeouts"
+	TCPActiveOpens     = "activeopens"
+	TCPPassiveOpens    = "passiveopens"
+	TCPRetransSegs     = "retranssegs"
+	TCPListenDrops     = "listendrops"
+	TCPListenOverflows = "listenoverflows"
+	TCPSynRetrans      = "tcpsynretrans"
+	TCPFastRetrans     = "tcpfastretrans"
+	TCPRetransFail     = "tcpretransfail"
+	TCPTimeouts        = "tcptimeouts"
 
-	TCPAbortOnClose        = "TCPAbortOnClose"
-	TCPAbortOnMemory       = "TCPAbortOnMemory"
-	TCPAbortOnTimeout      = "TCPAbortOnTimeout"
-	TCPAbortOnLinger       = "TCPAbortOnLinger"
-	TCPAbortOnData         = "TCPAbortOnData"
-	TCPAbortFailed         = "TCPAbortFailed"
-	TCPACKSkippedSynRecv   = "TCPACKSkippedSynRecv"
-	TCPACKSkippedPAWS      = "TCPACKSkippedPAWS"
-	TCPACKSkippedSeq       = "TCPACKSkippedSeq"
-	TCPACKSkippedFinWait2  = "TCPACKSkippedFinWait2"
-	TCPACKSkippedTimeWait  = "TCPACKSkippedTimeWait"
-	TCPACKSkippedChallenge = "TCPACKSkippedChallenge"
-	TCPRcvQDrop            = "TCPRcvQDrop"
-	PAWSActive             = "PAWSActive"
-	PAWSEstab              = "PAWSEstab"
-	EmbryonicRsts          = "EmbryonicRsts"
-	TCPWinProbe            = "TCPWinProbe"
-	TCPKeepAlive           = "TCPKeepAlive"
-	TCPMTUPFail            = "TCPMTUPFail"
-	TCPMTUPSuccess         = "TCPMTUPSuccess"
-	TCPZeroWindowDrop      = "TCPZeroWindowDrop"
-	TCPBacklogDrop         = "TCPBacklogDrop"
-	PFMemallocDrop         = "PFMemallocDrop"
-	TCPWqueueTooBig        = "TCPWqueueTooBig"
+	TCPAbortOnClose        = "tcpabortonclose"
+	TCPAbortOnMemory       = "tcpabortonmemory"
+	TCPAbortOnTimeout      = "tcpabortontimeout"
+	TCPAbortOnLinger       = "tcpabortonlinger"
+	TCPAbortOnData         = "tcpabortondata"
+	TCPAbortFailed         = "tcpabortfailed"
+	TCPACKSkippedSynRecv   = "tcpackskippedsynrecv"
+	TCPACKSkippedPAWS      = "tcpackskippedpaws"
+	TCPACKSkippedSeq       = "tcpackskippedseq"
+	TCPACKSkippedFinWait2  = "tcpackskippedfinwait2"
+	TCPACKSkippedTimeWait  = "tcpackskippedtimewait"
+	TCPACKSkippedChallenge = "tcpackskippedchallenge"
+	TCPRcvQDrop            = "tcprcvqdrop"
+	PAWSActive             = "pawsactive"
+	PAWSEstab              = "pawsestab"
+	EmbryonicRsts          = "embryonicrsts"
+	TCPWinProbe            = "tcpwinprobe"
+	TCPKeepAlive           = "tcpkeepalive"
+	TCPMTUPFail            = "tcpmtupfail"
+	TCPMTUPSuccess         = "tcpmtupsuccess"
+	TCPZeroWindowDrop      = "tcpzerowindowdrop"
+	TCPBacklogDrop         = "tcpbacklogdrop"
+	PFMemallocDrop         = "pfmemallocdrop"
+	TCPWqueueTooBig        = "tcpwqueuetoobig"
 
-	TCPMemoryPressures       = "TCPMemoryPressures"
-	TCPMemoryPressuresChrono = "TCPMemoryPressuresChrono"
+	TCPMemoryPressures       = "tcpmemorypressures"
+	TCPMemoryPressuresChrono = "tcpmemorypressureschrono"
 )
 
 var (
-	probe = &ProcNetstat{}
-
 	TCPExtMetrics = []string{TCPListenDrops,
 		TCPListenOverflows,
 		TCPSynRetrans,
@@ -98,80 +94,65 @@ var (
 		TCPWqueueTooBig}
 )
 
+func init() {
+	probe.MustRegisterMetricsProbe(probeName, netdevProbeCreator)
+}
+
+func netdevProbeCreator(_ map[string]interface{}) (probe.MetricsProbe, error) {
+	p := &ProcNetstat{}
+
+	batchMetrics := probe.NewLegacyBatchMetrics(probeName, TCPExtMetrics, p.CollectOnce)
+
+	return probe.NewMetricsProbe(probeName, p, batchMetrics), nil
+}
+
 type ProcNetstat struct {
 }
 
-func GetProbe() *ProcNetstat {
-	return probe
-}
-
-func (s *ProcNetstat) Close(_ proto.ProbeType) error {
+func (s *ProcNetstat) Start(_ context.Context) error {
 	return nil
 }
 
-func (s *ProcNetstat) Start(_ context.Context, _ proto.ProbeType) {
+func (s *ProcNetstat) Stop(_ context.Context) error {
+	return nil
 }
 
-func (s *ProcNetstat) Ready() bool {
-	// determine by if default snmp file was ready
-	if _, err := os.Stat("/proc/net/netstat"); os.IsNotExist(err) {
-		return false
-	}
-	return true
-}
-
-func (s *ProcNetstat) Name() string {
-	return ModuleName
-}
-
-func (s *ProcNetstat) GetMetricNames() []string {
-	res := []string{}
-	for _, m := range TCPExtMetrics {
-		res = append(res, metricUniqueID("tcpext", m))
-	}
-	return res
-}
-
-func (s *ProcNetstat) Collect(ctx context.Context) (map[string]map[uint32]uint64, error) {
+func (s *ProcNetstat) CollectOnce() (map[string]map[uint32]uint64, error) {
 	ets := nettop.GetAllEntity()
 	if len(ets) == 0 {
-		slog.Ctx(ctx).Info("collect", "mod", ModuleName, "ignore", "no entity found")
-		return nil, errors.New("no entity to collect")
+		log.Errorf("%s error, no entity found", probeName)
 	}
-	return collect(ctx, ets)
+	return collect(ets)
 }
 
-func collect(ctx context.Context, nslist []*nettop.Entity) (map[string]map[uint32]uint64, error) {
+func collect(nslist []*nettop.Entity) (map[string]map[uint32]uint64, error) {
 	resMap := make(map[string]map[uint32]uint64)
+
 	for _, stat := range TCPExtMetrics {
-		resMap[metricUniqueID("tcpext", stat)] = map[uint32]uint64{}
+		resMap[stat] = make(map[uint32]uint64)
 	}
 
 	for _, et := range nslist {
 		stats, err := getNetstatByPid(uint32(et.GetPid()))
 		if err != nil {
-			slog.Ctx(ctx).Info("collect", "mod", ModuleName, "ignore", "no entity found")
+			log.Errorf("%s failed collect pid %d, err: %v", probeName, et.GetPid(), err)
 			continue
 		}
-		slog.Ctx(ctx).Debug("collect", "mod", ModuleName, "netns", et.GetNetns(), "stats", stats)
+
 		extstats := stats[ProtocolTCPExt]
 		for _, stat := range TCPExtMetrics {
 			if _, ok := extstats[stat]; ok {
 				data, err := strconv.ParseUint(extstats[stat], 10, 64)
 				if err != nil {
-					slog.Ctx(ctx).Warn("collect", "mod", ModuleName, "ignore", stat, "err", err)
+					log.Errorf("%s failed parse stat %s, pid: %d err: %v", probeName, stat, et.GetPid(), err)
 					continue
 				}
-				resMap[metricUniqueID("tcpext", stat)][uint32(et.GetNetns())] += data
+				resMap[stat][uint32(et.GetNetns())] += data
 			}
 		}
 	}
 
 	return resMap, nil
-}
-
-func metricUniqueID(subject string, m string) string {
-	return fmt.Sprintf("%s%s", subject, strings.ToLower(m))
 }
 
 func getNetstatByPid(pid uint32) (map[string]map[string]string, error) {
@@ -214,14 +195,14 @@ func parseNetStats(r io.Reader, fileName string) (map[string]map[string]string, 
 		scanner.Scan()
 		valueParts := strings.Split(scanner.Text(), " ")
 		// Remove trailing :.
-		protocol := nameParts[0][:len(nameParts[0])-1]
+		protocol := strings.ToLower(nameParts[0][:len(nameParts[0])-1])
 		netStats[protocol] = map[string]string{}
 		if len(nameParts) != len(valueParts) {
 			return nil, fmt.Errorf("mismatch field count mismatch in %s: %s",
 				fileName, protocol)
 		}
 		for i := 1; i < len(nameParts); i++ {
-			netStats[protocol][nameParts[i]] = valueParts[i]
+			netStats[protocol][strings.ToLower(nameParts[i])] = valueParts[i]
 		}
 	}
 

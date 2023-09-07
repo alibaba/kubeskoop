@@ -4,12 +4,10 @@ Copyright © 2022 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
 	"github.com/spf13/cobra"
-	"golang.org/x/exp/slog"
 )
 
 // probeCmd represents the probe command
@@ -22,23 +20,16 @@ var (
 				"metric": {},
 				"event":  {},
 			}
-			res["metric"] = probe.ListMetricProbes()
+			res["metrics"] = probe.ListMetricsProbes()
+			res["event"] = probe.ListEventProbes()
 
-			els := probe.ListEvents()
-			for ep := range els {
-				res["event"] = append(res["event"], ep)
-			}
+			for key, l := range res {
+				fmt.Println(key)
+				indent := "    "
+				for _, s := range l {
+					fmt.Printf("%s%s\n", indent, s)
 
-			switch output {
-			case "json":
-				text, err := json.MarshalIndent(res, "", "  ")
-				if err != nil {
-					slog.Warn("json marshal failed", "err", err)
-					return
 				}
-				fmt.Println(string(text))
-			default:
-				sliceMapTextOutput("probes", res)
 			}
 		},
 	}

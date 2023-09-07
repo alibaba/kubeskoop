@@ -9,12 +9,11 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-
-	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
+	"time"
 
 	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
-
-	"golang.org/x/exp/slog"
+	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -29,38 +28,40 @@ const (
 	ProtocolUDPLite  = "UdpLite"
 
 	// metrics of tcp
-	TCPActiveOpens     = "ActiveOpens"
-	TCPPassiveOpens    = "PassiveOpens"
-	TCPRetransSegs     = "RetransSegs"
-	TCPListenDrops     = "ListenDrops"
-	TCPListenOverflows = "ListenOverflows"
-	TCPSynRetrans      = "TCPSynRetrans"
-	TCPFastRetrans     = "TCPFastRetrans"
-	TCPRetransFail     = "TCPRetransFail"
-	TCPTimeouts        = "TCPTimeouts"
-	TCPAttemptFails    = "AttemptFails"
-	TCPEstabResets     = "EstabResets"
-	TCPCurrEstab       = "CurrEstab"
-	TCPInSegs          = "InSegs"
-	TCPOutSegs         = "OutSegs"
-	TCPInErrs          = "InErrs"
-	TCPOutRsts         = "OutRsts"
+	TCPActiveOpens     = "activeopens"
+	TCPPassiveOpens    = "passiveopens"
+	TCPRetransSegs     = "retranssegs"
+	TCPListenDrops     = "listendrops"
+	TCPListenOverflows = "listenoverflows"
+	TCPSynRetrans      = "tcpsynretrans"
+	TCPFastRetrans     = "tcpfastretrans"
+	TCPRetransFail     = "tcpretransfail"
+	TCPTimeouts        = "tcptimeouts"
+	TCPAttemptFails    = "attemptfails"
+	TCPEstabResets     = "estabresets"
+	TCPCurrEstab       = "currestab"
+	TCPInSegs          = "insegs"
+	TCPOutSegs         = "outsegs"
+	TCPInErrs          = "inerrs"
+	TCPOutRsts         = "outrsts"
 
 	// metrics of udp
-	UDPInDatagrams  = "InDatagrams"
-	UDPNoPorts      = "NoPorts"
-	UDPInErrors     = "InErrors"
-	UDPOutDatagrams = "OutDatagrams"
-	UDPRcvbufErrors = "RcvbufErrors"
-	UDPSndbufErrors = "SndbufErrors"
-	UDPInCsumErrors = "InCsumErrors"
-	UDPIgnoredMulti = "IgnoredMulti"
+	UDPInDatagrams  = "indatagrams"
+	UDPNoPorts      = "noports"
+	UDPInErrors     = "inerrors"
+	UDPOutDatagrams = "outdatagrams"
+	UDPRcvbufErrors = "rcvbuferrors"
+	UDPSndbufErrors = "sndbuferrors"
+	UDPInCsumErrors = "incsumerrors"
+	UDPIgnoredMulti = "ignoredmulti"
 
 	//metrics of ip
-	IPInNoRoutes      = "InNoRoutes"
-	IPInTruncatedPkts = "InTruncatedPkts"
+	IPInNoRoutes      = "innoroutes"
+	IPInTruncatedPkts = "intruncatedpkts"
 
-	ModuleName = "procsnmp" // nolint
+	TCP = "tcp"
+	UDP = "udp"
+	IP  = "ip"
 )
 
 var (
@@ -68,75 +69,87 @@ var (
 	UDPStatMetrics = []string{UDPInDatagrams, UDPNoPorts, UDPInErrors, UDPOutDatagrams, UDPRcvbufErrors, UDPSndbufErrors, UDPInCsumErrors, UDPIgnoredMulti}
 	IPMetrics      = []string{IPInNoRoutes, IPInTruncatedPkts}
 
-	probe *ProcSNMP
-	once  sync.Once
+	metricsMap = map[string][]string{
+		TCP: TCPStatMetrcis,
+		UDP: UDPStatMetrics,
+		IP:  IPMetrics,
+	}
+
+	cache = &snmpCache{
+		cache: make(map[string]map[string]map[uint32]uint64),
+	}
 )
 
-func GetProbe() *ProcSNMP {
-	once.Do(func() {
-		probe = &ProcSNMP{}
-	})
-	return probe
+func init() {
+	probe.MustRegisterMetricsProbe(TCP, newSnmpProbeCreator(TCP))
+	probe.MustRegisterMetricsProbe(UDP, newSnmpProbeCreator(UDP))
+	probe.MustRegisterMetricsProbe(IP, newSnmpProbeCreator(IP))
 }
 
-type ProcSNMP struct {
+func newSnmpProbeCreator(probeName string) probe.MetricsProbeCreator {
+	return func(args map[string]interface{}) (probe.MetricsProbe, error) {
+		p := &procSNMP{
+			name: probeName,
+		}
+		metrics := metricsMap[probeName]
+		batchMetrics := probe.NewLegacyBatchMetrics(probeName, metrics, p.CollectOnce)
+		return probe.NewMetricsProbe(probeName, p, batchMetrics), nil
+	}
 }
 
-func (s *ProcSNMP) Close(_ proto.ProbeType) error {
+type procSNMP struct {
+	name string
+}
+
+func (s *procSNMP) Start(_ context.Context) error {
 	return nil
 }
 
-func (s *ProcSNMP) Start(_ context.Context, _ proto.ProbeType) {
+func (s *procSNMP) Stop(_ context.Context) error {
+	return nil
 }
 
-func (s *ProcSNMP) Ready() bool {
-	// determine by if default snmp file was ready
-	if _, err := os.Stat("/proc/net/snmp"); os.IsNotExist(err) {
-		return false
-	}
-	return true
+func (s *procSNMP) CollectOnce() (map[string]map[uint32]uint64, error) {
+	return cache.get(s.name)
 }
 
-func (s *ProcSNMP) Name() string {
-	return ModuleName
+type snmpCache struct {
+	cache map[string]map[string]map[uint32]uint64
+	err   error
+	last  time.Time
+	lock  sync.Mutex
 }
 
-func (s *ProcSNMP) GetMetricNames() []string {
-	res := []string{}
-	for _, m := range TCPStatMetrcis {
-		res = append(res, fmt.Sprintf("tcp%s", strings.ToLower(m)))
+func (c *snmpCache) get(name string) (map[string]map[uint32]uint64, error) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if c.err != nil {
+		return nil, c.err
 	}
-	for _, m := range UDPStatMetrics {
-		res = append(res, fmt.Sprintf("udp%s", strings.ToLower(m)))
+
+	if time.Since(c.last) > time.Second*2 {
+		c.reload()
 	}
-	for _, m := range IPMetrics {
-		res = append(res, fmt.Sprintf("ip%s", strings.ToLower(m)))
-	}
-	return res
+
+	return c.cache[name], nil
 }
 
-func (s *ProcSNMP) Collect(ctx context.Context) (map[string]map[uint32]uint64, error) {
-	ets := nettop.GetAllEntity()
-	if len(ets) == 0 {
-		slog.Ctx(ctx).Info("collect", "mod", ModuleName, "ignore", "no entity found")
-	}
-	return collect(ctx, ets)
+func (c *snmpCache) reload() {
+	c.cache, c.err = collect()
+	c.last = time.Now()
 }
 
-func metricUniqueID(subject string, m string) string {
-	return fmt.Sprintf("%s%s", strings.ToLower(subject), strings.ToLower(m))
-}
+func collect() (map[string]map[string]map[uint32]uint64, error) {
+	entitys := nettop.GetAllEntity()
 
-func collect(ctx context.Context, entitys []*nettop.Entity) (map[string]map[uint32]uint64, error) {
-	res := map[string]map[uint32]uint64{}
-	for _, m := range TCPStatMetrcis {
-		res[metricUniqueID("tcp", m)] = map[uint32]uint64{}
-	}
-	for _, m := range UDPStatMetrics {
-		res[metricUniqueID("udp", m)] = map[uint32]uint64{}
-	}
-	for _, m := range IPMetrics {
-		res[metricUniqueID("ip", m)] = map[uint32]uint64{}
+	res := make(map[string]map[string]map[uint32]uint64)
+
+	for proto, metricsList := range metricsMap {
+		res[proto] = make(map[string]map[uint32]uint64)
+		for _, metrics := range metricsList {
+			res[proto][metrics] = make(map[uint32]uint64)
+		}
 	}
 
 	for _, et := range entitys {
@@ -146,22 +159,21 @@ func collect(ctx context.Context, entitys []*nettop.Entity) (map[string]map[uint
 
 			stats, err := getNetstatByPid(pid)
 			if err != nil {
-				slog.Ctx(ctx).Debug("get netstat failed", "pid", pid, "nsinum", nsinum, "err", err)
+				log.Errorf("%s failed get netstat, pid: %d, nsinum: %d, err: %v", "snmp", pid, nsinum, err)
 				continue
 			}
 
 			for proto, stat := range stats {
 				for k, v := range stat {
-					mkey := metricUniqueID(proto, k)
-					slog.Ctx(ctx).Debug("store metric", "metric", mkey, "pid", pid, "nsinum", nsinum, "value", v)
 					data, err := strconv.ParseInt(v, 10, 64)
 					if err != nil {
-						slog.Ctx(ctx).Debug("parse netstat value", "metric", mkey, "pid", pid, "nsinum", nsinum, "value", v, "err", err)
+						log.Errorf("%s failed parse netstat value, pid: %d, nsinum: %d, key: %s value: %s, err: %v", "snmp", pid, nsinum, k, v, err)
 						continue
 					}
 					// ignore unaware metric
-					if _, ok := res[mkey]; ok {
-						res[mkey][uint32(nsinum)] = uint64(data)
+
+					if _, ok := res[proto][k]; ok {
+						res[proto][k][uint32(nsinum)] = uint64(data)
 					}
 				}
 			}
@@ -211,14 +223,14 @@ func parseNetStats(r io.Reader, fileName string) (map[string]map[string]string, 
 		scanner.Scan()
 		valueParts := strings.Split(scanner.Text(), " ")
 		// Remove trailing :.
-		protocol := nameParts[0][:len(nameParts[0])-1]
+		protocol := strings.ToLower(nameParts[0][:len(nameParts[0])-1])
 		netStats[protocol] = map[string]string{}
 		if len(nameParts) != len(valueParts) {
 			return nil, fmt.Errorf("mismatch field count mismatch in %s: %s",
 				fileName, protocol)
 		}
 		for i := 1; i < len(nameParts); i++ {
-			netStats[protocol][nameParts[i]] = valueParts[i]
+			netStats[protocol][strings.ToLower(nameParts[i])] = valueParts[i]
 		}
 	}
 

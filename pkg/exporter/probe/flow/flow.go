@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"strings"
 
+	probe2 "github.com/alibaba/kubeskoop/pkg/exporter/probe"
+
 	"github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
-	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/rlimit"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
-	log "golang.org/x/exp/slog"
 	"golang.org/x/sys/unix"
 )
 
@@ -30,16 +31,11 @@ const (
 )
 
 var (
-	probe   proto.MetricProbe = &Probe{}
-	dev                       = "eth0" //TODO 通过参数指定设备名称
-	bpfObjs                   = bpfObjects{}
+	dev     = "eth0"
+	bpfObjs = bpfObjects{}
 )
 
-func GetProbe() proto.MetricProbe {
-	return probe
-
-}
-func (f *Probe) Start(_ context.Context, _ proto.ProbeType) {
+func (f *Probe) Start(_ context.Context, _ probe2.Type) {
 	log.Info("flow probe starting...")
 
 	eth0, err := netlink.LinkByName(dev)
@@ -197,7 +193,7 @@ func replaceQdisc(link netlink.Link) error {
 	return netlink.QdiscReplace(qdisc)
 }
 
-func (f *Probe) Close(_ proto.ProbeType) error {
+func (f *Probe) Close(_ probe2.Type) error {
 	if f.enable {
 		return bpfObjs.Close()
 	}

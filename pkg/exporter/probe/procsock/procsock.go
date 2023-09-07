@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
+	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
 
 	"io"
 	"os"
@@ -20,60 +20,43 @@ import (
 )
 
 const (
-	TCPSockInuse    = "Inuse"
-	TCPSockOrphan   = "Orphan"
-	TCPSockTimewait = "TW"
-	TCPSockeAlloc   = "Alloc"
-	TCPSockeMem     = "Mem"
-
-	ModuleName = "procsock"
+	TCPSockInuse    = "inuse"
+	TCPSockOrphan   = "orphan"
+	TCPSockTimewait = "tw"
+	TCPSockeAlloc   = "alloc"
+	TCPSockeMem     = "mem"
 )
 
 var (
 	TCPSockStatMetrics = []string{TCPSockInuse, TCPSockOrphan, TCPSockTimewait, TCPSockeAlloc, TCPSockeMem}
-	probe              = &ProcSock{}
+	probeName          = "sock"
 )
 
-func GetProbe() *ProcSock {
-	return probe
+func init() {
+	probe.MustRegisterMetricsProbe(probeName, sockProbeCreator)
 }
 
-func (s *ProcSock) Close(_ proto.ProbeType) error {
-	return nil
+func sockProbeCreator(_ map[string]interface{}) (probe.MetricsProbe, error) {
+	p := &ProcSock{}
+
+	batchMetrics := probe.NewLegacyBatchMetrics(probeName, TCPSockStatMetrics, p.CollectOnce)
+
+	return probe.NewMetricsProbe(probeName, p, batchMetrics), nil
 }
 
-func (s *ProcSock) Start(_ context.Context, _ proto.ProbeType) {
-}
-
-func (s *ProcSock) Ready() bool {
-	// determine by if default snmp file was ready
-	if _, err := os.Stat("/proc/net/sockstat"); os.IsNotExist(err) {
-		return false
-	}
-	return true
-}
-
-func (s *ProcSock) Name() string {
-	return ModuleName
-}
-
-func (s *ProcSock) GetMetricNames() []string {
-	res := []string{}
-	for _, m := range TCPSockStatMetrics {
-		res = append(res, metricUniqueID("sock", m))
-	}
-	return res
-}
-
-func (s *ProcSock) Collect(ctx context.Context) (map[string]map[uint32]uint64, error) {
-	return collect(ctx)
-}
-
-func metricUniqueID(subject string, m string) string {
-	return fmt.Sprintf("%s%s", subject, strings.ToLower(m))
+func (s *ProcSock) CollectOnce() (map[string]map[uint32]uint64, error) {
+	return collect()
 }
 
 type ProcSock struct {
+}
+
+func (s *ProcSock) Start(_ context.Context) error {
+	return nil
+}
+
+func (s *ProcSock) Stop(_ context.Context) error {
+	return nil
 }
 
 type tcpsockstat struct {
@@ -84,10 +67,10 @@ type tcpsockstat struct {
 	Mem    int
 }
 
-func collect(_ context.Context) (resMap map[string]map[uint32]uint64, err error) {
+func collect() (resMap map[string]map[uint32]uint64, err error) {
 	resMap = make(map[string]map[uint32]uint64)
 	for _, stat := range TCPSockStatMetrics {
-		resMap[metricUniqueID("sock", stat)] = map[uint32]uint64{}
+		resMap[stat] = map[uint32]uint64{}
 	}
 
 	// for _, nslogic := range nslist {
@@ -107,11 +90,11 @@ func collect(_ context.Context) (resMap map[string]map[uint32]uint64, err error)
 		return resMap, err
 	}
 	nsinum := uint32(nettop.InitNetns)
-	resMap[metricUniqueID("sock", TCPSockInuse)][nsinum] = uint64(skstat.InUse)
-	resMap[metricUniqueID("sock", TCPSockOrphan)][nsinum] = uint64(skstat.Orphan)
-	resMap[metricUniqueID("sock", TCPSockTimewait)][nsinum] = uint64(skstat.TW)
-	resMap[metricUniqueID("sock", TCPSockeAlloc)][nsinum] = uint64(skstat.Alloc)
-	resMap[metricUniqueID("sock", TCPSockeMem)][nsinum] = uint64(skstat.Mem)
+	resMap[TCPSockInuse][nsinum] = uint64(skstat.InUse)
+	resMap[TCPSockOrphan][nsinum] = uint64(skstat.Orphan)
+	resMap[TCPSockTimewait][nsinum] = uint64(skstat.TW)
+	resMap[TCPSockeAlloc][nsinum] = uint64(skstat.Alloc)
+	resMap[TCPSockeMem][nsinum] = uint64(skstat.Mem)
 
 	return
 }
