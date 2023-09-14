@@ -50,6 +50,15 @@ func KernelRelease() (string, error) {
 	return unix.ByteSliceToString(uname.Release[:]), nil
 }
 
+func KernelArch() (string, error) {
+	var uname unix.Utsname
+	if err := unix.Uname(&uname); err != nil {
+		return "", fmt.Errorf("uname failed: %w", err)
+	}
+
+	return unix.ByteSliceToString(uname.Machine[:]), nil
+}
+
 // LoadBTFSpecOrNil once error occurs in load process, return nil and use system raw spec instead
 func LoadBTFSpecOrNil() *btf.Spec {
 	var (
@@ -60,7 +69,7 @@ func LoadBTFSpecOrNil() *btf.Spec {
 		btffile = kernelBTFPath
 	} else if os.IsNotExist(err) {
 		for _, btfPath := range []string{BTFPATH, bpfSharePath, userCustomBtfPath} {
-			btffile, err = findBTFFileWithPath(btfPath)
+			btffile, err = FindBTFFileWithPath(btfPath)
 			if err == nil {
 				break
 			}
@@ -85,7 +94,7 @@ func LoadBTFSpecOrNil() *btf.Spec {
 	return spec
 }
 
-func findBTFFileWithPath(path string) (string, error) {
+func FindBTFFileWithPath(path string) (string, error) {
 	path = filepath.Clean(path)
 
 	v, err := KernelRelease()

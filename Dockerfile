@@ -28,5 +28,7 @@ RUN apk add --no-cache \
 COPY --from=build /go/src/github.com/alibaba/kubeskoop/bin/inspector /bin/inspector
 COPY --from=build /go/src/github.com/alibaba/kubeskoop/bin/pod-collector /bin/pod-collector
 COPY --from=build /go/src/github.com/alibaba/kubeskoop/bin/skoop /bin/skoop
+COPY --from=build /go/src/github.com/alibaba/kubeskoop/bin/btfhack /bin/btfhack
+
 COPY tools/scripts/* /bin/
 COPY deploy/resource/kubeskoop-exporter-dashboard.json /etc/

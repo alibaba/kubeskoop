@@ -31,13 +31,13 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       initContainers:
         - name: inspector-prepare
-          image: registry.cn-hangzhou.aliyuncs.com/acs/btfhack:latest
+          image: "kubeskoop/kubeskoop:latest"
           volumeMounts:
             - name: btf-rawdata
               mountPath: /etc/net-exporter/btf
             - mountPath: /boot/
               name: boot
-          command: [btfhack, discover,-p ,/etc/net-exporter/btf/]
+          command: [btfhack, discover, -p, /etc/net-exporter/btf/]
       containers:
       - image: "kubeskoop/kubeskoop:latest"
         name: inspector

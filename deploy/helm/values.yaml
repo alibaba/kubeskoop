@@ -11,7 +11,7 @@ image:
 
 initContainer:
   enabled: true
-  repository: registry.cn-hangzhou.aliyuncs.com/acs/btfhack
+  repository: kubeskoop/kubeskoop
   tag: latest
   imagePullPolicy: Always
 

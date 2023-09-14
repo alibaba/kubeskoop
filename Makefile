@@ -14,7 +14,7 @@ GIT_COMMIT=${shell git rev-parse HEAD}
 ldflags="-X $(VERSION_PKG).Version=$(TAG) -X $(VERSION_PKG).Commit=${GIT_COMMIT}"
 
 .PHONY: all
-all: build-exporter build-skoop build-collector
+all: build-exporter build-skoop build-collector build-btfhack
 
 .PHONY: fmt
 fmt:
@@ -35,6 +35,10 @@ build-skoop:
 .PHONY: build-collector
 build-collector:
 	CGO_ENABLED=0 go build -o bin/pod-collector -ldflags $(ldflags) ./cmd/collector
+
+.PHONY: build-btfhack
+build-btfhack:
+	CGO_ENABLED=0 go build -o bin/btfhack -ldflags $(ldflags) ./cmd/btfhack
 
 .PHONY: image
 image: ## build kubeskoop image
