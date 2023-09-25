@@ -1,5 +1,5 @@
 debugmode: true
-port: 10080
+port: 9102
 metrics:
   probes:
   - name: conntrack
@@ -24,4 +24,7 @@ event:
   - name: file
     args:
       path: /tmp/exporter.json
+  - name: loki
+    args:
+      addr: 127.0.0.1:3100
 
