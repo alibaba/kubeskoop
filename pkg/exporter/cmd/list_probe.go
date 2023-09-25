@@ -16,10 +16,7 @@ var (
 		Use:   "probe",
 		Short: "list supported probe with metric exporting",
 		Run: func(cmd *cobra.Command, args []string) {
-			res := map[string][]string{
-				"metric": {},
-				"event":  {},
-			}
+			res := make(map[string][]string)
 			res["metrics"] = probe.ListMetricsProbes()
 			res["event"] = probe.ListEventProbes()
 
