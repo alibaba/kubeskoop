@@ -3,6 +3,7 @@ package nettop
 import (
 	"context"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"net"
 	"net/url"
 	"os"
@@ -589,9 +590,9 @@ func (r *remoteRuntimeService) determineAPIVersion(conn *grpc.ClientConn) error 
 
 	r.runtimeClient = runtimeapi.NewRuntimeServiceClient(conn)
 
-	_, err := r.runtimeClient.Version(ctx, &runtimeapi.VersionRequest{})
-
-	if status.Code(err) == codes.Unimplemented {
+	if _, err := r.runtimeClient.Version(ctx, &runtimeapi.VersionRequest{}); err == nil {
+		log.Warn("Using CRI v1 runtime API")
+	} else if status.Code(err) == codes.Unimplemented {
 		r.runtimeClientV1alpha2 = runtimeapiV1alpha2.NewRuntimeServiceClient(conn)
 	} else {
 		return fmt.Errorf("unable to determine runtime API version: %w", err)
