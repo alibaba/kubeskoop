@@ -20,12 +20,12 @@ type legacyBatchMetrics struct {
 
 func legacyMetricsName(module string, name string, underscore bool) string {
 	if underscore {
-		return fmt.Sprintf("%s_pod_%s_%s", defaultNamespace, module, name)
+		return fmt.Sprintf("%s_pod_%s_%s", LegacyMetricsNamespace, module, name)
 	}
-	return fmt.Sprintf("%s_pod_%s%s", defaultNamespace, module, name)
+	return fmt.Sprintf("%s_pod_%s%s", LegacyMetricsNamespace, module, name)
 }
 func newMetricsName(module, name string) string {
-	return prometheus.BuildFQName(newNamespace, module, name)
+	return prometheus.BuildFQName(MetricsNamespace, module, name)
 }
 
 type LegacyCollector func() (map[string]map[uint32]uint64, error)

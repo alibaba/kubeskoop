@@ -4,13 +4,14 @@ import (
 	"errors"
 	"fmt"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slog"
 )
 
-const defaultNamespace = "inspector"
-const newNamespace = "kubeskoop"
+const LegacyMetricsNamespace = "inspector"
+const MetricsNamespace = "kubeskoop"
 
 var (
 	availableMetricsProbes = make(map[string]MetricsProbeCreator)
@@ -45,7 +46,7 @@ func ListMetricsProbes() []string {
 	return ret
 }
 
-type Emit func(name string, labels []string, val float64) error
+type Emit func(name string, labels []string, val float64)
 
 type Collector func(emit Emit) error
 
@@ -71,6 +72,7 @@ type metricsInfo struct {
 }
 
 type BatchMetrics struct {
+	name           string
 	infoMap        map[string]*metricsInfo
 	ProbeCollector Collector
 }
@@ -93,6 +95,7 @@ func NewBatchMetrics(opts BatchMetricsOpts, probeCollector Collector) *BatchMetr
 	}
 
 	return &BatchMetrics{
+		name:           fmt.Sprintf("%s_%s", opts.Namespace, opts.Subsystem),
 		infoMap:        m,
 		ProbeCollector: probeCollector,
 	}
@@ -105,22 +108,18 @@ func (b *BatchMetrics) Describe(descs chan<- *prometheus.Desc) {
 }
 
 func (b *BatchMetrics) Collect(metrics chan<- prometheus.Metric) {
-	emit := func(name string, labels []string, val float64) error {
+	emit := func(name string, labels []string, val float64) {
 		info, ok := b.infoMap[name]
 		if !ok {
-			return ErrUndeclaredMetrics
+			log.Errorf("%s undeclared metrics %s", b.name, name)
+			return
 		}
-		m, err := prometheus.NewConstMetric(info.desc, info.valueType, val, labels...)
-		if err != nil {
-			return err
-		}
-		metrics <- m
-		return nil
+		metrics <- prometheus.MustNewConstMetric(info.desc, info.valueType, val, labels...)
 	}
 
 	err := b.ProbeCollector(emit)
 	if err != nil {
-		slog.Error("error collect", err)
+		log.Errorf("%s error collect, err: %v", b.name, err)
 		return
 	}
 }
