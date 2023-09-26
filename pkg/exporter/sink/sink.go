@@ -7,6 +7,12 @@ import (
 	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
 )
 
+const (
+	Stderr = "stderr"
+	File   = "file"
+	Loki   = "loki"
+)
+
 type Sink interface {
 	Write(event *probe.Event) error
 }
@@ -16,12 +22,12 @@ func CreateSink(name string, args interface{}) (Sink, error) {
 	argsMap, _ := args.(map[string]interface{})
 
 	switch name {
-	case "stderr":
+	case Stderr:
 		return NewStderrSink(), nil
-	case "loki":
+	case Loki:
 		addr := argsMap["addr"].(string)
 		return NewLokiSink(addr, nettop.GetNodeName())
-	case "file":
+	case File:
 		path := argsMap["path"].(string)
 		return NewFileSink(path)
 	}

@@ -29,6 +29,7 @@ func (f *FileSink) Write(event *probe.Event) error {
 		return fmt.Errorf("failed marshal event, err: %w", err)
 	}
 	_, err = f.file.Write(data)
+	f.file.Write([]byte{0x0a})
 
 	if err != nil {
 		return fmt.Errorf("failed sink event to file %s, err: %w", f.file.Name(), err)
