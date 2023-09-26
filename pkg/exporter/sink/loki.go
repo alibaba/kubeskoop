@@ -63,12 +63,10 @@ type LokiSink struct {
 }
 
 func (l *LokiSink) Write(event *probe.Event) error {
-	log.Error("try sink event in loki")
 	data, err := json.Marshal(event)
 	if err != nil {
 		return fmt.Errorf("failed marshal event, err: %w", err)
 	}
-	log.Error("after sink event in loki, data: %v", string(data))
 
 	l.client.Infof(string(data))
 	return nil
