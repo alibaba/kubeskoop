@@ -117,28 +117,28 @@ apiVersion: v1
 data:
   config.yaml: |-
     debugmode: true
-    metric_config:
-      interval: 15
-      port: 9102
+    port: 9102
+    metrics:
       probes:
-      - netdev
-      - io
-      - socketlatency
-      - packetloss
-      - sock
-      - tcpsummary
-      - tcp
-      - tcpext
-      - udp
-      - net_softirq
-      - virtcmdlatency
-    event_config:
-      port: 19102
-      loki_enable: true
-      loki_address: loki-service
+      - name: netdev
+      - name: io
+      - name: socketlatency
+      - name: packetloss
+      - name: sock
+      - name: tcpsummary
+      - name: tcp
+      - name: tcpext
+      - name: udp
+      - name: packetloss
+    event:
       probes:
-      - tcpreset
-      - packetloss
+      - name: packetloss
+      - name: tcpreset
+      sinks:
+      - name: stderr
+      - name: loki
+        args:
+          addr: loki-service
 kind: ConfigMap
 metadata:
   name: kubeskoop-config

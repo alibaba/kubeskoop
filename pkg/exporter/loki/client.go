@@ -10,10 +10,10 @@ import (
 	"sync"
 	"time"
 
+	inspproto "github.com/alibaba/kubeskoop/pkg/exporter/probe"
+
 	"github.com/alibaba/kubeskoop/pkg/exporter/loki/logproto"
 	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
-	inspproto "github.com/alibaba/kubeskoop/pkg/exporter/proto"
-
 	"github.com/golang/snappy"
 	"golang.org/x/exp/slog"
 	"google.golang.org/protobuf/proto"

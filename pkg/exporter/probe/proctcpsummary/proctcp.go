@@ -5,28 +5,26 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-
-	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
-
 	"io"
 	"net"
 	"os"
 	"strconv"
 	"strings"
 
-	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
+	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
+	log "github.com/sirupsen/logrus"
 
-	"golang.org/x/exp/slog"
+	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 )
 
 const (
 	ModuleName = "proctcpsummary"
 
-	TCPEstablishedConn = "tcpsummarytcpestablishedconn"
-	TCPTimewaitConn    = "tcpsummarytcptimewaitconn"
-	TCPTXQueue         = "tcpsummarytcptxqueue"
-	TCPRXQueue         = "tcpsummarytcprxqueue"
-	TCPListenBacklog   = "tcpsummarytcplistenbacklog"
+	TCPEstablishedConn = "tcpestablishedconn"
+	TCPTimewaitConn    = "tcptimewaitconn"
+	TCPTXQueue         = "tcptxqueue"
+	TCPRXQueue         = "tcprxqueue"
+	TCPListenBacklog   = "tcplistenbacklog"
 
 	// st mapping of tcp state
 	/*TCPEstablished:1   TCP_SYN_SENT:2
@@ -70,49 +68,42 @@ type (
 )
 
 var (
-	probe             = &ProcTCP{}
 	TCPSummaryMetrics = []string{TCPEstablishedConn, TCPTimewaitConn, TCPTXQueue, TCPRXQueue}
+	probeName         = "tcpsummary"
 )
+
+func init() {
+	probe.MustRegisterMetricsProbe(probeName, softNetProbeCreator)
+}
+
+func softNetProbeCreator(_ map[string]interface{}) (probe.MetricsProbe, error) {
+	p := &ProcTCP{}
+
+	batchMetrics := probe.NewLegacyBatchMetrics(probeName, TCPSummaryMetrics, p.CollectOnce)
+
+	return probe.NewMetricsProbe(probeName, p, batchMetrics), nil
+}
 
 type ProcTCP struct {
 }
 
-func GetProbe() *ProcTCP {
-	return probe
-}
-
-func (s *ProcTCP) Close(_ proto.ProbeType) error {
+func (s *ProcTCP) Start(_ context.Context) error {
 	return nil
 }
 
-func (s *ProcTCP) Start(_ context.Context, _ proto.ProbeType) {
+func (s *ProcTCP) Stop(_ context.Context) error {
+	return nil
 }
 
-func (s *ProcTCP) Ready() bool {
-	// determine by if default tcp file was ready
-	if _, err := os.Stat("/proc/net/tcp"); os.IsNotExist(err) {
-		return false
-	}
-	return true
-}
-
-func (s *ProcTCP) Name() string {
-	return ModuleName
-}
-
-func (s *ProcTCP) GetMetricNames() []string {
-	return TCPSummaryMetrics
-}
-
-func (s *ProcTCP) Collect(ctx context.Context) (map[string]map[uint32]uint64, error) {
+func (s *ProcTCP) CollectOnce() (map[string]map[uint32]uint64, error) {
 	ets := nettop.GetAllEntity()
 	if len(ets) == 0 {
-		slog.Ctx(ctx).Info("collect", "mod", ModuleName, "ignore", "no entity found")
+		log.Infof("failed collect tcp summary, no entity found")
 	}
-	return collect(ctx, ets), nil
+	return collect(ets), nil
 }
 
-func collect(ctx context.Context, pidlist []*nettop.Entity) map[string]map[uint32]uint64 {
+func collect(pidlist []*nettop.Entity) map[string]map[uint32]uint64 {
 	resMap := make(map[string]map[uint32]uint64)
 
 	for idx := range TCPSummaryMetrics {
@@ -120,14 +111,15 @@ func collect(ctx context.Context, pidlist []*nettop.Entity) map[string]map[uint3
 	}
 
 	for idx := range pidlist {
-		summary, err := newNetTCP(fmt.Sprintf("/proc/%d/net/tcp", pidlist[idx].GetPid()))
+		path := fmt.Sprintf("/proc/%d/net/tcp", pidlist[idx].GetPid())
+		summary, err := newNetTCP(path)
 		if err != nil {
-			slog.Ctx(ctx).Warn("collect tcp", "mod", ModuleName, "err", err, "pid", pidlist[idx])
+			log.Warnf("failed collect tcp, path %s, err: %v", path, err)
 			continue
 		}
 		summary6, err := newNetTCP(fmt.Sprintf("/proc/%d/net/tcp6", pidlist[idx].GetPid()))
 		if err != nil {
-			slog.Ctx(ctx).Warn("collect tcp6", "mod", ModuleName, "err", err, "pid", pidlist[idx])
+			log.Warnf("failed collect tcp6, path %s, err: %v", path, err)
 			continue
 		}
 		est, tw := summary.getEstTwCount()

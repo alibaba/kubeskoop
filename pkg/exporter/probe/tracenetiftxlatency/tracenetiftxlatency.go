@@ -6,21 +6,21 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"log"
 	"math/bits"
 	"sync"
+	"time"
 	"unsafe"
 
-	"github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
-	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
-	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
+	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
+	"github.com/alibaba/kubeskoop/pkg/exporter/util"
+	log "github.com/sirupsen/logrus"
 
+	"github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
 	"github.com/cilium/ebpf/ringbuf"
 	"github.com/cilium/ebpf/rlimit"
-	"golang.org/x/exp/slog"
 )
 
 // nolint
@@ -32,80 +32,167 @@ const (
 )
 
 var (
-	ModuleName = "insp_netiftxlat" // nolint
-
-	probe      = &NetifTxlatencyProbe{once: sync.Once{}, enabledProbes: map[proto.ProbeType]bool{}}
-	links      = []link.Link{}
-	events     = []string{"TXLAT_QDISC_100MS", "TXLAT_NETDEV_100MS"}
-	metrics    = []string{TXLAT_QDISC_SLOW, TXLAT_NETDEV_SLOW}
-	metricsMap = map[string]map[uint32]uint64{}
-
-	perfReader *perf.Reader
+	metrics              = []string{TXLAT_QDISC_SLOW, TXLAT_NETDEV_SLOW}
+	probeName            = "netiftxlat"
+	_netifTxlatencyProbe = &netifTxlatencyProbe{}
 )
 
-func GetProbe() *NetifTxlatencyProbe {
-	return probe
-}
-
 func init() {
-	for m := range metrics {
-		metricsMap[metrics[m]] = map[uint32]uint64{}
+	probe.MustRegisterMetricsProbe(probeName, metricsProbeCreator)
+	probe.MustRegisterEventProbe(probeName, eventProbeCreator)
+}
+
+func metricsProbeCreator(_ map[string]interface{}) (probe.MetricsProbe, error) {
+	p := &metricsProbe{}
+	batchMetrics := probe.NewLegacyBatchMetrics(probeName, metrics, p.CollectOnce)
+
+	return probe.NewMetricsProbe(probeName, p, batchMetrics), nil
+}
+
+func eventProbeCreator(sink chan<- *probe.Event, _ map[string]interface{}) (probe.EventProbe, error) {
+	p := &eventProbe{
+		sink: sink,
 	}
+	return probe.NewEventProbe(probeName, p), nil
 }
 
-type NetifTxlatencyProbe struct {
-	enable        bool
-	once          sync.Once
-	sub           chan<- proto.RawEvent
-	mtx           sync.Mutex
-	enabledProbes map[proto.ProbeType]bool
+type metricsProbe struct {
 }
 
-func (p *NetifTxlatencyProbe) Name() string {
-	return ModuleName
+func (p *metricsProbe) Start(_ context.Context) error {
+	return _netifTxlatencyProbe.start(probe.ProbeTypeMetrics)
 }
 
-func (p *NetifTxlatencyProbe) Start(ctx context.Context, probeType proto.ProbeType) {
-	if p.enable {
-		p.enabledProbes[probeType] = true
-		return
+func (p *metricsProbe) Stop(_ context.Context) error {
+	return _netifTxlatencyProbe.stop(probe.ProbeTypeMetrics)
+}
+
+func (p *metricsProbe) CollectOnce() (map[string]map[uint32]uint64, error) {
+	return _netifTxlatencyProbe.copyMetricsMap(), nil
+}
+
+type eventProbe struct {
+	sink chan<- *probe.Event
+}
+
+func (e *eventProbe) Start(_ context.Context) error {
+	err := _netifTxlatencyProbe.start(probe.ProbeTypeEvent)
+	if err != nil {
+		return err
 	}
 
-	// 将eBPF程序进行link
-	p.once.Do(func() {
-		err := start()
-		if err != nil {
-			slog.Ctx(ctx).Warn("start", "module", ModuleName, "err", err)
-			return
+	_netifTxlatencyProbe.sink = e.sink
+	return nil
+}
+
+func (e *eventProbe) Stop(_ context.Context) error {
+	return _netifTxlatencyProbe.stop(probe.ProbeTypeEvent)
+}
+
+type netifTxlatencyProbe struct {
+	objs        bpfObjects
+	links       []link.Link
+	sink        chan<- *probe.Event
+	refcnt      [probe.ProbeTypeCount]int
+	lock        sync.Mutex
+	perfReader  *perf.Reader
+	metricsMap  map[string]map[uint32]uint64
+	metricsLock sync.RWMutex
+}
+
+func (p *netifTxlatencyProbe) stop(probeType probe.Type) error {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	if p.refcnt[probeType] == 0 {
+		return fmt.Errorf("probe %s never start", probeType)
+	}
+
+	p.refcnt[probeType]--
+	if p.totalReferenceCountLocked() == 0 {
+		return p.cleanup()
+	}
+	return nil
+}
+
+func (p *netifTxlatencyProbe) cleanup() error {
+	if p.perfReader != nil {
+		p.perfReader.Close()
+	}
+
+	for _, link := range p.links {
+		link.Close()
+	}
+
+	p.links = nil
+
+	p.objs.Close()
+
+	return nil
+}
+
+func (p *netifTxlatencyProbe) copyMetricsMap() map[string]map[uint32]uint64 {
+	p.metricsLock.RLock()
+	defer p.metricsLock.RUnlock()
+	return probe.CopyLegacyMetricsMap(p.metricsMap)
+}
+
+func (p *netifTxlatencyProbe) totalReferenceCountLocked() int {
+	var c int
+	for _, n := range p.refcnt {
+		c += n
+	}
+	return c
+}
+
+func (p *netifTxlatencyProbe) start(probeType probe.Type) (err error) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	p.refcnt[probeType]++
+	if p.totalReferenceCountLocked() == 1 {
+		if err = p.loadAndAttachBPF(); err != nil {
+			log.Errorf("%s failed load and attach bpf, err: %v", probeName, err)
+			_ = p.cleanup()
+			return fmt.Errorf("%s failed load bpf: %w", probeName, err)
 		}
-		p.enable = true
-	})
 
-	if !p.enable {
-		// if load failed, do not start process
-		return
-	}
-	p.enabledProbes[probeType] = true
+		// 初始化map的读接口
+		p.perfReader, err = perf.NewReader(p.objs.bpfMaps.InspSklatEvent, int(unsafe.Sizeof(bpfInspNftxlatEventT{})))
+		if err != nil {
+			log.Errorf("%s failed create perf reader, err: %v", probeName, err)
+			return err
+		}
 
-	slog.Debug("start probe", "module", ModuleName)
-	if perfReader == nil {
-		slog.Ctx(ctx).Warn("start", "module", ModuleName, "err", "perf reader not ready")
-		return
+		go p.perfLoop()
 	}
-	// 开始针对perf事件进行读取
+
+	return nil
+}
+
+func (p *netifTxlatencyProbe) updateMetrics(netns uint32, metrics string) {
+	p.metricsLock.Lock()
+	defer p.metricsLock.Unlock()
+	if _, ok := p.metricsMap[metrics]; !ok {
+		p.metricsMap[metrics] = make(map[uint32]uint64)
+	}
+
+	p.metricsMap[metrics][netns]++
+}
+
+func (p *netifTxlatencyProbe) perfLoop() {
 	for {
-		record, err := perfReader.Read()
+		record, err := p.perfReader.Read()
 		if err != nil {
 			if errors.Is(err, ringbuf.ErrClosed) {
-				slog.Ctx(ctx).Info("received signal, exiting..", "module", ModuleName)
+				log.Errorf("%s received signal, exiting..", probeName)
 				return
 			}
-			slog.Ctx(ctx).Info("reading from reader", "module", ModuleName, "err", err)
+			log.Warnf("%s failed reading from reader, err: %v", probeName, err)
 			continue
 		}
 
 		if record.LostSamples != 0 {
-			slog.Ctx(ctx).Info("Perf event ring buffer full", "module", ModuleName, "drop samples", record.LostSamples)
+			log.Warnf("%s perf event ring buffer full, drop: %d", probeName, record.LostSamples)
 			continue
 		}
 
@@ -113,115 +200,44 @@ func (p *NetifTxlatencyProbe) Start(ctx context.Context, probeType proto.ProbeTy
 		var event bpfInspNftxlatEventT
 		// Parse the ringbuf event entry into a bpfEvent structure.
 		if err := binary.Read(bytes.NewBuffer(record.RawSample), binary.LittleEndian, &event); err != nil {
-			slog.Ctx(ctx).Info("parsing event", "module", ModuleName, "err", err)
+			log.Errorf("%s failed parsing event, err: %v", probeName, err)
 			continue
 		}
 
-		rawevt := proto.RawEvent{
-			Netns: event.SkbMeta.Netns,
+		evt := &probe.Event{
+			Timestamp: time.Now().UnixNano(),
+			Labels:    probe.LagacyEventLabels(event.SkbMeta.Netns),
 		}
 		tuple := fmt.Sprintf("protocol=%s saddr=%s sport=%d daddr=%s dport=%d ", bpfutil.GetProtoStr(event.Tuple.L4Proto), bpfutil.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Saddr))), bits.ReverseBytes16(event.Tuple.Sport), bpfutil.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Daddr))), bits.ReverseBytes16(event.Tuple.Dport))
-		rawevt.EventBody = fmt.Sprintf("%s latency:%s", tuple, bpfutil.GetHumanTimes(event.Latency))
+		evt.Message = fmt.Sprintf("%s latency:%s", tuple, bpfutil.GetHumanTimes(event.Latency))
 		/*#define THRESH
 		#define ACTION_QDISC	    1
 		#define ACTION_XMIT	        2
 		*/
 		if event.Type == 1 {
-			rawevt.EventType = "NETIFTXLAT_QDISC"
-			p.updateMetrics(rawevt.Netns, TXLAT_QDISC_SLOW)
+			evt.Type = "NETIFTXLAT_QDISC"
+			p.updateMetrics(event.SkbMeta.Netns, TXLAT_QDISC_SLOW)
 		} else if event.Type == 2 {
-			rawevt.EventType = "NETIFTXLAT_XMIT"
-			p.updateMetrics(rawevt.Netns, TXLAT_NETDEV_SLOW)
+			evt.Type = "NETIFTXLAT_XMIT"
+			p.updateMetrics(event.SkbMeta.Netns, TXLAT_NETDEV_SLOW)
 		}
 
 		// 分发给注册的dispatcher，其余逻辑由框架完成
-		if p.sub != nil {
-			slog.Ctx(ctx).Debug("broadcast event", "module", ModuleName)
-			p.sub <- rawevt
+		if p.sink != nil {
+			log.Debugf("%s sink event %s", probeName, util.ToJSONString(evt))
+			p.sink <- evt
 		}
 	}
+
 }
 
-// Register register sub chan to get perf events
-func (p *NetifTxlatencyProbe) Register(receiver chan<- proto.RawEvent) error {
-	p.mtx.Lock()
-	defer p.mtx.Unlock()
-	p.sub = receiver
-
-	return nil
+func (p *netifTxlatencyProbe) Collect(_ context.Context) (map[string]map[uint32]uint64, error) {
+	p.metricsLock.RLock()
+	defer p.metricsLock.RUnlock()
+	return probe.CopyLegacyMetricsMap(p.metricsMap), nil
 }
 
-func (p *NetifTxlatencyProbe) Ready() bool {
-	return p.enable
-}
-
-func (p *NetifTxlatencyProbe) Close(probeType proto.ProbeType) error {
-	if perfReader != nil {
-		perfReader.Close()
-		perfReader = nil
-	}
-
-	if !p.enable {
-		return nil
-	}
-
-	if _, ok := p.enabledProbes[probeType]; !ok {
-		return nil
-	}
-	if len(p.enabledProbes) > 1 {
-		delete(p.enabledProbes, probeType)
-		return nil
-	}
-
-	for _, link := range links {
-		link.Close()
-	}
-	links = []link.Link{}
-	p.enable = false
-	p.once = sync.Once{}
-	metricsMap = map[string]map[uint32]uint64{}
-
-	return nil
-}
-
-func (p *NetifTxlatencyProbe) updateMetrics(netns uint32, metric string) {
-	p.mtx.Lock()
-	defer p.mtx.Unlock()
-	if _, ok := metricsMap[metric]; ok {
-		metricsMap[metric][netns]++
-	}
-}
-
-func (p *NetifTxlatencyProbe) GetEventNames() []string {
-	return events
-}
-
-func (p *NetifTxlatencyProbe) GetMetricNames() []string {
-	return metrics
-}
-
-func (p *NetifTxlatencyProbe) Collect(_ context.Context) (map[string]map[uint32]uint64, error) {
-	ets := nettop.GetAllEntity()
-	resMap := map[string]map[uint32]uint64{}
-
-	for metric, v := range metricsMap {
-		resMap[metric] = make(map[uint32]uint64)
-		for _, et := range ets {
-			if et != nil {
-				nsinum := et.GetNetns()
-				if v, ok := v[uint32(nsinum)]; ok {
-					resMap[metric][uint32(nsinum)] = v
-				} else {
-					// if no kernel latency event recorded, set value to 0
-					resMap[metric][uint32(nsinum)] = 0
-				}
-			}
-		}
-	}
-	return resMap, nil
-}
-
-func start() error {
+func (p *netifTxlatencyProbe) loadAndAttachBPF() error {
 	// 准备动作
 	if err := rlimit.RemoveMemlock(); err != nil {
 		log.Fatal(err)
@@ -234,36 +250,28 @@ func start() error {
 	}
 
 	// 获取Loaded的程序/map的fd信息
-	objs := bpfObjects{}
-	if err := loadBpfObjects(&objs, &opts); err != nil {
+	if err := loadBpfObjects(p.objs, &opts); err != nil {
 		return fmt.Errorf("loading objects: %v", err)
 	}
 
 	// 执行link操作，保存rawfd
-	progQueue, err := link.Tracepoint("net", "net_dev_queue", objs.NetDevQueue, &link.TracepointOptions{})
+	progQueue, err := link.Tracepoint("net", "net_dev_queue", p.objs.NetDevQueue, &link.TracepointOptions{})
 	if err != nil {
 		return err
 	}
-	links = append(links, progQueue)
+	p.links = append(p.links, progQueue)
 
-	progStart, err := link.Tracepoint("net", "net_dev_start_xmit", objs.NetDevStartXmit, &link.TracepointOptions{})
+	progStart, err := link.Tracepoint("net", "net_dev_start_xmit", p.objs.NetDevStartXmit, &link.TracepointOptions{})
 	if err != nil {
 		return err
 	}
-	links = append(links, progStart)
+	p.links = append(p.links, progStart)
 
-	progXmit, err := link.Tracepoint("net", "net_dev_xmit", objs.NetDevXmit, &link.TracepointOptions{})
+	progXmit, err := link.Tracepoint("net", "net_dev_xmit", p.objs.NetDevXmit, &link.TracepointOptions{})
 	if err != nil {
 		return err
 	}
-	links = append(links, progXmit)
-
-	// 初始化map的读接口
-	reader, err := perf.NewReader(objs.bpfMaps.InspSklatEvent, int(unsafe.Sizeof(bpfInspNftxlatEventT{})))
-	if err != nil {
-		return err
-	}
-	perfReader = reader
+	p.links = append(p.links, progXmit)
 
 	return nil
 }

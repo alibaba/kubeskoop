@@ -7,19 +7,20 @@ import (
 	"errors"
 	"fmt"
 	"math/bits"
-	"strings"
 	"sync"
+	"time"
 	"unsafe"
 
-	"github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
-	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
+	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
+	"github.com/alibaba/kubeskoop/pkg/exporter/util"
+	log "github.com/sirupsen/logrus"
 
+	"github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
 	"github.com/cilium/ebpf/ringbuf"
 	"github.com/cilium/ebpf/rlimit"
-	"golang.org/x/exp/slog"
 )
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -cflags $BPF_CFLAGS -type insp_sklat_metric_t -type insp_sklat_event_t bpf ../../../../bpf/socketlatency.c -- -I../../../../bpf/headers -D__TARGET_ARCH_x86
@@ -55,103 +56,183 @@ const (
 )
 
 var (
-	probe  = &SocketLatencyProbe{once: sync.Once{}, mtx: sync.Mutex{}, enabledProbes: map[proto.ProbeType]bool{}}
-	objs   = bpfObjects{}
-	links  = []link.Link{}
-	events = []string{SOCKETLAT_READSLOW, SOCKETLAT_SENDSLOW}
-
+	probeName            = "socketlatency"
+	_socketLatency       = &socketLatencyProbe{}
 	socketlatencyMetrics = []string{READ100MS, READ1MS, WRITE100MS, WRITE1MS}
 )
 
-func GetProbe() *SocketLatencyProbe {
-	return probe
+func init() {
+	probe.MustRegisterMetricsProbe(probeName, metricsProbeCreator)
+	probe.MustRegisterEventProbe(probeName, eventProbeCreator)
 }
 
-type SocketLatencyProbe struct {
-	enable        bool
-	sub           chan<- proto.RawEvent
-	once          sync.Once
-	mtx           sync.Mutex
-	enabledProbes map[proto.ProbeType]bool
+func metricsProbeCreator(_ map[string]interface{}) (probe.MetricsProbe, error) {
+	p := &metricsProbe{}
+	batchMetrics := probe.NewLegacyBatchMetrics(probeName, socketlatencyMetrics, p.CollectOnce)
+
+	return probe.NewMetricsProbe(probeName, p, batchMetrics), nil
 }
 
-func (p *SocketLatencyProbe) Name() string {
-	return ModuleName
+func eventProbeCreator(sink chan<- *probe.Event, _ map[string]interface{}) (probe.EventProbe, error) {
+	p := &eventProbe{
+		sink: sink,
+	}
+	return probe.NewEventProbe(probeName, p), nil
 }
 
-func (p *SocketLatencyProbe) Ready() bool {
-	return p.enable
+type metricsProbe struct {
 }
 
-func (p *SocketLatencyProbe) GetEventNames() []string {
-	return events
+func (p *metricsProbe) Start(_ context.Context) error {
+	return _socketLatency.start(probe.ProbeTypeMetrics)
 }
 
-func (p *SocketLatencyProbe) Close(probeType proto.ProbeType) error {
-	if !p.enable {
-		return nil
+func (p *metricsProbe) Stop(_ context.Context) error {
+	return _socketLatency.stop(probe.ProbeTypeMetrics)
+}
+
+func (p *metricsProbe) CollectOnce() (map[string]map[uint32]uint64, error) {
+	return _socketLatency.collect()
+}
+
+type eventProbe struct {
+	sink chan<- *probe.Event
+}
+
+func (e *eventProbe) Start(_ context.Context) error {
+	err := _socketLatency.start(probe.ProbeTypeEvent)
+	if err != nil {
+		return err
 	}
 
-	if _, ok := p.enabledProbes[probeType]; !ok {
-		return nil
-	}
-	if len(p.enabledProbes) > 1 {
-		delete(p.enabledProbes, probeType)
-		return nil
+	_socketLatency.sink = e.sink
+	return nil
+}
+
+func (e *eventProbe) Stop(_ context.Context) error {
+	return _socketLatency.stop(probe.ProbeTypeEvent)
+}
+
+type socketLatencyProbe struct {
+	objs       bpfObjects
+	links      []link.Link
+	sink       chan<- *probe.Event
+	refcnt     [probe.ProbeTypeCount]int
+	lock       sync.Mutex
+	perfReader *perf.Reader
+}
+
+func (p *socketLatencyProbe) stop(probeType probe.Type) error {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	if p.refcnt[probeType] == 0 {
+		return fmt.Errorf("probe %s never start", probeType)
 	}
 
-	for _, link := range links {
+	p.refcnt[probeType]--
+	if p.totalReferenceCountLocked() == 0 {
+		return p.cleanup()
+	}
+	return nil
+}
+
+func (p *socketLatencyProbe) cleanup() error {
+	if p.perfReader != nil {
+		p.perfReader.Close()
+	}
+
+	for _, link := range p.links {
 		link.Close()
 	}
-	links = []link.Link{}
-	p.enable = false
-	p.once = sync.Once{}
 
-	delete(p.enabledProbes, probeType)
-	return nil
-}
+	p.links = nil
 
-func (p *SocketLatencyProbe) GetMetricNames() []string {
-	res := []string{}
-	for _, m := range socketlatencyMetrics {
-		res = append(res, strings.ToLower(m))
-	}
-	return res
-}
-
-func (p *SocketLatencyProbe) Register(receiver chan<- proto.RawEvent) error {
-	p.mtx.Lock()
-	defer p.mtx.Unlock()
-	p.sub = receiver
+	p.objs.Close()
 
 	return nil
 }
 
-func (p *SocketLatencyProbe) Start(ctx context.Context, probeType proto.ProbeType) {
-	// metric and events both start probe
-	if p.enable {
-		p.enabledProbes[probeType] = true
-		return
+func (p *socketLatencyProbe) totalReferenceCountLocked() int {
+	var c int
+	for _, n := range p.refcnt {
+		c += n
 	}
-	p.once.Do(func() {
-		err := loadSync()
-		if err != nil {
-			slog.Ctx(ctx).Warn("start", "module", ModuleName, "err", err)
+	return c
+}
+
+func (p *socketLatencyProbe) start(probeType probe.Type) (err error) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	p.refcnt[probeType]++
+	if p.totalReferenceCountLocked() == 1 {
+		if err = p.loadAndAttachBPF(); err != nil {
+			log.Errorf("%s failed load and attach bpf, err: %v", probeName, err)
+			_ = p.cleanup()
 			return
 		}
-		p.enable = true
-	})
+		p.perfReader, err = perf.NewReader(p.objs.bpfMaps.InspSklatEvents, int(unsafe.Sizeof(bpfInspSklatEventT{})))
+		if err != nil {
+			log.Warnf("%s failed create new perf reader, err: %v", probeName, err)
+			return
+		}
 
-	if !p.enable {
-		// if load failed, do not start process
-		return
+		go p.perfLoop()
 	}
-	p.enabledProbes[probeType] = true
 
-	p.startEventPoll(ctx)
+	return nil
 }
 
-func (p *SocketLatencyProbe) Collect(_ context.Context) (map[string]map[uint32]uint64, error) {
+func (p *socketLatencyProbe) perfLoop() {
+	for {
+		record, err := p.perfReader.Read()
+		if err != nil {
+			if errors.Is(err, ringbuf.ErrClosed) {
+				log.Infof("%s received signal, exiting..", probeName)
+				return
+			}
+			log.Infof("%s failed reading from reader, err: %v", probeName, err)
+			continue
+		}
+
+		if record.LostSamples != 0 {
+			log.Infof("%s perf event ring buffer full, drop: %d", probeName, record.LostSamples)
+			continue
+		}
+
+		var event bpfInspSklatEventT
+		if err := binary.Read(bytes.NewBuffer(record.RawSample), binary.LittleEndian, &event); err != nil {
+			log.Infof("%s failed parsing event, err: %v", probeName, err)
+			continue
+		}
+		// filter netlink/unixsock/tproxy packet
+		if event.Tuple.Dport == 0 && event.Tuple.Sport == 0 {
+			continue
+		}
+		evt := &probe.Event{
+			Timestamp: time.Now().UnixNano(),
+			Labels:    probe.LagacyEventLabels(event.SkbMeta.Netns),
+		}
+		/*
+			#define ACTION_READ	    1
+			#define ACTION_WRITE	2
+		*/
+		if event.Direction == ACTION_READ {
+			evt.Type = SOCKETLAT_READSLOW
+		} else if event.Direction == ACTION_WRITE {
+			evt.Type = SOCKETLAT_SENDSLOW
+		}
+
+		tuple := fmt.Sprintf("protocol=%s saddr=%s sport=%d daddr=%s dport=%d ", bpfutil.GetProtoStr(event.Tuple.L4Proto), bpfutil.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Saddr))), bits.ReverseBytes16(event.Tuple.Sport), bpfutil.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Daddr))), bits.ReverseBytes16(event.Tuple.Dport))
+		evt.Message = fmt.Sprintf("%s latency=%s", tuple, bpfutil.GetHumanTimes(event.Latency))
+		if p.sink != nil {
+			log.Debugf("%s sink event %s", probeName, util.ToJSONString(evt))
+			p.sink <- evt
+		}
+	}
+}
+
+func (p *socketLatencyProbe) collect() (map[string]map[uint32]uint64, error) {
 	res := map[string]map[uint32]uint64{}
 	for _, mtr := range socketlatencyMetrics {
 		res[mtr] = map[uint32]uint64{}
@@ -193,62 +274,7 @@ func (p *SocketLatencyProbe) Collect(_ context.Context) (map[string]map[uint32]u
 	return res, nil
 }
 
-func (p *SocketLatencyProbe) startEventPoll(ctx context.Context) {
-	reader, err := perf.NewReader(objs.bpfMaps.InspSklatEvents, int(unsafe.Sizeof(bpfInspSklatEventT{})))
-	if err != nil {
-		slog.Ctx(ctx).Warn("start new perf reader", "module", ModuleName, "err", err)
-		return
-	}
-
-	for {
-		record, err := reader.Read()
-		if err != nil {
-			if errors.Is(err, ringbuf.ErrClosed) {
-				slog.Ctx(ctx).Info("received signal, exiting..", "module", ModuleName)
-				return
-			}
-			slog.Ctx(ctx).Info("reading from reader", "module", ModuleName, "err", err)
-			continue
-		}
-
-		if record.LostSamples != 0 {
-			slog.Ctx(ctx).Info("Perf event ring buffer full", "module", ModuleName, "drop samples", record.LostSamples)
-			continue
-		}
-
-		var event bpfInspSklatEventT
-		if err := binary.Read(bytes.NewBuffer(record.RawSample), binary.LittleEndian, &event); err != nil {
-			slog.Ctx(ctx).Info("parsing event", "module", ModuleName, "err", err)
-			continue
-		}
-		// filter netlink/unixsock/tproxy packet
-		if event.Tuple.Dport == 0 && event.Tuple.Sport == 0 {
-			continue
-		}
-		rawevt := proto.RawEvent{
-			Netns: event.SkbMeta.Netns,
-		}
-		/*
-			#define ACTION_READ	    1
-			#define ACTION_WRITE	2
-		*/
-		if event.Direction == ACTION_READ {
-			rawevt.EventType = SOCKETLAT_READSLOW
-		} else if event.Direction == ACTION_WRITE {
-			rawevt.EventType = SOCKETLAT_SENDSLOW
-		}
-
-		tuple := fmt.Sprintf("protocol=%s saddr=%s sport=%d daddr=%s dport=%d ", bpfutil.GetProtoStr(event.Tuple.L4Proto), bpfutil.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Saddr))), bits.ReverseBytes16(event.Tuple.Sport), bpfutil.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Daddr))), bits.ReverseBytes16(event.Tuple.Dport))
-		rawevt.EventBody = fmt.Sprintf("%s latency=%s", tuple, bpfutil.GetHumanTimes(event.Latency))
-		if p.sub != nil {
-			slog.Ctx(ctx).Debug("broadcast event", "module", ModuleName)
-			p.sub <- rawevt
-		}
-	}
-
-}
-
-func loadSync() error {
+func (p *socketLatencyProbe) loadAndAttachBPF() error {
 	// Allow the current process to lock memory for eBPF resources.
 	if err := rlimit.RemoveMemlock(); err != nil {
 		return fmt.Errorf("remove limit failed: %s", err.Error())
@@ -261,47 +287,47 @@ func loadSync() error {
 	}
 
 	// Load pre-compiled programs and maps into the kernel.
-	if err := loadBpfObjects(&objs, &opts); err != nil {
+	if err := loadBpfObjects(&p.objs, &opts); err != nil {
 		return fmt.Errorf("loading objects: %s", err.Error())
 	}
 
-	linkcreate, err := link.Kprobe("inet_ehash_nolisten", objs.SockCreate, nil)
+	linkcreate, err := link.Kprobe("inet_ehash_nolisten", p.objs.SockCreate, nil)
 	if err != nil {
 		return fmt.Errorf("link inet_ehash_nolisten: %s", err.Error())
 	}
-	links = append(links, linkcreate)
+	p.links = append(p.links, linkcreate)
 
-	linkreceive, err := link.Kprobe("sock_def_readable", objs.SockReceive, nil)
+	linkreceive, err := link.Kprobe("sock_def_readable", p.objs.SockReceive, nil)
 	if err != nil {
 		return fmt.Errorf("link sock_def_readable: %s", err.Error())
 	}
-	links = append(links, linkreceive)
+	p.links = append(p.links, linkreceive)
 
-	linkread, err := link.Kprobe("tcp_cleanup_rbuf", objs.SockRead, nil)
+	linkread, err := link.Kprobe("tcp_cleanup_rbuf", p.objs.SockRead, nil)
 	if err != nil {
 		return fmt.Errorf("link tcp_cleanup_rbuf: %s", err.Error())
 	}
-	links = append(links, linkread)
+	p.links = append(p.links, linkread)
 
-	linkwrite, err := link.Kprobe("tcp_sendmsg_locked", objs.SockWrite, nil)
+	linkwrite, err := link.Kprobe("tcp_sendmsg_locked", p.objs.SockWrite, nil)
 	if err != nil {
 		return fmt.Errorf("link tcp_sendmsg_locked: %s", err.Error())
 	}
-	links = append(links, linkwrite)
+	p.links = append(p.links, linkwrite)
 
-	linksend, err := link.Kprobe("tcp_write_xmit", objs.SockSend, nil)
+	linksend, err := link.Kprobe("tcp_write_xmit", p.objs.SockSend, nil)
 	if err != nil {
 		return fmt.Errorf("link tcp_write_xmit: %s", err.Error())
 	}
-	links = append(links, linksend)
+	p.links = append(p.links, linksend)
 
-	linkdestroy, err := link.Kprobe("tcp_done", objs.SockDestroy, nil)
+	linkdestroy, err := link.Kprobe("tcp_done", p.objs.SockDestroy, nil)
 	if err != nil {
 		return fmt.Errorf("link tcp_done: %s", err.Error())
 	}
-	links = append(links, linkdestroy)
+	p.links = append(p.links, linkdestroy)
 
-	err = bpfutil.MustPin(objs.InspSklatMetric, ModuleName)
+	err = bpfutil.MustPin(p.objs.InspSklatMetric, probeName)
 	if err != nil {
 		return fmt.Errorf("pin map %s failed: %s", ModuleName, err.Error())
 	}

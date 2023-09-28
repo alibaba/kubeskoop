@@ -6,205 +6,151 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"log"
-	"sync"
+	"time"
 	"unsafe"
 
 	"github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
 	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
-	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
-
+	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
 	"github.com/cilium/ebpf/ringbuf"
 	"github.com/cilium/ebpf/rlimit"
-	"golang.org/x/exp/slog"
+	log "github.com/sirupsen/logrus"
 )
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -cflags $BPF_CFLAGS  -type insp_biolat_event_t bpf ../../../../bpf/tracebiolatency.c -- -I../../../../bpf/headers -D__TARGET_ARCH_x86
 var (
-	ModuleName = "insp_biolatency" // nolint
-
-	probe  = &BiolatencyProbe{once: sync.Once{}}
-	links  = []link.Link{}
-	events = []string{"BIOLAT_10MS", "BIOLAT_100MS"}
-
-	perfReader *perf.Reader
+	probeName = "biolatency"
 )
 
+func init() {
+	probe.MustRegisterEventProbe(probeName, bioLatencyProbeCreator)
+}
+
+func bioLatencyProbeCreator(sink chan<- *probe.Event, _ map[string]interface{}) (probe.EventProbe, error) {
+	p := &BiolatencyProbe{
+		sink: sink,
+	}
+	return probe.NewEventProbe(probeName, p), nil
+}
+
 type BiolatencyProbe struct {
-	enable bool
-	once   sync.Once
-	sub    chan<- proto.RawEvent
-	mtx    sync.Mutex
+	sink   chan<- *probe.Event
+	objs   bpfObjects
+	links  []link.Link
+	reader *perf.Reader
 }
 
-func GetProbe() *BiolatencyProbe {
-	return probe
-}
-
-func (p *BiolatencyProbe) Name() string {
-	return ModuleName
-}
-
-// Register register sub chan to get perf events
-func (p *BiolatencyProbe) Register(receiver chan<- proto.RawEvent) error {
-	p.mtx.Lock()
-	defer p.mtx.Unlock()
-	p.sub = receiver
-
-	return nil
-}
-
-func (p *BiolatencyProbe) Ready() bool {
-	return p.enable
-}
-
-func (p *BiolatencyProbe) Close(_ proto.ProbeType) error {
-	if p.enable {
-		for _, link := range links {
-			link.Close()
-		}
-		links = []link.Link{}
-		p.enable = false
-		p.once = sync.Once{}
+func (p *BiolatencyProbe) Start(_ context.Context) error {
+	log.Debugf("start probe %s", probeName)
+	if err := p.loadAndAttachBPF(); err != nil {
+		_ = p.cleanup()
+		return err
 	}
 
-	if perfReader != nil {
-		perfReader.Close()
-		perfReader = nil
+	var err error
+	p.reader, err = perf.NewReader(p.objs.InspBiolatEvts, int(unsafe.Sizeof(bpfInspBiolatEntryT{})))
+	if err != nil {
+		_ = p.cleanup()
+		return err
 	}
 
-	return nil
-}
-
-func (p *BiolatencyProbe) GetEventNames() []string {
-	return events
-}
-
-func (p *BiolatencyProbe) Start(ctx context.Context, _ proto.ProbeType) {
-	p.once.Do(func() {
-		err := start()
-		if err != nil {
-			slog.Ctx(ctx).Warn("start", "module", ModuleName, "err", err)
-			return
-		}
-		p.enable = true
-	})
-
-	if !p.enable {
-		// if load failed, do not start process
-		return
-	}
-
-	slog.Debug("start probe", "module", ModuleName)
-	if perfReader == nil {
-		slog.Ctx(ctx).Warn("start", "module", ModuleName, "err", "perf reader not ready")
-		return
-	}
+	go p.perf()
 
 	// 开始针对perf事件进行读取
+	return nil
+}
+
+func (p *BiolatencyProbe) perf() {
 	for {
-		record, err := perfReader.Read()
+		record, err := p.reader.Read()
 		if err != nil {
 			if errors.Is(err, ringbuf.ErrClosed) {
-				slog.Ctx(ctx).Info("received signal, exiting..", "module", ModuleName)
+				log.Infof("%s received signal, exiting..", probeName)
 				return
 			}
-			slog.Ctx(ctx).Info("reading from reader", "module", ModuleName, "err", err)
+			log.Infof("%s failed reading from reader, err: %v", probeName, err)
 			continue
 		}
 
 		if record.LostSamples != 0 {
-			slog.Ctx(ctx).Info("Perf event ring buffer full", "module", ModuleName, "drop samples", record.LostSamples)
+			log.Infof("%s perf event ring buffer full, drop: %d", probeName, record.LostSamples)
 			continue
 		}
 
-		// 解析perf事件信息，输出为proto.RawEvent
+		// 解析perf事件信息，输出为proto.Event
 		var event bpfInspBiolatEventT
 		// Parse the ringbuf event entry into a bpfEvent structure.
 		if err := binary.Read(bytes.NewBuffer(record.RawSample), binary.LittleEndian, &event); err != nil {
-			slog.Ctx(ctx).Info("parsing event", "module", ModuleName, "err", err)
+			log.Infof("%s failed parsing event, err: %v", probeName, err)
 			continue
 		}
 		pid := event.Pid
 		if et, err := nettop.GetEntityByPid(int(pid)); err != nil || et == nil {
-			slog.Ctx(ctx).Warn("unspecified event", "pid", pid, "task", bpfutil.GetCommString(event.Target))
+			log.Warnf("%s got unspecified event, pid: %d, task %s", probeName, pid, bpfutil.GetCommString(event.Target))
 			continue
 		}
-		rawevt := proto.RawEvent{
-			EventType: "BIOLAT_10MS",
-			EventBody: fmt.Sprintf("%s %d latency %s", bpfutil.GetCommString(event.Target), event.Pid, bpfutil.GetHumanTimes(event.Latency)),
+		evt := &probe.Event{
+			Timestamp: time.Now().UnixNano(),
+			Type:      "BIOLAT_10MS",
+			Message:   fmt.Sprintf("%s %d latency %s", bpfutil.GetCommString(event.Target), event.Pid, bpfutil.GetHumanTimes(event.Latency)),
 		}
 
-		// 分发给注册的dispatcher，其余逻辑由框架完成
-		if p.sub != nil {
-			slog.Ctx(ctx).Debug("broadcast event", "module", ModuleName)
-			p.sub <- rawevt
-		}
+		log.Errorf("sink event to channel")
+		p.sink <- evt
 	}
 }
 
-func start() error {
+func (p *BiolatencyProbe) Stop(_ context.Context) error {
+	return p.cleanup()
+}
+
+func (p *BiolatencyProbe) cleanup() error {
+	if p.reader != nil {
+		p.reader.Close()
+	}
+
+	for _, link := range p.links {
+		link.Close()
+	}
+
+	p.objs.Close()
+
+	return nil
+}
+
+func (p *BiolatencyProbe) loadAndAttachBPF() error {
 	// 准备动作
 	if err := rlimit.RemoveMemlock(); err != nil {
 		log.Fatal(err)
 	}
+
+	p.links = nil
 
 	opts := ebpf.CollectionOptions{}
 
 	opts.Programs = ebpf.ProgramOptions{
 		KernelTypes: bpfutil.LoadBTFSpecOrNil(),
 	}
-	objs := bpfObjects{}
 	// Load pre-compiled programs and maps into the kernel.
-	if err := loadBpfObjects(&objs, &opts); err != nil {
+	if err := loadBpfObjects(&p.objs, &opts); err != nil {
 		return fmt.Errorf("loading objects: %s", err.Error())
 	}
 
-	linkcreate, err := link.Kprobe("blk_account_io_start", objs.BiolatStart, nil)
+	linkcreate, err := link.Kprobe("blk_account_io_start", p.objs.BiolatStart, nil)
 	if err != nil {
 		return fmt.Errorf("link blk_account_io_start: %s", err.Error())
 	}
-	links = append(links, linkcreate)
 
-	linkdone, err := link.Kprobe("blk_account_io_done", objs.BiolatFinish, nil)
+	p.links = append(p.links, linkcreate)
+
+	linkdone, err := link.Kprobe("blk_account_io_done", p.objs.BiolatFinish, nil)
 	if err != nil {
 		return fmt.Errorf("link blk_account_io_done: %s", err.Error())
 	}
-	links = append(links, linkdone)
 
-	reader, err := perf.NewReader(objs.InspBiolatEvts, int(unsafe.Sizeof(bpfInspBiolatEntryT{})))
-	if err != nil {
-		return fmt.Errorf("perf new reader failed: %s", err.Error())
-	}
-	perfReader = reader
+	p.links = append(p.links, linkdone)
 	return nil
-
-	// for {
-	// 	record, err := reader.Read()
-	// 	if err != nil {
-	// 		if errors.Is(err, ringbuf.ErrClosed) {
-	// 			log.Println("received signal, exiting..")
-	// 			return err
-	// 		}
-	// 		log.Printf("reading from reader: %s", err)
-	// 		continue
-	// 	}
-
-	// 	if record.LostSamples != 0 {
-	// 		log.Printf("Perf event ring buffer full, dropped %d samples", record.LostSamples)
-	// 		continue
-	// 	}
-
-	// 	var event bpfInspBiolatEventT
-	// 	// Parse the ringbuf event entry into a bpfEvent structure.
-	// 	if err := binary.Read(bytes.NewBuffer(record.RawSample), binary.LittleEndian, &event); err != nil {
-	// 		log.Printf("parsing event: %s", err)
-	// 		continue
-	// 	}
-
-	// 	fmt.Printf("%-10s %-6d %-6s\n", bpfutil.GetCommString(event.Target), event.Pid, bpfutil.GetHumanTimes(event.Latency))
-	// }
 }

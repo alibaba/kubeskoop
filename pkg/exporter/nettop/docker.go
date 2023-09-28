@@ -7,6 +7,8 @@ import (
 	io "io"
 	"net"
 	"net/http"
+
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -39,22 +41,22 @@ func getPidForContainerBySock(id string) (int, error) {
 	url := fmt.Sprintf("http://localhost/containers/%s/json", id)
 	response, err := dockerhttpc.Get(url)
 	if err != nil {
-		logger.Warn("get response with %s", err.Error())
+		log.Errorf("failed get docker response, err: %v", err)
 		return 0, err
 	}
 
 	b, err := io.ReadAll(response.Body)
 	if err != nil {
-		logger.Warn("get response with %s", err.Error())
+		log.Errorf("failed get docker response, err: %v", err)
 		return 0, err
 	}
 
 	sd := &slimDocker{}
 	err = json.Unmarshal(b, &sd)
 	if err != nil {
-		logger.Warn("get response", "err", err.Error())
+		log.Errorf("failed get docker response, err: %v", err)
 		return 0, err
 	}
-	logger.Info("finish get pid", "sandbox", id, "pid", sd.State.Pid)
+	log.Infof("finish get pid, sandbox: %s, pid: %d", id, sd.State.Pid)
 	return sd.State.Pid, nil
 }

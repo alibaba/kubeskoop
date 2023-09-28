@@ -4,80 +4,54 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"strconv"
 	"strings"
 
-	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
+	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
 )
 
 const maxBufferSize = 1024 * 1024
 
 var (
-	ModuleName = "insp_ipvs"
+	probeName = "ipvs"
 
 	statf = "/proc/net/ip_vs_stats"
 
-	probe = &ProcIPVS{}
-
-	IPVSServiceCount              = "IPVSServiceCount"
-	IPVSServiceTCPConnCount       = "IPVSServiceTCPConnCount"
-	IPVSServiceTCPInBytesCount    = "IPVSServiceTCPInBytesCount"
-	IPVSServiceTCPInPacketsCount  = "IPVSServiceTCPInPacketsCount"
-	IPVSServiceTCPOutBytesCount   = "IPVSServiceTCPOutBytesCount"
-	IPVSServiceTCPOutPacketsCount = "IPVSServiceTCPOutPacketsCount"
-	IPVSServiceUDPConnCount       = "IPVSServiceUDPConnCount"
-	IPVSServiceUDPInBytesCount    = "IPVSServiceUDPInBytesCount"
-	IPVSServiceUDPInPacketsCount  = "IPVSServiceUDPInPacketsCount"
-	IPVSServiceUDPOutBytesCount   = "IPVSServiceUDPOutBytesCount"
-	IPVSServiceUDPOutPacketsCount = "IPVSServiceUDPOutPacketsCount"
-
-	Connections     = "Connections"
-	IncomingPackets = "IncomingPackets"
-	OutgoingPackets = "OutgoingPackets"
-	IncomingBytes   = "IncomingBytes"
-	OutgoingBytes   = "OutgoingBytes"
+	Connections     = "connections"
+	IncomingPackets = "incomingpackets"
+	OutgoingPackets = "outgoingpackets"
+	IncomingBytes   = "incomingbytes"
+	OutgoingBytes   = "outgoingbytes"
 
 	IPVSMetrics = []string{Connections, IncomingPackets, OutgoingBytes, IncomingBytes, OutgoingPackets}
 )
 
+func init() {
+	probe.MustRegisterMetricsProbe(probeName, ipvsProbeCreator)
+}
+
+func ipvsProbeCreator(_ map[string]interface{}) (probe.MetricsProbe, error) {
+	p := &ProcIPVS{}
+
+	batchMetrics := probe.NewLegacyBatchMetrics(probeName, IPVSMetrics, p.CollectOnce)
+
+	return probe.NewMetricsProbe(probeName, p, batchMetrics), nil
+}
+
 type ProcIPVS struct {
 }
 
-func GetProbe() *ProcIPVS {
-	return probe
-}
-
-func (p *ProcIPVS) Name() string {
-	return ModuleName
-}
-
-func (p *ProcIPVS) Close(_ proto.ProbeType) error {
+func (p *ProcIPVS) Start(_ context.Context) error {
 	return nil
 }
 
-func (p *ProcIPVS) Start(_ context.Context, _ proto.ProbeType) {
+func (p *ProcIPVS) Stop(_ context.Context) error {
+	return nil
 }
 
-func (p *ProcIPVS) Ready() bool {
-	// determine by if default ipvs stats file was ready
-	if _, err := os.Stat(statf); os.IsNotExist(err) {
-		return false
-	}
-	return true
-}
-
-func (p *ProcIPVS) GetMetricNames() []string {
-	res := []string{}
-	for _, m := range IPVSMetrics {
-		res = append(res, metricUniqueID("ipvs", m))
-	}
-	return res
-}
-
-func (p *ProcIPVS) Collect(_ context.Context) (map[string]map[uint32]uint64, error) {
+func (p *ProcIPVS) CollectOnce() (map[string]map[uint32]uint64, error) {
 	resMap := make(map[string]map[uint32]uint64)
 	f, err := os.Open(statf)
 	if err != nil {
@@ -96,16 +70,12 @@ func (p *ProcIPVS) Collect(_ context.Context) (map[string]map[uint32]uint64, err
 		return resMap, err
 	}
 	// only handle stats in default netns
-	resMap[metricUniqueID("ipvs", Connections)] = map[uint32]uint64{0: stats.Connections}
-	resMap[metricUniqueID("ipvs", IncomingPackets)] = map[uint32]uint64{0: stats.IncomingBytes}
-	resMap[metricUniqueID("ipvs", IncomingBytes)] = map[uint32]uint64{0: stats.IncomingBytes}
-	resMap[metricUniqueID("ipvs", OutgoingPackets)] = map[uint32]uint64{0: stats.OutgoingPackets}
-	resMap[metricUniqueID("ipvs", OutgoingBytes)] = map[uint32]uint64{0: stats.OutgoingBytes}
+	resMap[Connections] = map[uint32]uint64{0: stats.Connections}
+	resMap[IncomingPackets] = map[uint32]uint64{0: stats.IncomingBytes}
+	resMap[IncomingBytes] = map[uint32]uint64{0: stats.IncomingBytes}
+	resMap[OutgoingPackets] = map[uint32]uint64{0: stats.OutgoingPackets}
+	resMap[OutgoingBytes] = map[uint32]uint64{0: stats.OutgoingBytes}
 	return resMap, nil
-}
-
-func metricUniqueID(subject string, m string) string {
-	return fmt.Sprintf("%s%s", subject, strings.ToLower(m))
 }
 
 // IPVSStats holds IPVS statistics, as exposed by the kernel in `/proc/net/ip_vs_stats`.

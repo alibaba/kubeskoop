@@ -5,73 +5,62 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
-
-	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
 
 	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
+	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/prometheus/procfs"
-	"golang.org/x/exp/slog"
 )
 
 const (
-	IOReadSyscall  = "IOReadSyscall"
-	IOWriteSyscall = "IOWriteSyscall"
-	IOReadBytes    = "IOReadBytes"
-	IOWriteBytes   = "IOWriteBytes"
+	IOReadSyscall  = "ioreadsyscall"
+	IOWriteSyscall = "iowritesyscall"
+	IOReadBytes    = "ioreadbytes"
+	IOWriteBytes   = "iowritebytes"
 
-	ModuleName = "procio" // nolint
+	probeName = "io" // nolint
 )
 
 var (
-	probe = &ProcIO{}
-
 	IOMetrics = []string{IOReadSyscall, IOWriteSyscall, IOReadBytes, IOWriteBytes}
 )
+
+func init() {
+	probe.MustRegisterMetricsProbe(probeName, ioProbeCreator)
+}
+
+func ioProbeCreator(_ map[string]interface{}) (probe.MetricsProbe, error) {
+	p := &ProcIO{}
+
+	batchMetrics := probe.NewLegacyBatchMetrics(probeName, IOMetrics, p.CollectOnce)
+
+	return probe.NewMetricsProbe(probeName, p, batchMetrics), nil
+}
 
 type ProcIO struct {
 }
 
-func GetProbe() *ProcIO {
-	return probe
-}
-
-func (s *ProcIO) Close(_ proto.ProbeType) error {
+func (s *ProcIO) Start(_ context.Context) error {
 	return nil
 }
 
-func (s *ProcIO) Start(_ context.Context, _ proto.ProbeType) {
+func (s *ProcIO) Stop(_ context.Context) error {
+	return nil
 }
 
-func (s *ProcIO) Ready() bool {
-	return true
-}
-
-func (s *ProcIO) Name() string {
-	return ModuleName
-}
-
-func (s *ProcIO) GetMetricNames() []string {
-	res := []string{}
-	for _, m := range IOMetrics {
-		res = append(res, metricUniqueID("io", m))
-	}
-	return res
-}
-
-func (s *ProcIO) Collect(ctx context.Context) (map[string]map[uint32]uint64, error) {
+func (s *ProcIO) CollectOnce() (map[string]map[uint32]uint64, error) {
 	ets := nettop.GetAllEntity()
 	if len(ets) == 0 {
-		slog.Ctx(ctx).Info("collect", "mod", ModuleName, "ignore", "no entity found")
+		log.Infof("procio: no entity found")
 	}
-	return collect(ctx, ets)
+	return collect(ets)
 }
 
-func collect(_ context.Context, _ []*nettop.Entity) (map[string]map[uint32]uint64, error) {
+func collect(_ []*nettop.Entity) (map[string]map[uint32]uint64, error) {
 	resMap := make(map[string]map[uint32]uint64)
 	for _, stat := range IOMetrics {
-		resMap[metricUniqueID("io", stat)] = map[uint32]uint64{}
+		resMap[stat] = map[uint32]uint64{}
 	}
 
 	procios, err := getAllProcessIO(nettop.GetAllEntity())
@@ -81,18 +70,14 @@ func collect(_ context.Context, _ []*nettop.Entity) (map[string]map[uint32]uint6
 
 	for nsinum := range procios {
 		for _, procio := range procios[nsinum] {
-			resMap[metricUniqueID("io", IOReadSyscall)][nsinum] += procio.SyscR
-			resMap[metricUniqueID("io", IOWriteSyscall)][nsinum] += procio.SyscW
-			resMap[metricUniqueID("io", IOReadBytes)][nsinum] += procio.ReadBytes
-			resMap[metricUniqueID("io", IOWriteBytes)][nsinum] += procio.WriteBytes
+			resMap[IOReadSyscall][nsinum] += procio.SyscR
+			resMap[IOWriteSyscall][nsinum] += procio.SyscW
+			resMap[IOReadBytes][nsinum] += procio.ReadBytes
+			resMap[IOWriteBytes][nsinum] += procio.WriteBytes
 		}
 	}
 
 	return resMap, nil
-}
-
-func metricUniqueID(subject string, m string) string {
-	return fmt.Sprintf("%s%s", subject, strings.ToLower(m))
 }
 
 func getAllProcessIO(nslist []*nettop.Entity) (map[uint32][]procfs.ProcIO, error) {

@@ -9,164 +9,199 @@ import (
 	"sync"
 	"unsafe"
 
-	"github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
-	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
+	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
+	"github.com/alibaba/kubeskoop/pkg/exporter/util"
+	log "github.com/sirupsen/logrus"
 
+	"github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
 	"github.com/cilium/ebpf/ringbuf"
 	"github.com/cilium/ebpf/rlimit"
-	"golang.org/x/exp/slog"
 )
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -cflags $BPF_CFLAGS -type insp_virtcmdlat_event_t  bpf ../../../../bpf/virtcmdlatency.c -- -I../../../../bpf/headers -D__TARGET_ARCH_x86
 
 const (
-	ModuleName = "insp_virtcmdlatency" // nolint
-
 	VIRTCMD100MS  = "virtcmdlatency100ms"
 	VIRTCMD       = "virtcmdlatency"
 	VIRTCMDEXCUTE = "VIRTCMDEXCUTE"
 
-	fn = "virtnet_send_command"
+	fn        = "virtnet_send_command"
+	probeName = "virtcmdLatency"
 )
 
 var (
-	probe   = &VirtcmdLatencyProbe{once: sync.Once{}, mtx: sync.Mutex{}, enabledProbes: map[proto.ProbeType]bool{}}
-	objs    = bpfObjects{}
-	links   = []link.Link{}
-	events  = []string{VIRTCMDEXCUTE}
-	metrics = []string{VIRTCMD100MS, VIRTCMD}
-
-	metricsMap = map[string]map[uint32]uint64{}
+	metrics              = []string{VIRTCMD100MS, VIRTCMD}
+	_virtcmdLatencyProbe = &virtcmdLatencyProbe{}
 )
 
-func GetProbe() *VirtcmdLatencyProbe {
-	return probe
-}
-
 func init() {
-	for m := range metrics {
-		metricsMap[metrics[m]] = map[uint32]uint64{
-			0: 0,
-		}
+	probe.MustRegisterMetricsProbe(probeName, metricsProbeCreator)
+	probe.MustRegisterEventProbe(probeName, eventProbeCreator)
+}
+
+func metricsProbeCreator(_ map[string]interface{}) (probe.MetricsProbe, error) {
+	p := &metricsProbe{}
+	batchMetrics := probe.NewLegacyBatchMetrics(probeName, metrics, p.CollectOnce)
+
+	return probe.NewMetricsProbe(probeName, p, batchMetrics), nil
+}
+
+func eventProbeCreator(sink chan<- *probe.Event, _ map[string]interface{}) (probe.EventProbe, error) {
+	p := &eventProbe{
+		sink: sink,
 	}
+	return probe.NewEventProbe(probeName, p), nil
 }
 
-type VirtcmdLatencyProbe struct {
-	enable        bool
-	sub           chan<- proto.RawEvent
-	once          sync.Once
-	mtx           sync.Mutex
-	enabledProbes map[proto.ProbeType]bool
+type metricsProbe struct {
 }
 
-func (p *VirtcmdLatencyProbe) Name() string {
-	return ModuleName
+func (p *metricsProbe) Start(ctx context.Context) error {
+	return _virtcmdLatencyProbe.start(ctx, probe.ProbeTypeMetrics)
 }
 
-func (p *VirtcmdLatencyProbe) Ready() bool {
-	return p.enable
+func (p *metricsProbe) Stop(ctx context.Context) error {
+	return _virtcmdLatencyProbe.stop(ctx, probe.ProbeTypeMetrics)
 }
 
-func (p *VirtcmdLatencyProbe) GetMetricNames() []string {
-	return metrics
+func (p *metricsProbe) CollectOnce() (map[string]map[uint32]uint64, error) {
+	return _virtcmdLatencyProbe.copyMetricsMap(), nil
 }
 
-func (p *VirtcmdLatencyProbe) GetEventNames() []string {
-	return events
+type eventProbe struct {
+	sink chan<- *probe.Event
 }
 
-func (p *VirtcmdLatencyProbe) Close(probeType proto.ProbeType) error {
-	if !p.enable {
-		return nil
+func (e *eventProbe) Start(ctx context.Context) error {
+	err := _virtcmdLatencyProbe.start(ctx, probe.ProbeTypeEvent)
+	if err != nil {
+		return err
 	}
 
-	if _, ok := p.enabledProbes[probeType]; !ok {
-		return nil
-	}
-	if len(p.enabledProbes) > 1 {
-		delete(p.enabledProbes, probeType)
-		return nil
+	_virtcmdLatencyProbe.sink = e.sink
+	return nil
+}
+
+func (e *eventProbe) Stop(ctx context.Context) error {
+	return _virtcmdLatencyProbe.stop(ctx, probe.ProbeTypeEvent)
+}
+
+type virtcmdLatencyProbe struct {
+	objs        bpfObjects
+	links       []link.Link
+	sink        chan<- *probe.Event
+	refcnt      [probe.ProbeTypeCount]int
+	lock        sync.Mutex
+	perfReader  *perf.Reader
+	metricsMap  map[string]map[uint32]uint64
+	metricsLock sync.RWMutex
+}
+
+func (p *virtcmdLatencyProbe) stop(_ context.Context, probeType probe.Type) error {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	if p.refcnt[probeType] == 0 {
+		return fmt.Errorf("probe %s never start", probeType)
 	}
 
-	for _, link := range links {
+	p.refcnt[probeType]--
+	if p.totalReferenceCountLocked() == 0 {
+		return p.cleanup()
+	}
+	return nil
+}
+
+func (p *virtcmdLatencyProbe) cleanup() error {
+	if p.perfReader != nil {
+		p.perfReader.Close()
+	}
+
+	for _, link := range p.links {
 		link.Close()
 	}
-	links = []link.Link{}
-	p.enable = false
-	p.once = sync.Once{}
-	metricsMap = map[string]map[uint32]uint64{}
 
-	delete(p.enabledProbes, probeType)
-	return nil
-}
+	p.links = nil
 
-func (p *VirtcmdLatencyProbe) Collect(_ context.Context) (map[string]map[uint32]uint64, error) {
-	return metricsMap, nil
-}
-
-func (p *VirtcmdLatencyProbe) Register(receiver chan<- proto.RawEvent) error {
-	p.mtx.Lock()
-	defer p.mtx.Unlock()
-	p.sub = receiver
+	p.objs.Close()
 
 	return nil
 }
 
-func (p *VirtcmdLatencyProbe) Start(ctx context.Context, probeType proto.ProbeType) {
-	// metric and events both start probe
-	if p.enable {
-		p.enabledProbes[probeType] = true
-		return
+func (p *virtcmdLatencyProbe) updateMetrics(metrics string) {
+	p.metricsLock.Lock()
+	defer p.metricsLock.Unlock()
+	if _, ok := p.metricsMap[metrics]; !ok {
+		p.metricsMap[metrics] = make(map[uint32]uint64)
 	}
-	p.once.Do(func() {
-		err := loadSync()
-		if err != nil {
-			slog.Ctx(ctx).Warn("start", "module", ModuleName, "err", err)
+
+	p.metricsMap[metrics][0]++
+}
+
+func (p *virtcmdLatencyProbe) copyMetricsMap() map[string]map[uint32]uint64 {
+	p.metricsLock.RLock()
+	defer p.metricsLock.RUnlock()
+	return probe.CopyLegacyMetricsMap(p.metricsMap)
+}
+
+func (p *virtcmdLatencyProbe) totalReferenceCountLocked() int {
+	var c int
+	for _, n := range p.refcnt {
+		c += n
+	}
+	return c
+}
+
+func (p *virtcmdLatencyProbe) start(_ context.Context, probeType probe.Type) (err error) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	p.refcnt[probeType]++
+	if p.totalReferenceCountLocked() == 1 {
+		if err = p.loadAndAttachBPF(); err != nil {
+			log.Errorf("%s failed load and attach bpf, err: %v", probeName, err)
+			_ = p.cleanup()
 			return
 		}
-		p.enable = true
-	})
+		p.perfReader, err = perf.NewReader(p.objs.bpfMaps.InspVirtcmdlatEvents, int(unsafe.Sizeof(bpfInspVirtcmdlatEventT{})))
+		if err != nil {
+			log.Warnf("%s failed create new perf reader, err: %v", probeName, err)
+			return
+		}
 
-	if !p.enable {
-		// if load failed, do not start process
-		return
-	}
-	p.enabledProbes[probeType] = true
-
-	reader, err := perf.NewReader(objs.bpfMaps.InspVirtcmdlatEvents, int(unsafe.Sizeof(bpfInspVirtcmdlatEventT{})))
-	if err != nil {
-		slog.Ctx(ctx).Warn("start new perf reader", "module", ModuleName, "err", err)
-		return
+		go p.perfLoop()
 	}
 
+	return nil
+}
+
+func (p *virtcmdLatencyProbe) perfLoop() {
 	for {
-		record, err := reader.Read()
+		record, err := p.perfReader.Read()
 		if err != nil {
 			if errors.Is(err, ringbuf.ErrClosed) {
-				slog.Ctx(ctx).Info("received signal, exiting..", "module", ModuleName)
+				log.Infof("%s received signal, exiting..", probeName)
 				return
 			}
-			slog.Ctx(ctx).Info("reading from reader", "module", ModuleName, "err", err)
+			log.Infof("%s failed reading from reader, err: %v", probeName, err)
 			continue
 		}
 
 		if record.LostSamples != 0 {
-			slog.Ctx(ctx).Info("Perf event ring buffer full", "module", ModuleName, "drop samples", record.LostSamples)
+			log.Infof("%s perf event ring buffer full, drop: %d", probeName, record.LostSamples)
 			continue
 		}
 
 		var event bpfInspVirtcmdlatEventT
 		if err := binary.Read(bytes.NewBuffer(record.RawSample), binary.LittleEndian, &event); err != nil {
-			slog.Ctx(ctx).Info("parsing event", "module", ModuleName, "err", err)
+			log.Infof("%s failed parsing event, err: %v", probeName, err)
 			continue
 		}
 
-		rawevt := proto.RawEvent{
-			Netns:     0,
-			EventType: VIRTCMDEXCUTE,
+		evt := &probe.Event{
+			Type: VIRTCMDEXCUTE,
 		}
 
 		if event.Latency > 100000000 {
@@ -175,23 +210,15 @@ func (p *VirtcmdLatencyProbe) Start(ctx context.Context, probeType proto.ProbeTy
 			p.updateMetrics(VIRTCMD)
 		}
 
-		rawevt.EventBody = fmt.Sprintf("cpu=%d  pid=%d  latency=%s", event.Cpu, event.Pid, bpfutil.GetHumanTimes(event.Latency))
-		if p.sub != nil {
-			slog.Ctx(ctx).Debug("broadcast event", "module", ModuleName)
-			p.sub <- rawevt
+		evt.Message = fmt.Sprintf("cpu=%d  pid=%d  latency=%s", event.Cpu, event.Pid, bpfutil.GetHumanTimes(event.Latency))
+		if p.sink != nil {
+			log.Debugf("%s sink event %s", probeName, util.ToJSONString(evt))
+			p.sink <- evt
 		}
 	}
 }
 
-func (p *VirtcmdLatencyProbe) updateMetrics(k string) {
-	p.mtx.Lock()
-	defer p.mtx.Unlock()
-	if _, ok := metricsMap[k]; ok {
-		metricsMap[k][0]++
-	}
-}
-
-func loadSync() error {
+func (p *virtcmdLatencyProbe) loadAndAttachBPF() error {
 	if err := rlimit.RemoveMemlock(); err != nil {
 		return fmt.Errorf("remove limit failed: %s", err.Error())
 	}
@@ -203,21 +230,21 @@ func loadSync() error {
 	}
 
 	// Load pre-compiled programs and maps into the kernel.
-	if err := loadBpfObjects(&objs, &opts); err != nil {
+	if err := loadBpfObjects(&p.objs, &opts); err != nil {
 		return fmt.Errorf("loading objects: %s", err.Error())
 	}
 
-	linkentry, err := link.Kprobe(fn, objs.TraceVirtcmd, &link.KprobeOptions{})
+	linkentry, err := link.Kprobe(fn, p.objs.TraceVirtcmd, &link.KprobeOptions{})
 	if err != nil {
 		return fmt.Errorf("link %s: %s", fn, err.Error())
 	}
-	links = append(links, linkentry)
+	p.links = append(p.links, linkentry)
 
-	linkexit, err := link.Kretprobe(fn, objs.TraceVirtcmdret, &link.KprobeOptions{})
+	linkexit, err := link.Kretprobe(fn, p.objs.TraceVirtcmdret, &link.KprobeOptions{})
 	if err != nil {
 		return fmt.Errorf("link ret %s: %s", fn, err.Error())
 	}
 
-	links = append(links, linkexit)
+	p.links = append(p.links, linkexit)
 	return nil
 }

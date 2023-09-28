@@ -1,13 +1,13 @@
 package cmd
 
 import (
-	"io"
 	"os"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/exp/slog"
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -18,14 +18,9 @@ var (
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			nettop.Init(sidecar)
 			if debug {
-				opts := slog.HandlerOptions{
-					AddSource: true,
-					Level:     slog.DebugLevel,
-				}
-
-				slog.SetDefault(slog.New(opts.NewTextHandler(os.Stdout)))
+				log.SetLevel(log.DebugLevel)
 			} else {
-				slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard)))
+				log.SetLevel(log.InfoLevel)
 			}
 		},
 	}

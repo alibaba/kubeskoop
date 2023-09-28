@@ -1,96 +1,175 @@
 package probe
 
 import (
-	"context"
+	"errors"
 	"fmt"
 
-	"github.com/alibaba/kubeskoop/pkg/exporter/probe/flow"
-	"github.com/alibaba/kubeskoop/pkg/exporter/probe/nlconntrack"
-	"github.com/alibaba/kubeskoop/pkg/exporter/probe/nlqdisc"
-	"github.com/alibaba/kubeskoop/pkg/exporter/probe/procfd"
-	"github.com/alibaba/kubeskoop/pkg/exporter/probe/procio"
-	"github.com/alibaba/kubeskoop/pkg/exporter/probe/procipvs"
-	"github.com/alibaba/kubeskoop/pkg/exporter/probe/procnetdev"
-	"github.com/alibaba/kubeskoop/pkg/exporter/probe/procnetstat"
-	"github.com/alibaba/kubeskoop/pkg/exporter/probe/procsnmp"
-	"github.com/alibaba/kubeskoop/pkg/exporter/probe/procsock"
-	"github.com/alibaba/kubeskoop/pkg/exporter/probe/procsoftnet"
-	"github.com/alibaba/kubeskoop/pkg/exporter/probe/proctcpsummary"
-	"github.com/alibaba/kubeskoop/pkg/exporter/probe/tracekernel"
-	tracenetif "github.com/alibaba/kubeskoop/pkg/exporter/probe/tracenetiftxlatency"
-	"github.com/alibaba/kubeskoop/pkg/exporter/probe/tracenetsoftirq"
-	"github.com/alibaba/kubeskoop/pkg/exporter/probe/tracepacketloss"
-	"github.com/alibaba/kubeskoop/pkg/exporter/probe/tracesocketlatency"
-	"github.com/alibaba/kubeskoop/pkg/exporter/probe/tracevirtcmdlat"
-	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
+	log "github.com/sirupsen/logrus"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/exp/maps"
 )
+
+const LegacyMetricsNamespace = "inspector"
+const MetricsNamespace = "kubeskoop"
 
 var (
-	availmprobes map[string]proto.MetricProbe
+	availableMetricsProbes = make(map[string]MetricsProbeCreator)
+	ErrUndeclaredMetrics   = errors.New("undeclared metrics")
 )
 
-func init() {
-	availmprobes = map[string]proto.MetricProbe{}
+type MetricsProbeCreator func(args map[string]interface{}) (MetricsProbe, error)
 
-	availmprobes["tcp"] = procsnmp.GetProbe()
-	availmprobes["udp"] = procsnmp.GetProbe()
-	availmprobes["ip"] = procsnmp.GetProbe()
-	availmprobes["netdev"] = procnetdev.GetProbe()
-	availmprobes["softnet"] = procsoftnet.GetProbe()
-	availmprobes["sock"] = procsock.GetProbe()
-	availmprobes["io"] = procio.GetProbe()
-	availmprobes["tcpext"] = procnetstat.GetProbe()
-	availmprobes["socketlatency"] = tracesocketlatency.GetProbe()
-	availmprobes["packetloss"] = tracepacketloss.GetProbe()
-	availmprobes["net_softirq"] = tracenetsoftirq.GetProbe()
-	availmprobes["netiftxlatency"] = tracenetif.GetProbe()
-	availmprobes["kernellatency"] = tracekernel.GetProbe()
-	availmprobes["tcpsummary"] = proctcpsummary.GetProbe()
-	availmprobes["virtcmdlatency"] = tracevirtcmdlat.GetProbe()
-	availmprobes["conntrack"] = nlconntrack.GetProbe()
-	availmprobes["ipvs"] = procipvs.GetProbe()
-	availmprobes["qdisc"] = nlqdisc.GetProbe()
-	availmprobes["fd"] = procfd.GetProbe()
-	availmprobes["flow"] = flow.GetProbe()
-}
-
-func ListMetricProbes() (probelist []string) {
-	for k := range availmprobes {
-		probelist = append(probelist, k)
+func MustRegisterMetricsProbe(name string, creator MetricsProbeCreator) {
+	if _, ok := availableMetricsProbes[name]; ok {
+		panic(fmt.Errorf("duplicated event probe %s", name))
 	}
-	return
+
+	availableMetricsProbes[name] = creator
 }
 
-func ListMetrics() map[string][]string {
-	mm := make(map[string][]string)
-	for p, pb := range availmprobes {
-		if pb != nil {
-			// for multi metric of one probe,filter with prefix
-			mnames := pb.GetMetricNames()
-			mm[p] = append(mm[p], mnames...)
+func CreateMetricsProbe(name string, _ interface{}) (MetricsProbe, error) {
+	creator, ok := availableMetricsProbes[name]
+	if !ok {
+		return nil, fmt.Errorf("undefined probe %s", name)
+	}
+
+	//TODO reflect creator's arguments
+	return creator(nil)
+}
+
+func ListMetricsProbes() []string {
+	var ret []string
+	for key := range availableMetricsProbes {
+		ret = append(ret, key)
+	}
+	return ret
+}
+
+type Emit func(name string, labels []string, val float64)
+
+type Collector func(emit Emit) error
+
+type SingleMetricsOpts struct {
+	Name           string
+	Help           string
+	ConstLabels    map[string]string
+	VariableLabels []string
+	ValueType      prometheus.ValueType
+}
+
+type BatchMetricsOpts struct {
+	Namespace         string
+	Subsystem         string
+	ConstLabels       map[string]string
+	VariableLabels    []string
+	SingleMetricsOpts []SingleMetricsOpts
+}
+
+type metricsInfo struct {
+	desc      *prometheus.Desc
+	valueType prometheus.ValueType
+}
+
+type BatchMetrics struct {
+	name           string
+	infoMap        map[string]*metricsInfo
+	ProbeCollector Collector
+}
+
+func NewBatchMetrics(opts BatchMetricsOpts, probeCollector Collector) *BatchMetrics {
+	m := make(map[string]*metricsInfo)
+	for _, metrics := range opts.SingleMetricsOpts {
+		constLabels, variableLables := mergeLabels(opts, metrics)
+		desc := prometheus.NewDesc(
+			prometheus.BuildFQName(opts.Namespace, opts.Subsystem, metrics.Name),
+			metrics.Help,
+			variableLables,
+			constLabels,
+		)
+
+		m[metrics.Name] = &metricsInfo{
+			desc:      desc,
+			valueType: metrics.ValueType,
 		}
 	}
-	return mm
+
+	return &BatchMetrics{
+		name:           fmt.Sprintf("%s_%s", opts.Namespace, opts.Subsystem),
+		infoMap:        m,
+		ProbeCollector: probeCollector,
+	}
 }
 
-func GetProbe(subject string) proto.MetricProbe {
-	if p, ok := availmprobes[subject]; ok {
-		return p
+func (b *BatchMetrics) Describe(descs chan<- *prometheus.Desc) {
+	for _, info := range b.infoMap {
+		descs <- info.desc
+	}
+}
+
+func (b *BatchMetrics) Collect(metrics chan<- prometheus.Metric) {
+	emit := func(name string, labels []string, val float64) {
+		info, ok := b.infoMap[name]
+		if !ok {
+			log.Errorf("%s undeclared metrics %s", b.name, name)
+			return
+		}
+		metrics <- prometheus.MustNewConstMetric(info.desc, info.valueType, val, labels...)
 	}
 
-	return nil
+	err := b.ProbeCollector(emit)
+	if err != nil {
+		log.Errorf("%s error collect, err: %v", b.name, err)
+		return
+	}
 }
 
-// CollectOnce collect from probe directly for test
-func CollectOnce(ctx context.Context, subject string) (map[string]map[uint32]uint64, error) {
-	return collectOnce(ctx, subject)
+func mergeLabels(opts BatchMetricsOpts, metrics SingleMetricsOpts) (map[string]string, []string) {
+	constLabels := mergeMap(opts.ConstLabels, metrics.ConstLabels)
+	variableLabels := mergeArray(opts.VariableLabels, metrics.VariableLabels)
+
+	return constLabels, variableLabels
 }
 
-func collectOnce(ctx context.Context, subject string) (map[string]map[uint32]uint64, error) {
-	probe, ok := availmprobes[subject]
-	if !ok {
-		return nil, fmt.Errorf("no probe found of %s", subject)
+func mergeArray(labels []string, labels2 []string) []string {
+	m := make(map[string]bool)
+	for _, s := range labels {
+		m[s] = true
 	}
 
-	return probe.Collect(ctx)
+	for _, s := range labels2 {
+		if _, ok := m[s]; ok {
+			//to avoid duplicated label
+			panic(fmt.Sprintf("metric label %s already declared in BatchMetricsOpts", s))
+		}
+	}
+
+	var ret []string
+	for k := range m {
+		ret = append(ret, k)
+	}
+
+	return ret
 }
+
+// if a key exists in both maps, value in labels2 will be keep
+func mergeMap(labels map[string]string, labels2 map[string]string) map[string]string {
+	ret := make(map[string]string)
+	maps.Copy(ret, labels)
+	maps.Copy(ret, labels2)
+	return ret
+}
+
+type combinedMetricsProbe struct {
+	Probe
+	prometheus.Collector
+}
+
+func NewMetricsProbe(name string, simpleProbe SimpleProbe, collector prometheus.Collector) MetricsProbe {
+	return &combinedMetricsProbe{
+		Probe:     NewProbe(name, simpleProbe),
+		Collector: collector,
+	}
+}
+
+var _ prometheus.Collector = &BatchMetrics{}

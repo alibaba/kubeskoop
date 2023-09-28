@@ -7,17 +7,19 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 	"unsafe"
 
-	"github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
-	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
+	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
+	"github.com/alibaba/kubeskoop/pkg/exporter/util"
+	log "github.com/sirupsen/logrus"
 
+	"github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
 	"github.com/cilium/ebpf/ringbuf"
 	"github.com/cilium/ebpf/rlimit"
-	"golang.org/x/exp/slog"
 )
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -cflags $BPF_CFLAGS -type insp_softirq_event_t bpf ../../../../bpf/net_softirq.c -- -I../../../../bpf/headers -D__TARGET_ARCH_x86
@@ -29,132 +31,178 @@ const (
 )
 
 var (
-	ModuleName = "insp_netsoftirq" // nolint
-	probe      = &NetSoftirqProbe{once: sync.Once{}, mtx: sync.Mutex{}, enabledProbes: map[proto.ProbeType]bool{}}
-	objs       = bpfObjects{}
-	links      = []link.Link{}
-	metricsMap = map[string]map[uint32]uint64{}
-
-	events  = []string{"NETSOFTIRQ_SCHED_SLOW", "NETSOFTIRQ_SCHED_100MS", "NETSOFTIRQ_EXCUTE_SLOW", "NETSOFTIRQ_EXCUTE_100MS"}
-	metrics = []string{NETSOFTIRQ_SCHED_SLOW, NETSOFTIRQ_SCHED_100MS, NETSOFTIRQ_EXCUTE_SLOW, NETSOFTIRQ_EXCUTE_100MS}
+	metrics          = []string{NETSOFTIRQ_SCHED_SLOW, NETSOFTIRQ_SCHED_100MS, NETSOFTIRQ_EXCUTE_SLOW, NETSOFTIRQ_EXCUTE_100MS}
+	probeName        = "netsoftirq"
+	_netSoftirqProbe = &netSoftirqProbe{}
 )
 
-func GetProbe() *NetSoftirqProbe {
-	return probe
-}
-
 func init() {
-	for m := range metrics {
-		metricsMap[metrics[m]] = map[uint32]uint64{
-			0: 0,
-		}
+	probe.MustRegisterMetricsProbe(probeName, metricsProbeCreator)
+	probe.MustRegisterEventProbe(probeName, eventProbeCreator)
+}
+
+func metricsProbeCreator(_ map[string]interface{}) (probe.MetricsProbe, error) {
+	p := &metricsProbe{}
+	batchMetrics := probe.NewLegacyBatchMetrics(probeName, metrics, p.CollectOnce)
+
+	return probe.NewMetricsProbe(probeName, p, batchMetrics), nil
+}
+
+func eventProbeCreator(sink chan<- *probe.Event, _ map[string]interface{}) (probe.EventProbe, error) {
+	p := &eventProbe{
+		sink: sink,
 	}
+	return probe.NewEventProbe(probeName, p), nil
 }
 
-type NetSoftirqProbe struct {
-	enable        bool
-	sub           chan<- proto.RawEvent
-	once          sync.Once
-	mtx           sync.Mutex
-	enabledProbes map[proto.ProbeType]bool
+type metricsProbe struct {
 }
 
-func (p *NetSoftirqProbe) Name() string {
-	return ModuleName
+func (p *metricsProbe) Start(_ context.Context) error {
+	return _netSoftirqProbe.start(probe.ProbeTypeMetrics)
 }
 
-func (p *NetSoftirqProbe) Ready() bool {
-	return p.enable
+func (p *metricsProbe) Stop(_ context.Context) error {
+	return _netSoftirqProbe.stop(probe.ProbeTypeMetrics)
 }
 
-func (p *NetSoftirqProbe) GetEventNames() []string {
-	return events
+func (p *metricsProbe) CollectOnce() (map[string]map[uint32]uint64, error) {
+	return _netSoftirqProbe.copyMetricsMap(), nil
 }
 
-func (p *NetSoftirqProbe) GetMetricNames() []string {
-	return metrics
+type eventProbe struct {
+	sink chan<- *probe.Event
 }
 
-func (p *NetSoftirqProbe) Collect(_ context.Context) (map[string]map[uint32]uint64, error) {
-	return metricsMap, nil
-}
-
-func (p *NetSoftirqProbe) Close(probeType proto.ProbeType) error {
-	if !p.enable {
-		return nil
-	}
-
-	if _, ok := p.enabledProbes[probeType]; !ok {
-		return nil
-	}
-	if len(p.enabledProbes) > 1 {
-		delete(p.enabledProbes, probeType)
-		return nil
+func (e *eventProbe) Start(_ context.Context) error {
+	err := _netSoftirqProbe.start(probe.ProbeTypeEvent)
+	if err != nil {
+		return err
 	}
 
-	for _, link := range links {
-		link.Close()
-	}
-	links = []link.Link{}
-	p.enable = false
-	p.once = sync.Once{}
-	metricsMap = map[string]map[uint32]uint64{}
-
-	delete(p.enabledProbes, probeType)
+	_netSoftirqProbe.sink = e.sink
 	return nil
 }
 
-func (p *NetSoftirqProbe) Start(ctx context.Context, probeType proto.ProbeType) {
-	if p.enable {
-		p.enabledProbes[probeType] = true
-		return
+func (e *eventProbe) Stop(_ context.Context) error {
+	return _netSoftirqProbe.stop(probe.ProbeTypeEvent)
+}
+
+type netSoftirqProbe struct {
+	objs        bpfObjects
+	links       []link.Link
+	sink        chan<- *probe.Event
+	refcnt      [probe.ProbeTypeCount]int
+	lock        sync.Mutex
+	perfReader  *perf.Reader
+	metricsMap  map[string]map[uint32]uint64
+	metricsLock sync.RWMutex
+}
+
+func (p *netSoftirqProbe) stop(probeType probe.Type) error {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	if p.refcnt[probeType] == 0 {
+		return fmt.Errorf("probe %s never start", probeType)
 	}
 
-	p.once.Do(func() {
-		err := loadSync()
-		if err != nil {
-			slog.Ctx(ctx).Warn("start", "module", ModuleName, "err", err)
-			return
+	p.refcnt[probeType]--
+	if p.totalReferenceCountLocked() == 0 {
+		return p.cleanup()
+	}
+	return nil
+}
+
+func (p *netSoftirqProbe) cleanup() error {
+	if p.perfReader != nil {
+		p.perfReader.Close()
+	}
+
+	for _, link := range p.links {
+		link.Close()
+	}
+
+	p.links = nil
+
+	p.objs.Close()
+
+	return nil
+}
+
+func (p *netSoftirqProbe) copyMetricsMap() map[string]map[uint32]uint64 {
+	p.metricsLock.RLock()
+	defer p.metricsLock.RUnlock()
+	return probe.CopyLegacyMetricsMap(p.metricsMap)
+}
+
+func (p *netSoftirqProbe) totalReferenceCountLocked() int {
+	var c int
+	for _, n := range p.refcnt {
+		c += n
+	}
+	return c
+}
+
+func (p *netSoftirqProbe) start(probeType probe.Type) (err error) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	p.refcnt[probeType]++
+	if p.totalReferenceCountLocked() == 1 {
+		if err = p.loadAndAttachBPF(); err != nil {
+			log.Errorf("%s failed load and attach bpf, err: %v", probeName, err)
+			_ = p.cleanup()
+			return fmt.Errorf("%s failed load bpf: %w", probeName, err)
 		}
-		p.enable = true
-	})
 
-	if !p.enable {
-		// if load failed, do not start process
-		return
-	}
-	p.enabledProbes[probeType] = true
+		// 初始化map的读接口
+		p.perfReader, err = perf.NewReader(p.objs.bpfMaps.InspSoftirqEvents, int(unsafe.Sizeof(bpfInspSoftirqEventT{})))
+		if err != nil {
+			log.Errorf("%s failed create perf reader, err: %v", probeName, err)
+			return err
+		}
 
-	reader, err := perf.NewReader(objs.bpfMaps.InspSoftirqEvents, int(unsafe.Sizeof(bpfInspSoftirqEventT{})))
-	if err != nil {
-		slog.Ctx(ctx).Warn("start new perf reader", "module", ModuleName, "err", err)
-		return
+		go p.perfLoop()
 	}
 
+	return nil
+}
+
+func (p *netSoftirqProbe) updateMetrics(metrics string) {
+	p.metricsLock.Lock()
+	defer p.metricsLock.Unlock()
+	if _, ok := p.metricsMap[metrics]; !ok {
+		p.metricsMap[metrics] = make(map[uint32]uint64)
+	}
+
+	p.metricsMap[metrics][0]++
+}
+
+func (p *netSoftirqProbe) perfLoop() {
 	for {
-		record, err := reader.Read()
+		record, err := p.perfReader.Read()
 		if err != nil {
 			if errors.Is(err, ringbuf.ErrClosed) {
-				slog.Ctx(ctx).Info("received signal, exiting..", "module", ModuleName)
+				log.Errorf("%s received signal, exiting..", probeName)
 				return
 			}
-			slog.Ctx(ctx).Info("reading from reader", "module", ModuleName, "err", err)
+			log.Warnf("%s failed reading from reader, err: %v", probeName, err)
 			continue
 		}
 
 		if record.LostSamples != 0 {
-			slog.Ctx(ctx).Info("Perf event ring buffer full", "module", ModuleName, "drop samples", record.LostSamples)
+			log.Warnf("%s perf event ring buffer full, drop: %d", probeName, record.LostSamples)
 			continue
 		}
 
 		var event bpfInspSoftirqEventT
 		if err := binary.Read(bytes.NewBuffer(record.RawSample), binary.LittleEndian, &event); err != nil {
-			slog.Ctx(ctx).Info("parsing event", "module", ModuleName, "err", err)
+			log.Errorf("%s failed parsing event, err: %v", probeName, err)
 			continue
 		}
 
-		rawevt := proto.RawEvent{
-			Netns: 0,
+		evt := &probe.Event{
+			Timestamp: time.Now().UnixNano(),
 		}
 
 		/*
@@ -164,51 +212,35 @@ func (p *NetSoftirqProbe) Start(ctx context.Context, probeType proto.ProbeType) 
 		switch event.Phase {
 		case 1:
 			if event.Latency > 100000000 {
-				rawevt.EventType = "NETSOFTIRQ_SCHED_100MS"
+				evt.Type = "NETSOFTIRQ_SCHED_100MS"
 				p.updateMetrics(NETSOFTIRQ_SCHED_100MS)
 			} else {
-				rawevt.EventType = "NETSOFTIRQ_SCHED_SLOW"
+				evt.Type = "NETSOFTIRQ_SCHED_SLOW"
 				p.updateMetrics(NETSOFTIRQ_SCHED_SLOW)
 			}
 		case 2:
 			if event.Latency > 100000000 {
-				rawevt.EventType = "NETSOFTIRQ_EXCUTE_100MS"
+				evt.Type = "NETSOFTIRQ_EXCUTE_100MS"
 				p.updateMetrics(NETSOFTIRQ_EXCUTE_100MS)
 			} else {
-				rawevt.EventType = "NETSOFTIRQ_EXCUTE_SLOW"
+				evt.Type = "NETSOFTIRQ_EXCUTE_SLOW"
 				p.updateMetrics(NETSOFTIRQ_EXCUTE_SLOW)
 			}
 
 		default:
-			slog.Ctx(ctx).Info("parsing event", "module", ModuleName, "ignore", event)
+			log.Infof("%s failed parsing event, phase: %d", probeName, event.Phase)
 			continue
 		}
 
-		rawevt.EventBody = fmt.Sprintf("cpu=%d pid=%d latency=%s ", event.Cpu, event.Pid, bpfutil.GetHumanTimes(event.Latency))
-		if p.sub != nil {
-			slog.Ctx(ctx).Debug("broadcast event", "module", ModuleName)
-			p.sub <- rawevt
+		evt.Message = fmt.Sprintf("cpu=%d pid=%d latency=%s ", event.Cpu, event.Pid, bpfutil.GetHumanTimes(event.Latency))
+		if p.sink != nil {
+			log.Debugf("%s sink event %s", probeName, util.ToJSONString(evt))
+			p.sink <- evt
 		}
 	}
 }
 
-func (p *NetSoftirqProbe) updateMetrics(k string) {
-	p.mtx.Lock()
-	defer p.mtx.Unlock()
-	if _, ok := metricsMap[k]; ok {
-		metricsMap[k][0]++
-	}
-}
-
-func (p *NetSoftirqProbe) Register(receiver chan<- proto.RawEvent) error {
-	p.mtx.Lock()
-	defer p.mtx.Unlock()
-	p.sub = receiver
-
-	return nil
-}
-
-func loadSync() error {
+func (p *netSoftirqProbe) loadAndAttachBPF() error {
 	// 准备动作
 	if err := rlimit.RemoveMemlock(); err != nil {
 		return err
@@ -221,27 +253,27 @@ func loadSync() error {
 	}
 
 	// 获取Loaded的程序/map的fd信息
-	if err := loadBpfObjects(&objs, &opts); err != nil {
+	if err := loadBpfObjects(&p.objs, &opts); err != nil {
 		return fmt.Errorf("loading objects: %v", err)
 	}
 
-	prograise, err := link.Tracepoint("irq", "softirq_raise", objs.TraceSoftirqRaise, &link.TracepointOptions{})
+	prograise, err := link.Tracepoint("irq", "softirq_raise", p.objs.TraceSoftirqRaise, &link.TracepointOptions{})
 	if err != nil {
 		return fmt.Errorf("link softirq_raise: %s", err.Error())
 	}
-	links = append(links, prograise)
+	p.links = append(p.links, prograise)
 
-	progentry, err := link.Tracepoint("irq", "softirq_entry", objs.TraceSoftirqEntry, &link.TracepointOptions{})
+	progentry, err := link.Tracepoint("irq", "softirq_entry", p.objs.TraceSoftirqEntry, &link.TracepointOptions{})
 	if err != nil {
 		return fmt.Errorf("link softirq_entry: %s", err.Error())
 	}
-	links = append(links, progentry)
+	p.links = append(p.links, progentry)
 
-	progexit, err := link.Tracepoint("irq", "softirq_exit", objs.TraceSoftirqExit, &link.TracepointOptions{})
+	progexit, err := link.Tracepoint("irq", "softirq_exit", p.objs.TraceSoftirqExit, &link.TracepointOptions{})
 	if err != nil {
-		return fmt.Errorf("link softirq_exit: %s", err.Error())
+		return fmt.Errorf("link softirq_exit: %w", err)
 	}
-	links = append(links, progexit)
+	p.links = append(p.links, progexit)
 
 	return nil
 }

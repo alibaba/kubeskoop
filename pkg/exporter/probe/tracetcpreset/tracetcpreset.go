@@ -6,21 +6,21 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-
 	"math/bits"
-	"sync"
 	"syscall"
+	"time"
 	"unsafe"
 
-	"github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
-	"github.com/alibaba/kubeskoop/pkg/exporter/proto"
+	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
+	"github.com/alibaba/kubeskoop/pkg/exporter/util"
+	log "github.com/sirupsen/logrus"
 
+	"github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
 	"github.com/cilium/ebpf/ringbuf"
 	"github.com/cilium/ebpf/rlimit"
-	"golang.org/x/exp/slog"
 )
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -cflags $BPF_CFLAGS -type insp_tcpreset_event_t bpf ../../../../bpf/tcpreset.c -- -I../../../../bpf/headers -D__TARGET_ARCH_x86
@@ -34,121 +34,67 @@ const (
 )
 
 var (
-	ModuleName = "insp_tcpreset" // nolint
-	objs       = bpfObjects{}
-	probe      = &TCPResetProbe{once: sync.Once{}, mtx: sync.Mutex{}, enabledProbes: map[proto.ProbeType]bool{}}
-	links      = []link.Link{}
-
-	events = []string{TCPRESET_NOSOCK, TCPRESET_ACTIVE, TCPRESET_PROCESS, TCPRESET_RECEIVE}
+	probeName = "tcpreset"
 )
 
-func GetProbe() *TCPResetProbe {
-	return probe
+func init() {
+	probe.MustRegisterEventProbe(probeName, eventProbeCreator)
 }
 
-type TCPResetProbe struct {
-	enable        bool
-	sub           chan<- proto.RawEvent
-	once          sync.Once
-	mtx           sync.Mutex
-	enabledProbes map[proto.ProbeType]bool
-}
-
-func (p *TCPResetProbe) Name() string {
-	return ModuleName
-}
-
-func (p *TCPResetProbe) Ready() bool {
-	return p.enable
-}
-
-func (p *TCPResetProbe) GetEventNames() []string {
-	return events
-}
-
-func (p *TCPResetProbe) Close(probeType proto.ProbeType) error {
-	if !p.enable {
-		return nil
+func eventProbeCreator(sink chan<- *probe.Event, _ map[string]interface{}) (probe.EventProbe, error) {
+	p := &tcpResetProbe{
+		sink: sink,
 	}
-
-	if _, ok := p.enabledProbes[probeType]; !ok {
-		return nil
-	}
-	if len(p.enabledProbes) > 1 {
-		delete(p.enabledProbes, probeType)
-		return nil
-	}
-
-	for _, link := range links {
-		link.Close()
-	}
-	links = []link.Link{}
-	p.enable = false
-	p.once = sync.Once{}
-
-	delete(p.enabledProbes, probeType)
-	return nil
+	return probe.NewEventProbe(probeName, p), nil
 }
 
-func (p *TCPResetProbe) Register(receiver chan<- proto.RawEvent) error {
-	p.mtx.Lock()
-	defer p.mtx.Unlock()
-	p.sub = receiver
-
-	return nil
+type tcpResetProbe struct {
+	sink       chan<- *probe.Event
+	objs       bpfObjects
+	links      []link.Link
+	perfReader *perf.Reader
 }
 
-func (p *TCPResetProbe) Start(ctx context.Context, probeType proto.ProbeType) {
-	if p.enable {
-		p.enabledProbes[probeType] = true
-		return
-	}
-
-	p.once.Do(func() {
-		err := loadSync()
-		if err != nil {
-			slog.Ctx(ctx).Warn("start", "module", ModuleName, "err", err)
-			return
-		}
-		p.enable = true
-	})
-
-	if !p.enable {
-		// if load failed, do not start process
-		return
-	}
-	p.enabledProbes[probeType] = true
-
-	reader, err := perf.NewReader(objs.bpfMaps.InspTcpresetEvents, int(unsafe.Sizeof(bpfInspTcpresetEventT{})))
+func (p *tcpResetProbe) Start(_ context.Context) (err error) {
+	err = p.loadAndAttachBPF()
 	if err != nil {
-		slog.Ctx(ctx).Warn("start new perf reader", "module", ModuleName, "err", err)
+		log.Errorf("%s failed load and attach bpf, err: %v", probeName, err)
+		_ = p.cleanup()
 		return
 	}
 
+	p.perfReader, err = perf.NewReader(p.objs.bpfMaps.InspTcpresetEvents, int(unsafe.Sizeof(bpfInspTcpresetEventT{})))
+	if err != nil {
+		log.Errorf("%s failed create new perf reader, err: %v", probeName, err)
+		_ = p.cleanup()
+		return
+	}
+
+	go p.perfLoop()
+	return
+}
+
+func (p *tcpResetProbe) perfLoop() {
 	for {
-		record, err := reader.Read()
+		record, err := p.perfReader.Read()
 		if err != nil {
 			if errors.Is(err, ringbuf.ErrClosed) {
-				slog.Ctx(ctx).Info("received signal, exiting..", "module", ModuleName)
+				log.Infof("%s received signal, exiting..", probeName)
 				return
 			}
-			slog.Ctx(ctx).Info("reading from reader", "module", ModuleName, "err", err)
+			log.Errorf("%s failed reading from reader, err: %v", probeName, err)
 			continue
 		}
 
 		if record.LostSamples != 0 {
-			slog.Ctx(ctx).Info("Perf event ring buffer full", "module", ModuleName, "drop samples", record.LostSamples)
+			log.Infof("%s perf event ring buffer full, drop: %d", probeName, record.LostSamples)
 			continue
 		}
 
 		var event bpfInspTcpresetEventT
 		if err := binary.Read(bytes.NewBuffer(record.RawSample), binary.LittleEndian, &event); err != nil {
-			slog.Ctx(ctx).Info("parsing event", "module", ModuleName, "err", err)
+			log.Infof("%s failed parsing event, err: %v", probeName, err)
 			continue
-		}
-
-		rawevt := proto.RawEvent{
-			Netns: 0,
 		}
 
 		/*
@@ -157,35 +103,65 @@ func (p *TCPResetProbe) Start(ctx context.Context, probeType proto.ProbeType) {
 			#define RESET_PROCESS 4
 			#define RESET_RECEIVE 8
 		*/
+
+		var eventType probe.EventType
+
 		switch event.Type {
 		case 1:
-			rawevt.EventType = TCPRESET_NOSOCK
+			eventType = TCPRESET_NOSOCK
 		case 2:
-			rawevt.EventType = TCPRESET_ACTIVE
+			eventType = TCPRESET_ACTIVE
 		case 4:
-			rawevt.EventType = TCPRESET_PROCESS
+			eventType = TCPRESET_PROCESS
 		case 8:
-			rawevt.EventType = TCPRESET_RECEIVE
+			eventType = TCPRESET_RECEIVE
 		default:
-			slog.Ctx(ctx).Info("parsing event", "module", ModuleName, "ignore", event)
-		}
-
-		rawevt.Netns = event.SkbMeta.Netns
-		if event.Tuple.L3Proto == syscall.ETH_P_IPV6 {
-			slog.Ctx(ctx).Debug("ignore event of ipv6 proto")
+			log.Infof("%s got invalid perf event type %d, data: %s", probeName, event.Type, util.ToJSONString(event))
 			continue
 		}
+
+		if event.Tuple.L3Proto == syscall.ETH_P_IPV6 {
+			log.Infof("%s ignore event of ipv6 proto", probeName)
+			continue
+		}
+
+		evt := &probe.Event{
+			Timestamp: time.Now().UnixNano(),
+			Type:      eventType,
+			Labels:    probe.LagacyEventLabels(event.SkbMeta.Netns),
+		}
+
 		tuple := fmt.Sprintf("protocol=%s saddr=%s sport=%d daddr=%s dport=%d ", bpfutil.GetProtoStr(event.Tuple.L4Proto), bpfutil.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Saddr))), bits.ReverseBytes16(event.Tuple.Sport), bpfutil.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Daddr))), bits.ReverseBytes16(event.Tuple.Dport))
 		stateStr := bpfutil.GetSkcStateStr(event.State)
-		rawevt.EventBody = fmt.Sprintf("%s state:%s ", tuple, stateStr)
-		if p.sub != nil {
-			slog.Ctx(ctx).Debug("broadcast event", "module", ModuleName)
-			p.sub <- rawevt
+		evt.Message = fmt.Sprintf("%s state:%s ", tuple, stateStr)
+		if p.sink != nil {
+			log.Debugf("%s sink event: %s", probeName, util.ToJSONString(evt))
+			p.sink <- evt
 		}
 	}
 }
 
-func loadSync() error {
+func (p *tcpResetProbe) Stop(_ context.Context) error {
+	return p.cleanup()
+}
+
+func (p *tcpResetProbe) cleanup() error {
+	if p.perfReader != nil {
+		p.perfReader.Close()
+	}
+
+	for _, link := range p.links {
+		link.Close()
+	}
+	p.links = nil
+
+	p.objs.Close()
+
+	return nil
+
+}
+
+func (p *tcpResetProbe) loadAndAttachBPF() error {
 	// 准备动作
 	if err := rlimit.RemoveMemlock(); err != nil {
 		return err
@@ -198,27 +174,27 @@ func loadSync() error {
 	}
 
 	// 获取Loaded的程序/map的fd信息
-	if err := loadBpfObjects(&objs, &opts); err != nil {
+	if err := loadBpfObjects(&p.objs, &opts); err != nil {
 		return fmt.Errorf("loading objects: %v", err)
 	}
 
-	progsend, err := link.Kprobe("tcp_v4_send_reset", objs.TraceSendreset, &link.KprobeOptions{})
+	progsend, err := link.Kprobe("tcp_v4_send_reset", p.objs.TraceSendreset, &link.KprobeOptions{})
 	if err != nil {
 		return fmt.Errorf("link tcp_v4_send_reset: %s", err.Error())
 	}
-	links = append(links, progsend)
+	p.links = append(p.links, progsend)
 
-	progactive, err := link.Kprobe("tcp_send_active_reset", objs.TraceSendactive, &link.KprobeOptions{})
+	progactive, err := link.Kprobe("tcp_send_active_reset", p.objs.TraceSendactive, &link.KprobeOptions{})
 	if err != nil {
 		return fmt.Errorf("link tcp_send_active_reset: %s", err.Error())
 	}
-	links = append(links, progactive)
+	p.links = append(p.links, progactive)
 
-	kprecv, err := link.Tracepoint("tcp", "tcp_receive_reset", objs.InspRstrx, nil)
+	kprecv, err := link.Tracepoint("tcp", "tcp_receive_reset", p.objs.InspRstrx, nil)
 	if err != nil {
 		return err
 	}
-	links = append(links, kprecv)
+	p.links = append(p.links, kprecv)
 
 	return nil
 }
