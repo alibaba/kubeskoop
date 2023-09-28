@@ -114,7 +114,12 @@ func (b *BatchMetrics) Collect(metrics chan<- prometheus.Metric) {
 			log.Errorf("%s undeclared metrics %s", b.name, name)
 			return
 		}
-		metrics <- prometheus.MustNewConstMetric(info.desc, info.valueType, val, labels...)
+		m, err := prometheus.NewConstMetric(info.desc, info.valueType, val, labels...)
+		if err != nil {
+			log.Errorf("%s failed create metrics, err: %v", b.name, err)
+			return
+		}
+		metrics <- m
 	}
 
 	err := b.ProbeCollector(emit)
