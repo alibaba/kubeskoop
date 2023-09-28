@@ -21,10 +21,4 @@ event:
   - name: tcpreset
   sinks:
   - name: stderr
-  - name: file
-    args:
-      path: /tmp/exporter.json
-  - name: loki
-    args:
-      addr: 127.0.0.1:3100
 

@@ -89,15 +89,10 @@ curl {{skoop-exporter的pod ip}}:9102/status |jq .
 | name                               | Skoop-exporter daemonset name                                                                                        | `skoop-exporter`                   |
 | namespace                          | The namespace of skoop-exporter workload                                                                             | `skoop`                            |
 | debugmode                          | Enable the debugmode of skoop-exporter, with debug interface, debug log level and pprof support                      | `false`                            |
-| config.enableEventServer           | Enable the event server                                                                                              | `false`                            |
-| config.enableMetricServer          | Enable the metric server                                                                                             | `true`                             |
-| config.remoteLokiAddress           | Set the remote grafana loki endpoint to push events                                                                  | ``                                 |
-| config.metricLabelVerbose          | Deliever the detail information of pod in metric label, such as app label, ip                                        | `false`                            |
-| config.metricServerPort            | Metric server port, provide HTTP service                                                                             | 9102                               |
-| config.eventServerPort             | Event  sever port, provide GRPC service                                                                              | 19102                              |
-| config.metricProbes                | Metric probes to enable                                                                                              | refer to the probe guide           |
+| config.serverPort                  | Metric server port, provide HTTP service                                                                             | 9102                               |
+| config.metricsProbes               | Metric probes to enable                                                                                              | refer to the probe guide           |
 | config.eventProbes                 | Event probes to enable                                                                                               | refer to the probe guide           |
-| config.metricCacheInterval         | Metric cache interval                                                                                                | 15                                 |
+| config.eventSinks                  | Sink config for events, stderr/file/loki are supported now                                                           | 15                                 |
 
 ## 配置
 
@@ -113,14 +108,10 @@ Skoop-exporter支持的配置项如下:
 | Setting                            | Description                                                                                                          | Default                            |
 |------------------------------------|----------------------------------------------------------------------------------------------------------------------|------------------------------------|
 | debugmode                          | Enable the debugmode of skoop-exporter, with debug interface, debug log level and pprof support                      | `false`                            |
-| event_config.loki_enable           | Enable the event server remote push                                                                                  | `false`                            |
-| event_config.loki_address          | Set the remote grafana loki endpoint to push events                                                                  | ``                                 |
-| event_config.probes                | Event probes to enable                                                                                               | refer to the probe guide           |
-| event_config.port                  | Event  sever port, provide GRPC service                                                                              | 19102                              |
-| metric_config.verbose              | Deliever the detail information of pod in metric label, such as app label, ip                                        | `false`                            |
-| metric_config.port                 | Metric server port, provide HTTP service                                                                             | 9102                               |
-| metric_config.probes               | Metric probes to enable                                                                                              | refer to the probe guide           |
-| metric_config.interval             | Metric cache interval                                                                                                | 15                                 |
+| port                               | metrics server port                                                                                                  | 9102                               |
+| metrics.probes                     | Metric probes to enable                                                                                              | refer to the probe guide           |
+| event.probes                       | Event  probes to enable                                                                                              | refer to the probe guide           |
+| event.sink                         | Sink config for events, stderr/file/loki are supported now                                                           | refer to the probe guide           |
 
 可以选择配置的probe如下，他们的详细指标和事件，参见reference_guide：
 
