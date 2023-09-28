@@ -116,17 +116,32 @@ func (p *metricsProbe) collectOnce(emit probe.Emit) error {
 			val.Bytes += values[i].Bytes
 			val.Packets += values[i].Packets
 		}
-		emit("bytes", []string{}, float64(val.Bytes))
-		emit("packets", []string{}, float64(val.Packets))
 
-		fmt.Printf("proto: %d %s:%d->%s:%d pkts: %d, bytes: %d\n",
-			key.Proto,
+		var protocol string
+
+		switch key.Proto {
+		case 1:
+			protocol = "icmp"
+		case 6:
+			protocol = "tcp"
+		case 17:
+			protocol = "udp"
+		case 132:
+			protocol = "sctp"
+		default:
+			log.Errorf("%s unknown ip protocol number %d", probeName, key.Proto)
+		}
+
+		labels := []string{
+			protocol,
 			toIPString(key.Src),
-			htons(key.Sport),
 			toIPString(key.Dst),
-			htons(key.Dport),
-			val.Packets,
-			val.Bytes)
+			fmt.Sprintf("%d", htons(key.Sport)),
+			fmt.Sprintf("%d", htons(key.Dport)),
+		}
+
+		emit("bytes", labels, float64(val.Bytes))
+		emit("packets", labels, float64(val.Packets))
 	}
 	return nil
 }
