@@ -13,10 +13,22 @@ type EventServer struct {
 }
 
 func NewEventServer(sinks []sink.Sink) (*EventServer, error) {
+	var sinkWrappers []*sinkWrapper
+
+	done := make(chan struct{})
+
+	for _, s := range sinks {
+		sinkWrappers = append(sinkWrappers, &sinkWrapper{
+			ch:   make(chan *probe.Event, 1024),
+			s:    s,
+			done: done,
+		})
+	}
+
 	probeManager := &EventProbeManager{
-		sinks:    sinks,
+		sinks:    sinkWrappers,
 		sinkChan: make(chan *probe.Event),
-		done:     make(chan struct{}),
+		done:     done,
 	}
 
 	return &EventServer{
@@ -25,7 +37,7 @@ func NewEventServer(sinks []sink.Sink) (*EventServer, error) {
 }
 
 func (s *EventServer) Start(ctx context.Context, probeConfig []ProbeConfig) error {
-	go s.probeManager.(*EventProbeManager).start()
+	s.probeManager.(*EventProbeManager).start()
 	return s.DynamicProbeServer.Start(ctx, probeConfig)
 }
 
@@ -39,8 +51,14 @@ func (s *EventServer) Stop(ctx context.Context) error {
 
 type EventProbeManager struct {
 	sinkChan chan *probe.Event
-	sinks    []sink.Sink
+	sinks    []*sinkWrapper
 	done     chan struct{}
+}
+
+type sinkWrapper struct {
+	ch   chan *probe.Event
+	s    sink.Sink
+	done chan struct{}
 }
 
 func (m *EventProbeManager) stop() {
@@ -48,20 +66,43 @@ func (m *EventProbeManager) stop() {
 	close(m.done)
 }
 
-func (m *EventProbeManager) start() {
+func consume(sw *sinkWrapper) {
+loop:
 	for {
 		select {
-		case evt := <-m.sinkChan:
-			for _, sink := range m.sinks {
-				//TODO be concurrency
-				if err := sink.Write(evt); err != nil {
-					log.Errorf("error sink evt %s", err)
-				}
+		case evt := <-sw.ch:
+			if err := sw.s.Write(evt); err != nil {
+				log.Errorf("error sink evt %s", err)
 			}
-		case <-m.done:
-			break
+		case <-sw.done:
+			break loop
 		}
 	}
+}
+
+func (m *EventProbeManager) start() {
+	for _, s := range m.sinks {
+		go consume(s)
+	}
+
+	go func() {
+	loop:
+		for {
+			select {
+			case evt := <-m.sinkChan:
+				for _, sw := range m.sinks {
+					select {
+					case sw.ch <- evt:
+						break
+					default:
+						log.Errorf("%s is blocked, discard event.", sw.s)
+					}
+				}
+			case <-m.done:
+				break loop
+			}
+		}
+	}()
 }
 
 func (m *EventProbeManager) CreateProbe(config ProbeConfig) (probe.EventProbe, error) {

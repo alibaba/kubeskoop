@@ -62,6 +62,10 @@ type LokiSink struct {
 	client promtail.Client
 }
 
+func (l *LokiSink) String() string {
+	return "loki"
+}
+
 func (l *LokiSink) Write(event *probe.Event) error {
 	data, err := json.Marshal(event)
 	if err != nil {

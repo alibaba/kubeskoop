@@ -15,7 +15,11 @@ func NewStderrSink() *StderrSink {
 	return &StderrSink{}
 }
 
-func (s StderrSink) Write(event *probe.Event) error {
+func (s *StderrSink) String() string {
+	return "stderr"
+}
+
+func (s *StderrSink) Write(event *probe.Event) error {
 	data, err := json.Marshal(event)
 	if err != nil {
 		return fmt.Errorf("failed marshal event, err: %w", err)
