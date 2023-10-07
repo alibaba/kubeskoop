@@ -98,7 +98,6 @@ func (p *BiolatencyProbe) perf() {
 			Message:   fmt.Sprintf("%s %d latency %s", bpfutil.GetCommString(event.Target), event.Pid, bpfutil.GetHumanTimes(event.Latency)),
 		}
 
-		log.Errorf("sink event to channel")
 		p.sink <- evt
 	}
 }

@@ -23,6 +23,10 @@ type FileSink struct {
 	file *os.File
 }
 
+func (f *FileSink) String() string {
+	return "file"
+}
+
 func (f *FileSink) Write(event *probe.Event) error {
 	data, err := json.Marshal(event)
 	if err != nil {
