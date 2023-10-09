@@ -2,8 +2,9 @@ package probe
 
 import (
 	"fmt"
-	"github.com/mitchellh/mapstructure"
 	"reflect"
+
+	"github.com/mitchellh/mapstructure"
 )
 
 func validateProbeCreatorReturnValue[T interface{}](t reflect.Type) error {

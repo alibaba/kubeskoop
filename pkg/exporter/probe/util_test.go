@@ -1,9 +1,10 @@
 package probe
 
 import (
-	"golang.org/x/exp/slices"
 	"reflect"
 	"testing"
+
+	"golang.org/x/exp/slices"
 )
 
 type test interface {
