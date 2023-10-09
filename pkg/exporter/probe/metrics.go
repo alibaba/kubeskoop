@@ -3,6 +3,7 @@ package probe
 import (
 	"errors"
 	"fmt"
+	"reflect"
 
 	log "github.com/sirupsen/logrus"
 
@@ -14,28 +15,89 @@ const LegacyMetricsNamespace = "inspector"
 const MetricsNamespace = "kubeskoop"
 
 var (
-	availableMetricsProbes = make(map[string]MetricsProbeCreator)
+	availableMetricsProbes = make(map[string]*MetricsProbeCreator)
 	ErrUndeclaredMetrics   = errors.New("undeclared metrics")
 )
 
-type MetricsProbeCreator func(args map[string]interface{}) (MetricsProbe, error)
-
-func MustRegisterMetricsProbe(name string, creator MetricsProbeCreator) {
-	if _, ok := availableMetricsProbes[name]; ok {
-		panic(fmt.Errorf("duplicated event probe %s", name))
-	}
-
-	availableMetricsProbes[name] = creator
+// type MetricsProbeCreator func(args map[string]interface{}) (MetricsProbe, error)
+type MetricsProbeCreator struct {
+	f reflect.Value
+	s *reflect.Type
 }
 
-func CreateMetricsProbe(name string, _ interface{}) (MetricsProbe, error) {
+func NewMetricProbeCreator(creator interface{}) (*MetricsProbeCreator, error) {
+	t := reflect.TypeOf(creator)
+	if t.Kind() != reflect.Func {
+		return nil, fmt.Errorf("metric probe creator %#v is not a func", creator)
+	}
+
+	err := validateProbeCreatorReturnValue[MetricsProbe](reflect.TypeOf(creator))
+	if err != nil {
+		return nil, err
+	}
+
+	if t.NumIn() > 1 {
+		return nil, fmt.Errorf("input parameter count of creator should be either 0 or 1")
+	}
+
+	ret := &MetricsProbeCreator{
+		f: reflect.ValueOf(creator),
+	}
+
+	if t.NumIn() == 1 {
+		st := t.In(0)
+		if st.Kind() != reflect.Struct && st.Kind() != reflect.Map {
+			return nil, fmt.Errorf("input parameter should be struct, but %s", st.Kind())
+		}
+		if st.Kind() == reflect.Map && st.Key().Kind() != reflect.String {
+			return nil, fmt.Errorf("map key type of input parameter should be string")
+		}
+		ret.s = &st
+	}
+
+	return ret, nil
+}
+
+func (m *MetricsProbeCreator) Call(args map[string]interface{}) (MetricsProbe, error) {
+	var in []reflect.Value
+	if m.s != nil {
+		s, err := createStructFromTypeWithArgs(*m.s, args)
+		if err != nil {
+			return nil, err
+		}
+		in = append(in, s)
+	}
+
+	result := m.f.Call(in)
+	// return parameter count and type has been checked in NewMetricProbeCreator
+	ret := result[0].Interface().(MetricsProbe)
+	err := result[1].Interface()
+	if err == nil {
+		return ret, nil
+	}
+	return ret, err.(error)
+}
+
+func MustRegisterMetricsProbe(name string, creator interface{}) {
+	if _, ok := availableMetricsProbes[name]; ok {
+		panic(fmt.Errorf("duplicated metric probe %s", name))
+	}
+
+	c, err := NewMetricProbeCreator(creator)
+	if err != nil {
+		panic(fmt.Errorf("error register metric probe %s: %s", name, err))
+	}
+
+	availableMetricsProbes[name] = c
+}
+
+func CreateMetricsProbe(name string, args map[string]interface{}) (MetricsProbe, error) {
 	creator, ok := availableMetricsProbes[name]
 	if !ok {
 		return nil, fmt.Errorf("undefined probe %s", name)
 	}
 
-	//TODO reflect creator's arguments
-	return creator(nil)
+	return creator.Call(args)
 }
 
 func ListMetricsProbes() []string {

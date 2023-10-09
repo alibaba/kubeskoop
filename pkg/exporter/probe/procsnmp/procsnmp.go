@@ -86,7 +86,7 @@ func init() {
 	probe.MustRegisterMetricsProbe(IP, newSnmpProbeCreator(IP))
 }
 
-func newSnmpProbeCreator(probeName string) probe.MetricsProbeCreator {
+func newSnmpProbeCreator(probeName string) func(args map[string]interface{}) (probe.MetricsProbe, error) {
 	return func(args map[string]interface{}) (probe.MetricsProbe, error) {
 		p := &procSNMP{
 			name: probeName,

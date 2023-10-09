@@ -233,8 +233,8 @@ type EventSinkConfig struct {
 }
 
 type ProbeConfig struct {
-	Name string      `yaml:"name" mapstructure:"name"`
-	Args interface{} `yaml:"args" mapstructure:"args"`
+	Name string                 `yaml:"name" mapstructure:"name"`
+	Args map[string]interface{} `yaml:"args" mapstructure:"args"`
 }
 
 type inspServer struct {
