@@ -76,7 +76,7 @@ func init() {
 	probe.MustRegisterMetricsProbe(probeName, softNetProbeCreator)
 }
 
-func softNetProbeCreator(_ map[string]interface{}) (probe.MetricsProbe, error) {
+func softNetProbeCreator() (probe.MetricsProbe, error) {
 	p := &ProcTCP{}
 
 	batchMetrics := probe.NewLegacyBatchMetrics(probeName, TCPSummaryMetrics, p.CollectOnce)

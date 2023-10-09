@@ -98,7 +98,7 @@ func init() {
 	probe.MustRegisterMetricsProbe(probeName, netdevProbeCreator)
 }
 
-func netdevProbeCreator(_ map[string]interface{}) (probe.MetricsProbe, error) {
+func netdevProbeCreator() (probe.MetricsProbe, error) {
 	p := &ProcNetstat{}
 
 	batchMetrics := probe.NewLegacyBatchMetrics(probeName, TCPExtMetrics, p.CollectOnce)

@@ -41,7 +41,7 @@ func init() {
 	probe.MustRegisterEventProbe(probeName, eventProbeCreator)
 }
 
-func eventProbeCreator(sink chan<- *probe.Event, _ map[string]interface{}) (probe.EventProbe, error) {
+func eventProbeCreator(sink chan<- *probe.Event) (probe.EventProbe, error) {
 	p := &tcpResetProbe{
 		sink: sink,
 	}
