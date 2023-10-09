@@ -79,6 +79,40 @@ func (e *EventProbeCreator) Call(sink chan<- *Event, args map[string]interface{}
 	return ret, err.(error)
 }
 
+// MustRegisterEventProbe registers the event probe by given name and creator.
+// The creator is a function that creates EventProbe. Return values of the creator
+// must be (EventProbe, error). The creator can accept one parameter
+// of type chan<- *Event, or struct/map as an extra parameter.
+// When the creator specifies the extra parameter, the configuration of the probe in the configuration file
+// will be passed to the creator when the probe is created. For example:
+//
+// The creator accepts no extra args.
+//
+//	func eventProbeCreator(sink chan<- *Event) (EventProbe, error)
+//
+// The creator accepts struct "probeArgs" as args. Names of struct fields are case-insensitive.
+//
+//		// Config in yaml
+//		args:
+//	      argA: test
+//		  argB: 20
+//		  argC:
+//		    - a
+//		// Struct definition
+//		type probeArgs struct {
+//		  ArgA string
+//		  ArgB int
+//		  ArgC []string
+//		}
+//		// The creator function:
+//		func eventProbeCreator(sink chan<- *Event, args probeArgs) (EventProbe, error)
+//
+// The creator can also use a map with string keys as parameters.
+// However, if you use a type other than interface{} as the value type, errors may occur
+// during the configuration parsing process.
+//
+//	func metricsProbeCreator(sink chan<- *Event, args map[string]string) (EventProbe, error)
+//	func metricsProbeCreator(sink chan<- *Event, args map[string]interface{} (EventProbe, error)
 func MustRegisterEventProbe(name string, creator interface{}) {
 	if _, ok := availableEventProbe[name]; ok {
 		panic(fmt.Errorf("duplicated event probe %s", name))

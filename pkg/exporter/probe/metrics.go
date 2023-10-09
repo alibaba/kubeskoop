@@ -78,6 +78,39 @@ func (m *MetricsProbeCreator) Call(args map[string]interface{}) (MetricsProbe, e
 	return ret, err.(error)
 }
 
+// MustRegisterMetricsProbe registers the metrics probe by given name and creator.
+// The creator is a function that creates MetricProbe. Return values of the creator
+// must be (MetricsProbe, error). The creator can accept no parameter, or struct/map as a parameter.
+// When the creator specifies the parameter, the configuration of the probe in the configuration file
+// will be passed to the creator when the probe is created. For example:
+//
+// The creator accepts no extra args.
+//
+//	func metricsProbeCreator() (MetricsProbe, error)
+//
+// The creator accepts struct "probeArgs" as args. Names of struct fields are case-insensitive.
+//
+//		// Config in yaml
+//		args:
+//	      argA: test
+//		  argB: 20
+//		  argC:
+//		    - a
+//		// Struct definition
+//		type probeArgs struct {
+//		  ArgA string
+//		  ArgB int
+//		  ArgC []string
+//		}
+//		// The creator function:
+//		func metricsProbeCreator(args probeArgs) (MetricsProbe, error)
+//
+// The creator can also use a map with string keys as parameters.
+// However, if you use a type other than interface{} as the value type, errors may occur
+// during the configuration parsing process.
+//
+//	func metricsProbeCreator(args map[string]string) (MetricsProbe, error)
+//	func metricsProbeCreator(args map[string]interface{} (MetricsProbe, error)
 func MustRegisterMetricsProbe(name string, creator interface{}) {
 	if _, ok := availableMetricsProbes[name]; ok {
 		panic(fmt.Errorf("duplicated metric probe %s", name))
