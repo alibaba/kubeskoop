@@ -9,47 +9,39 @@ import (
 )
 
 var (
-	availableEventProbe = make(map[string]*EventProbeCreator)
+	availableEventProbe = make(map[string]*eventProbeCreator)
 )
 
-// type EventProbeCreator func(sink chan<- *Event, args map[string]interface{}) (EventProbe, error)
-type EventProbeCreator struct {
+type eventProbeCreator struct {
 	f reflect.Value
 	s *reflect.Type
 }
 
-func NewEventProbeCreator(creator interface{}) (*EventProbeCreator, error) {
+func newEventProbeCreator(creator interface{}) (*eventProbeCreator, error) {
 	t := reflect.TypeOf(creator)
-	if t.Kind() != reflect.Func {
-		return nil, fmt.Errorf("metric probe creator %#v is not a func", creator)
-	}
-
-	err := validateProbeCreatorReturnValue[EventProbe](reflect.TypeOf(creator))
+	err := validateProbeCreatorReturnValue[EventProbe](t)
 	if err != nil {
 		return nil, err
 	}
 
 	if t.NumIn() != 1 && t.NumIn() != 2 {
-		return nil, fmt.Errorf("input parameter count of creator should be either 2 or 3")
+		return nil, fmt.Errorf("input parameter count of creator should be either 1 or 2")
 	}
 
 	ct := t.In(0)
 	et := reflect.TypeOf((*Event)(nil))
 	if ct.Kind() != reflect.Chan || ct.ChanDir() != reflect.SendDir || ct.Elem() != et {
-		return nil, fmt.Errorf("first input parameter should be a send channel of *Event")
+		return nil, fmt.Errorf("first input parameter type should be chan<- *Event")
 	}
 
-	ret := &EventProbeCreator{
+	ret := &eventProbeCreator{
 		f: reflect.ValueOf(creator),
 	}
 
 	if t.NumIn() == 2 {
 		st := t.In(1)
-		if st.Kind() != reflect.Struct && st.Kind() != reflect.Map {
-			return nil, fmt.Errorf("input parameter should be struct, but %s", st.Kind())
-		}
-		if st.Kind() == reflect.Map && st.Key().Kind() != reflect.String {
-			return nil, fmt.Errorf("map key type of input parameter should be string")
+		if err := validateParamTypeMapOrStruct(st); err != nil {
+			return nil, err
 		}
 		ret.s = &st
 	}
@@ -57,7 +49,7 @@ func NewEventProbeCreator(creator interface{}) (*EventProbeCreator, error) {
 	return ret, nil
 }
 
-func (e *EventProbeCreator) Call(sink chan<- *Event, args map[string]interface{}) (EventProbe, error) {
+func (e *eventProbeCreator) Call(sink chan<- *Event, args map[string]interface{}) (EventProbe, error) {
 	in := []reflect.Value{
 		reflect.ValueOf(sink),
 	}
@@ -70,7 +62,7 @@ func (e *EventProbeCreator) Call(sink chan<- *Event, args map[string]interface{}
 	}
 
 	result := e.f.Call(in)
-	// return parameter count and type has been checked in NewEventProbeCreator
+	// return parameter count and type has been checked in newEventProbeCreator
 	ret := result[0].Interface().(EventProbe)
 	err := result[1].Interface()
 	if err == nil {
@@ -118,7 +110,7 @@ func MustRegisterEventProbe(name string, creator interface{}) {
 		panic(fmt.Errorf("duplicated event probe %s", name))
 	}
 
-	c, err := NewEventProbeCreator(creator)
+	c, err := newEventProbeCreator(creator)
 	if err != nil {
 		panic(fmt.Errorf("error register event probe %s: %s", name, err))
 	}

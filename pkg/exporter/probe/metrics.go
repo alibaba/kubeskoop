@@ -15,23 +15,18 @@ const LegacyMetricsNamespace = "inspector"
 const MetricsNamespace = "kubeskoop"
 
 var (
-	availableMetricsProbes = make(map[string]*MetricsProbeCreator)
+	availableMetricsProbes = make(map[string]*metricsProbeCreator)
 	ErrUndeclaredMetrics   = errors.New("undeclared metrics")
 )
 
-// type MetricsProbeCreator func(args map[string]interface{}) (MetricsProbe, error)
-type MetricsProbeCreator struct {
+type metricsProbeCreator struct {
 	f reflect.Value
 	s *reflect.Type
 }
 
-func NewMetricProbeCreator(creator interface{}) (*MetricsProbeCreator, error) {
+func newMetricProbeCreator(creator interface{}) (*metricsProbeCreator, error) {
 	t := reflect.TypeOf(creator)
-	if t.Kind() != reflect.Func {
-		return nil, fmt.Errorf("metric probe creator %#v is not a func", creator)
-	}
-
-	err := validateProbeCreatorReturnValue[MetricsProbe](reflect.TypeOf(creator))
+	err := validateProbeCreatorReturnValue[MetricsProbe](t)
 	if err != nil {
 		return nil, err
 	}
@@ -40,17 +35,14 @@ func NewMetricProbeCreator(creator interface{}) (*MetricsProbeCreator, error) {
 		return nil, fmt.Errorf("input parameter count of creator should be either 0 or 1")
 	}
 
-	ret := &MetricsProbeCreator{
+	ret := &metricsProbeCreator{
 		f: reflect.ValueOf(creator),
 	}
 
 	if t.NumIn() == 1 {
 		st := t.In(0)
-		if st.Kind() != reflect.Struct && st.Kind() != reflect.Map {
-			return nil, fmt.Errorf("input parameter should be struct, but %s", st.Kind())
-		}
-		if st.Kind() == reflect.Map && st.Key().Kind() != reflect.String {
-			return nil, fmt.Errorf("map key type of input parameter should be string")
+		if err := validateParamTypeMapOrStruct(st); err != nil {
+			return nil, err
 		}
 		ret.s = &st
 	}
@@ -58,7 +50,7 @@ func NewMetricProbeCreator(creator interface{}) (*MetricsProbeCreator, error) {
 	return ret, nil
 }
 
-func (m *MetricsProbeCreator) Call(args map[string]interface{}) (MetricsProbe, error) {
+func (m *metricsProbeCreator) Call(args map[string]interface{}) (MetricsProbe, error) {
 	var in []reflect.Value
 	if m.s != nil {
 		s, err := createStructFromTypeWithArgs(*m.s, args)
@@ -69,7 +61,7 @@ func (m *MetricsProbeCreator) Call(args map[string]interface{}) (MetricsProbe, e
 	}
 
 	result := m.f.Call(in)
-	// return parameter count and type has been checked in NewMetricProbeCreator
+	// return parameter count and type has been checked in newMetricProbeCreator
 	ret := result[0].Interface().(MetricsProbe)
 	err := result[1].Interface()
 	if err == nil {
@@ -116,7 +108,7 @@ func MustRegisterMetricsProbe(name string, creator interface{}) {
 		panic(fmt.Errorf("duplicated metric probe %s", name))
 	}
 
-	c, err := NewMetricProbeCreator(creator)
+	c, err := newMetricProbeCreator(creator)
 	if err != nil {
 		panic(fmt.Errorf("error register metric probe %s: %s", name, err))
 	}

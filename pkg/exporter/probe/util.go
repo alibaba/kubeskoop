@@ -9,7 +9,7 @@ import (
 
 func validateProbeCreatorReturnValue[T interface{}](t reflect.Type) error {
 	if t.Kind() != reflect.Func {
-		return fmt.Errorf("%s is not Func type", t)
+		return fmt.Errorf("creator %#v is not a func", t)
 	}
 
 	if t.NumOut() != 2 {
@@ -24,6 +24,20 @@ func validateProbeCreatorReturnValue[T interface{}](t reflect.Type) error {
 	et := reflect.TypeOf((*error)(nil)).Elem()
 	if !t.Out(1).Implements(et) {
 		return fmt.Errorf("arg 1 should implement error")
+	}
+	return nil
+}
+
+func validateParamTypeMapOrStruct(t reflect.Type) error {
+	switch t.Kind() {
+	case reflect.Struct:
+		// no need to check
+	case reflect.Map:
+		if t.Key().Kind() != reflect.String {
+			return fmt.Errorf("map key type of input parameter should be string")
+		}
+	default:
+		return fmt.Errorf("input parameter type should be struct, but %s", t.Kind())
 	}
 	return nil
 }
