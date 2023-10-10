@@ -32,7 +32,6 @@ const (
 )
 
 var (
-	dev       = "eth0"
 	probeName = "flow"
 )
 
@@ -40,8 +39,18 @@ func init() {
 	probe.MustRegisterMetricsProbe(probeName, metricsProbeCreator)
 }
 
-func metricsProbeCreator(_ map[string]interface{}) (probe.MetricsProbe, error) {
-	p := &metricsProbe{}
+type flowArgs struct {
+	Dev string
+}
+
+func metricsProbeCreator(args flowArgs) (probe.MetricsProbe, error) {
+	if args.Dev == "" {
+		args.Dev = "eth0"
+	}
+
+	p := &metricsProbe{
+		args: args,
+	}
 	opts := probe.BatchMetricsOpts{
 		Namespace:      probe.MetricsNamespace,
 		Subsystem:      probeName,
@@ -57,6 +66,7 @@ func metricsProbeCreator(_ map[string]interface{}) (probe.MetricsProbe, error) {
 
 type metricsProbe struct {
 	bpfObjs bpfObjects
+	args    flowArgs
 }
 
 func (p *metricsProbe) Start(_ context.Context) error {
@@ -80,7 +90,7 @@ func (p *metricsProbe) Stop(_ context.Context) error {
 
 func (p *metricsProbe) cleanup() error {
 	//TODO only clean qdisc after replace qdisc successfully
-	link, err := netlink.LinkByName(dev)
+	link, err := netlink.LinkByName(p.args.Dev)
 	if err == nil {
 		_ = cleanQdisc(link)
 	}
@@ -203,15 +213,9 @@ func (p *metricsProbe) loadBPF() error {
 
 	opts := ebpf.CollectionOptions{}
 
-	//TODO 优化btf文件的查找方式
-	btf, err := bpfutil.LoadBTFFromFile("/sys/kernel/btf/vmlinux")
-	if err != nil {
-		panic(err)
-	}
-
 	opts.Programs = ebpf.ProgramOptions{
 		LogLevel:    ebpf.LogLevelInstruction | ebpf.LogLevelBranch | ebpf.LogLevelStats,
-		KernelTypes: btf,
+		KernelTypes: bpfutil.LoadBTFSpecOrNil(),
 	}
 
 	// Load pre-compiled programs and maps into the kernel.
@@ -222,9 +226,9 @@ func (p *metricsProbe) loadBPF() error {
 }
 
 func (p *metricsProbe) loadAndAttachBPF() error {
-	eth0, err := netlink.LinkByName(dev)
+	eth0, err := netlink.LinkByName(p.args.Dev)
 	if err != nil {
-		return fmt.Errorf("fail get link %s, err: %w", dev, err)
+		return fmt.Errorf("fail get link %s, err: %w", p.args.Dev, err)
 	}
 
 	if err := p.loadBPF(); err != nil {
@@ -232,7 +236,7 @@ func (p *metricsProbe) loadAndAttachBPF() error {
 	}
 
 	if err := p.setupTCFilter(eth0); err != nil {
-		return fmt.Errorf("failed replace %s qdisc with clsact, err: %v", dev, err)
+		return fmt.Errorf("failed replace %s qdisc with clsact, err: %v", p.args.Dev, err)
 	}
 	return nil
 }

@@ -61,7 +61,7 @@ func init() {
 	probe.MustRegisterEventProbe(probeName, eventProbeCreator)
 }
 
-func metricsProbeCreator(_ map[string]interface{}) (probe.MetricsProbe, error) {
+func metricsProbeCreator() (probe.MetricsProbe, error) {
 	p := &metricsProbe{}
 	batchMetrics := probe.NewLegacyBatchMetricsWithUnderscore(probeName, packetLossMetrics, p.CollectOnce)
 

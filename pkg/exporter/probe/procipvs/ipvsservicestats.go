@@ -32,7 +32,7 @@ func init() {
 	probe.MustRegisterMetricsProbe(probeName, ipvsProbeCreator)
 }
 
-func ipvsProbeCreator(_ map[string]interface{}) (probe.MetricsProbe, error) {
+func ipvsProbeCreator() (probe.MetricsProbe, error) {
 	p := &ProcIPVS{}
 
 	batchMetrics := probe.NewLegacyBatchMetrics(probeName, IPVSMetrics, p.CollectOnce)

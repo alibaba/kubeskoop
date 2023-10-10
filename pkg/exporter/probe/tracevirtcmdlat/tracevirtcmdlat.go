@@ -49,7 +49,7 @@ func metricsProbeCreator(_ map[string]interface{}) (probe.MetricsProbe, error) {
 	return probe.NewMetricsProbe(probeName, p, batchMetrics), nil
 }
 
-func eventProbeCreator(sink chan<- *probe.Event, _ map[string]interface{}) (probe.EventProbe, error) {
+func eventProbeCreator(sink chan<- *probe.Event) (probe.EventProbe, error) {
 	p := &eventProbe{
 		sink: sink,
 	}

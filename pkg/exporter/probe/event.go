@@ -2,37 +2,133 @@ package probe
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 	"golang.org/x/exp/slog"
 )
 
 var (
-	availableEventProbe = make(map[string]EventProbeCreator)
+	availableEventProbe = make(map[string]*eventProbeCreator)
 )
 
-type EventProbeCreator func(sink chan<- *Event, args map[string]interface{}) (EventProbe, error)
+type eventProbeCreator struct {
+	f reflect.Value
+	s *reflect.Type
+}
 
-func MustRegisterEventProbe(name string, creator EventProbeCreator) {
+func newEventProbeCreator(creator interface{}) (*eventProbeCreator, error) {
+	t := reflect.TypeOf(creator)
+	err := validateProbeCreatorReturnValue[EventProbe](t)
+	if err != nil {
+		return nil, err
+	}
+
+	if t.NumIn() != 1 && t.NumIn() != 2 {
+		return nil, fmt.Errorf("input parameter count of creator should be either 1 or 2")
+	}
+
+	ct := t.In(0)
+	et := reflect.TypeOf((*Event)(nil))
+	if ct.Kind() != reflect.Chan || ct.ChanDir() != reflect.SendDir || ct.Elem() != et {
+		return nil, fmt.Errorf("first input parameter type should be chan<- *Event")
+	}
+
+	ret := &eventProbeCreator{
+		f: reflect.ValueOf(creator),
+	}
+
+	if t.NumIn() == 2 {
+		st := t.In(1)
+		if err := validateParamTypeMapOrStruct(st); err != nil {
+			return nil, err
+		}
+		ret.s = &st
+	}
+
+	return ret, nil
+}
+
+func (e *eventProbeCreator) Call(sink chan<- *Event, args map[string]interface{}) (EventProbe, error) {
+	in := []reflect.Value{
+		reflect.ValueOf(sink),
+	}
+	if e.s != nil {
+		s, err := createStructFromTypeWithArgs(*e.s, args)
+		if err != nil {
+			return nil, err
+		}
+		in = append(in, s)
+	}
+
+	result := e.f.Call(in)
+	// return parameter count and type has been checked in newEventProbeCreator
+	ret := result[0].Interface().(EventProbe)
+	err := result[1].Interface()
+	if err == nil {
+		return ret, nil
+	}
+	return ret, err.(error)
+}
+
+// MustRegisterEventProbe registers the event probe by given name and creator.
+// The creator is a function that creates EventProbe. Return values of the creator
+// must be (EventProbe, error). The creator can accept one parameter
+// of type chan<- *Event, or struct/map as an extra parameter.
+// When the creator specifies the extra parameter, the configuration of the probe in the configuration file
+// will be passed to the creator when the probe is created. For example:
+//
+// The creator accepts no extra args.
+//
+//	func eventProbeCreator(sink chan<- *Event) (EventProbe, error)
+//
+// The creator accepts struct "probeArgs" as args. Names of struct fields are case-insensitive.
+//
+//		// Config in yaml
+//		args:
+//	      argA: test
+//		  argB: 20
+//		  argC:
+//		    - a
+//		// Struct definition
+//		type probeArgs struct {
+//		  ArgA string
+//		  ArgB int
+//		  ArgC []string
+//		}
+//		// The creator function:
+//		func eventProbeCreator(sink chan<- *Event, args probeArgs) (EventProbe, error)
+//
+// The creator can also use a map with string keys as parameters.
+// However, if you use a type other than interface{} as the value type, errors may occur
+// during the configuration parsing process.
+//
+//	func metricsProbeCreator(sink chan<- *Event, args map[string]string) (EventProbe, error)
+//	func metricsProbeCreator(sink chan<- *Event, args map[string]interface{} (EventProbe, error)
+func MustRegisterEventProbe(name string, creator interface{}) {
 	if _, ok := availableEventProbe[name]; ok {
 		panic(fmt.Errorf("duplicated event probe %s", name))
 	}
 
-	availableEventProbe[name] = creator
+	c, err := newEventProbeCreator(creator)
+	if err != nil {
+		panic(fmt.Errorf("error register event probe %s: %s", name, err))
+	}
+
+	availableEventProbe[name] = c
 }
 
 func NewEventProbe(name string, simpleProbe SimpleProbe) EventProbe {
 	return NewProbe(name, simpleProbe)
 }
 
-func CreateEventProbe(name string, sink chan<- *Event, _ interface{}) (EventProbe, error) {
+func CreateEventProbe(name string, sink chan<- *Event, args map[string]interface{}) (EventProbe, error) {
 	creator, ok := availableEventProbe[name]
 	if !ok {
 		return nil, fmt.Errorf("undefined probe %s", name)
 	}
 
-	//TODO reflect creator's arguments
-	return creator(sink, nil)
+	return creator.Call(sink, args)
 }
 
 func ListEventProbes() []string {

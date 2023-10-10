@@ -36,7 +36,7 @@ func init() {
 	probe.MustRegisterMetricsProbe(probeName, sockProbeCreator)
 }
 
-func sockProbeCreator(_ map[string]interface{}) (probe.MetricsProbe, error) {
+func sockProbeCreator() (probe.MetricsProbe, error) {
 	p := &ProcSock{}
 
 	batchMetrics := probe.NewLegacyBatchMetrics(probeName, TCPSockStatMetrics, p.CollectOnce)

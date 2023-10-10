@@ -29,7 +29,7 @@ func init() {
 	probe.MustRegisterEventProbe(probeName, bioLatencyProbeCreator)
 }
 
-func bioLatencyProbeCreator(sink chan<- *probe.Event, _ map[string]interface{}) (probe.EventProbe, error) {
+func bioLatencyProbeCreator(sink chan<- *probe.Event) (probe.EventProbe, error) {
 	p := &BiolatencyProbe{
 		sink: sink,
 	}

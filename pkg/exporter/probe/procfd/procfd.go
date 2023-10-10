@@ -26,7 +26,7 @@ func init() {
 	probe.MustRegisterMetricsProbe(probeName, fdProbeCreator)
 }
 
-func fdProbeCreator(_ map[string]interface{}) (probe.MetricsProbe, error) {
+func fdProbeCreator() (probe.MetricsProbe, error) {
 	p := &ProcFD{}
 
 	batchMetrics := probe.NewLegacyBatchMetrics(probeName, FDMetrics, p.CollectOnce)

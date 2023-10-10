@@ -59,7 +59,7 @@ func init() {
 	probe.MustRegisterMetricsProbe(probeName, qdiscProbeCreator)
 }
 
-func qdiscProbeCreator(_ map[string]interface{}) (probe.MetricsProbe, error) {
+func qdiscProbeCreator() (probe.MetricsProbe, error) {
 	p := &Probe{}
 
 	batchMetrics := probe.NewLegacyBatchMetrics(probeName, qdiscMetrics, p.CollectOnce)

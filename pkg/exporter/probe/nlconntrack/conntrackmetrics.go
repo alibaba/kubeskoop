@@ -29,7 +29,7 @@ var (
 	conntrackMetrics = []string{Found, Invalid, Ignore, Insert, InsertFailed, Drop, EarlyDrop, Error, SearchRestart, Entries, MaxEntries}
 )
 
-func metricsProbeCreator(_ map[string]interface{}) (probe.MetricsProbe, error) {
+func metricsProbeCreator() (probe.MetricsProbe, error) {
 	p := &conntrackMetricsProbe{}
 
 	batchMetrics := probe.NewLegacyBatchMetrics(probeName, conntrackMetrics, p.CollectOnce)

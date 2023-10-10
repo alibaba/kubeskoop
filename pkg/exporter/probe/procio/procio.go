@@ -30,7 +30,7 @@ func init() {
 	probe.MustRegisterMetricsProbe(probeName, ioProbeCreator)
 }
 
-func ioProbeCreator(_ map[string]interface{}) (probe.MetricsProbe, error) {
+func ioProbeCreator() (probe.MetricsProbe, error) {
 	p := &ProcIO{}
 
 	batchMetrics := probe.NewLegacyBatchMetrics(probeName, IOMetrics, p.CollectOnce)
