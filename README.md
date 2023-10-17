@@ -102,8 +102,9 @@ kubectl get service -n kubeskoop grafana -o wide
 
 #### network performance analysis
 
-Open the NodePort Service of grafana on web browser, open the network monitoring page,
-and check the water level of each monitor item corresponding to the time point of the performance problem. For example：  
+Open the NodePort Service of grafana on web browser, login with the default username `admin` and password `kubeskoop`,
+then open the network monitoring page, and check the water level of each monitor item corresponding to the time point of the performance problem.  
+For example:  
 ![grafana_performance](/docs/images/monitoring.png)
 
 #### network jitter & anomy event analysis
