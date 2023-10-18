@@ -1,0 +1,37 @@
+.successDetail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 428px;
+}
+
+.successDetail div {
+  text-align: center;
+}
+
+.successDetail .exceptionImage {
+  margin-bottom: 22px;
+}
+
+.successDetail .statusCode {
+  margin-bottom: 6px;
+  color: #000;
+  font-size: 28px;
+  line-height: 52px;
+  text-align: center;
+}
+.successDetail .description {
+  margin-bottom: 20px;
+  color: #666;
+  font-size: 14px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.successDetail .operationWrap {
+  text-align: center;
+}
+
+.successDetail .mainAction {
+  margin-right: 8px;
+}

@@ -1,0 +1,19 @@
+.logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text1-1, #ccc);
+  font-weight: bold;
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.logo:visited, .logo:link {
+  color: var(--color-text1-1, #ccc);
+  text-decoration: none;
+}
+
+.logo img {
+  height: 24px;
+  margin-right: 10px;
+}

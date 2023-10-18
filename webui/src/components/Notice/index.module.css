@@ -1,0 +1,79 @@
+.noticeIcon {
+  width: 40px;
+  line-height: 50px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.close {
+  display: none;
+  cursor: pointer;
+}
+
+.noticeContainer {
+  width: 270px;
+  background: var(--color-white, #fff);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.12);
+}
+
+.noticeContainer :global .next-list-header {
+  margin: 0 12px;
+}
+.noticeContainer :global .next-list-footer {
+  border: 0;
+}
+
+.noticeContainer :global .next-list-item-title,
+.noticeContainer :global .next-list-item {
+  font-weight: normal;
+}
+
+.noticeContainer :global .next-list-item {
+  padding: 8px 12px;
+  font-size: var(--font-size-caption, 12px);
+}
+
+.noticeItem:hover {
+  background: var(--color-fill1-2, #f2f3f7);
+}
+
+.noticeItem:hover :global .close {
+  display: block;
+}
+
+.title,
+.footer {
+  height: 16px;
+  font-weight: normal;
+  line-height: 16px;
+}
+
+.title h4 {
+  display: inline-block;
+  margin: 0;
+  color: var(--color-text1-4, #333);
+  font-size: var(--font-size-body-1, 12px);
+  line-height: 16px;
+}
+
+.footer {
+  text-align: center;
+}
+
+.footer a {
+  color: var(--color-text1-3, #666);
+  font-size: var(--font-size-caption, 12px);
+  cursor: pointer;
+}
+
+.empty :global .next-list-item-content {
+  align-items: center;
+  height: 40px;
+}
+
+.clear {
+  float: right;
+  color: var(--color-text1-3, #666);
+  font-size: var(--font-size-caption, 12px);
+  cursor: pointer;
+}

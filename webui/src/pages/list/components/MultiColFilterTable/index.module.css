@@ -1,0 +1,28 @@
+.container :global .table-empty-block {
+  width: 100%;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  user-select: none;
+}
+
+.container :global .table-empty-block .result-image {
+  height: 120px;
+}
+
+.container :global .table-empty-block .result-image img {
+  height: 100%;
+}
+
+.container :global .table-empty-block .result-title {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #bcc4cc;
+}
+
+.container .form-actions {
+  text-align: right;
+  align-self: end;
+}

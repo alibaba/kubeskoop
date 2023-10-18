@@ -4,3 +4,34 @@ cmd/exporter/exporter
 .idea
 .vscode
 pkg/exporter/proto/github.com/alibaba/kubeskoop/proto/inspector_grpc.pb.go
+
+# dependencies
+webui/node_modules
+
+# testing
+webui/coverage
+
+# production
+webui/build
+
+# misc
+.DS_Store
+*.swp
+*.dia~
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# local env files
+.env*.local
+
+# tmp
+.ice
+
+# cache
+.eslintcache
+.stylelintcache
+

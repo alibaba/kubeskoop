@@ -1,0 +1,35 @@
+.cardSubTitle {
+  color: var(--color-text1-2, #999);
+  font-size: 12px;
+  line-height: 22px;
+  letter-spacing: 0;
+}
+
+.cardDes {
+  margin-top: 6px;
+  color: var(--color-text1-2, #999);
+  font-size: 12px;
+  line-height: 17px;
+  letter-spacing: 0;
+}
+
+.cardDes span {
+  margin-left: 2px;
+  color: #36cfc9;
+  font-weight: bold;
+}
+
+.cardValue {
+  margin-top: 10px;
+  color: #333;
+  font-weight: var(--font-weight-3, bold);
+  font-size: 28px;
+  line-height: 28px;
+  letter-spacing: 0;
+}
+
+.cardFoot {
+  padding: 13px 16px;
+  color: #666;
+  font-size: 12px;
+}

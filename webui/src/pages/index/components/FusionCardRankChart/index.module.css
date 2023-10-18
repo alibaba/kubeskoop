@@ -1,0 +1,103 @@
+.hisMap {
+  width: 100%;
+  height: 345px;
+  background: url(https://s2.ax1x.com/2020/02/17/3iKU5q.png) 50% 50% no-repeat;
+  background-size: contain;
+}
+
+.histogram {
+  width: 100%;
+  height: 100%;
+  padding: 20px;
+}
+
+.histogram .hisTitle {
+  color: #999;
+  font-size: 12px;
+  line-height: 12px;
+}
+
+.histogram .hisBody {
+  height: 20px;
+}
+
+.histogram .hisRate {
+  margin-left: 10px;
+  font-weight: bold;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.card {
+  height: 100%;
+  background-color: #fff;
+  border-radius: px;
+}
+
+.card .title {
+  margin-top: 24px;
+  margin-left: 24px;
+  color: #333;
+  font-weight: bold;
+}
+
+.card .titleDiv {
+  margin-bottom: 0;
+}
+
+.subCard {
+  height: 100%;
+}
+
+.subCard .subDiv {
+  height: 100%;
+  margin: 0;
+}
+
+.subCard .subFooter {
+  margin-top: 50px;
+}
+
+.subCard .subFooter div:first-child {
+  color: rgba(153, 153, 153, 1);
+}
+
+.subCard .subFooter div:nth-child(2) {
+  color: rgba(54, 207, 201, 1);
+  font-size: 32px;
+}
+
+.subCard .subBody {
+  width: 100%;
+}
+
+.subCard .subBody .subName {
+  color: #222;
+  font-weight: bold;
+  font-size: 16px;
+  line-height: 50px;
+  text-align: center;
+}
+
+.subCard .subBody .subName+div {
+  width: 100%;
+  margin-top: 0;
+}
+
+.subCard .subMain {
+  margin-top: 50px;
+}
+
+.subCard .subMain .subTypeName {
+  color: rgba(153, 153, 153, 1);
+  font-size: 12px;
+}
+
+.subCard .subMain .subMainDiv {
+  height: 20px;
+}
+
+.subCard .subMain .subTypeValue {
+  font-weight: bold;
+  font-size: 20px;
+}
