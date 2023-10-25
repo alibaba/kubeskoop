@@ -27,6 +27,7 @@ RUN apk add --no-cache \
 
 COPY --from=build /go/src/github.com/alibaba/kubeskoop/bin/inspector /bin/inspector
 COPY --from=build /go/src/github.com/alibaba/kubeskoop/bin/pod-collector /bin/pod-collector
+COPY --from=build /go/src/github.com/alibaba/kubeskoop/bin/controller /bin/controller
 COPY --from=build /go/src/github.com/alibaba/kubeskoop/bin/skoop /bin/skoop
 COPY --from=build /go/src/github.com/alibaba/kubeskoop/bin/btfhack /bin/btfhack
 

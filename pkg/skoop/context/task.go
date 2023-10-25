@@ -12,14 +12,14 @@ import (
 )
 
 type TaskConfig struct {
-	Source      string
+	Source      string `json:"source"`
 	Destination struct {
-		Address string
-		Port    uint16
-	}
-	SourceEndpoint model.Endpoint
-	DstEndpoint    model.Endpoint
-	Protocol       string
+		Address string `json:"address"`
+		Port    uint16 `json:"port"`
+	} `json:"destination"`
+	SourceEndpoint model.Endpoint `json:"source_endpoint"`
+	DstEndpoint    model.Endpoint `json:"dst_endpoint"`
+	Protocol       string         `json:"protocol"`
 }
 
 func (tc *TaskConfig) BindFlags(fs *pflag.FlagSet) {

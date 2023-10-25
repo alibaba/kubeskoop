@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	task_agent "github.com/alibaba/kubeskoop/pkg/exporter/task-agent"
 	"net/http"
 	"os"
 	"os/signal"
@@ -74,6 +75,13 @@ var (
 			})
 			insp.v.WatchConfig()
 
+			if insp.config.EnableController {
+				err = task_agent.NewTaskAgent(nettop.GetNodeName()).Run()
+				if err != nil {
+					log.Errorf("start task agent err: %v", err)
+					return
+				}
+			}
 			// block here
 			err = insp.start()
 			if err != nil {
@@ -216,10 +224,11 @@ func init() {
 }
 
 type inspServerConfig struct {
-	DebugMode     bool          `yaml:"debugmode" mapstructure:"debugmode"`
-	Port          uint16        `yaml:"port" mapstructure:"port"`
-	MetricsConfig MetricsConfig `yaml:"metrics" mapstructure:"metrics"`
-	EventConfig   EventConfig   `yaml:"event" mapstructure:"event"`
+	DebugMode        bool          `yaml:"debugmode" mapstructure:"debugmode"`
+	Port             uint16        `yaml:"port" mapstructure:"port"`
+	EnableController bool          `yaml:"enablecontroller" mapstructure:"enablecontroller"`
+	MetricsConfig    MetricsConfig `yaml:"metrics" mapstructure:"metrics"`
+	EventConfig      EventConfig   `yaml:"event" mapstructure:"event"`
 }
 
 type MetricsConfig struct {

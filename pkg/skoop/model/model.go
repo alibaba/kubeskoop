@@ -28,9 +28,9 @@ const (
 )
 
 type Endpoint struct {
-	IP   string
-	Type EndpointType
-	Port uint16
+	IP   string       `json:"ip"`
+	Type EndpointType `json:"type"`
+	Port uint16       `json:"port"`
 }
 
 func (e Endpoint) String() string {

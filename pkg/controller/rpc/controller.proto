@@ -1,0 +1,91 @@
+syntax = "proto3";
+
+package controller_rpc;
+option go_package = "./;rpc";
+
+service ControllerRegisterService {
+  // Agent Health Check
+  rpc RegisterAgent(AgentInfo) returns (ControllerInfo);
+  rpc ReportEvents(stream Event) returns (EventReply);
+  rpc WatchTasks(TaskFilter) returns (stream ServerTask);
+  rpc UploadTaskResult(TaskResult) returns (TaskResultReply);
+}
+
+message AgentInfo {
+  string node_name = 1;
+  string version = 2;
+  repeated TaskType support_task_types = 3;
+}
+
+message ControllerInfo {
+  string version = 1;
+}
+
+message Event {
+  int64 timestamp = 1;
+  string name = 2;
+  string message = 3;
+}
+
+message EventReply {
+  bool success = 1;
+  string message = 2;
+}
+
+message TaskFilter {
+  string node_name = 1;
+  TaskType type = 2;
+}
+
+message ServerTask {
+  ControllerInfo server = 1;
+  Task task = 2;
+}
+
+enum TaskType {
+  Capture = 0;
+}
+
+message Task {
+  TaskType type = 1;
+  string id = 2;
+  oneof TaskInfo {
+    CaptureInfo capture = 3;
+  }
+}
+
+message PodInfo {
+  string name = 1;
+  string namespace = 2;
+  string ipv4 = 3;
+  string ipv6 = 4;
+}
+
+message NodeInfo {
+  string name = 1;
+}
+
+message CaptureInfo {
+  PodInfo pod = 1;
+  NodeInfo node = 2;
+  bool capture_host_ns = 4;
+}
+
+message CaptureResult {
+  bytes message = 2;
+}
+
+message TaskResult {
+  string id = 1;
+  TaskType type = 2;
+  bool success = 3;
+  string message = 4;
+  oneof TaskResultInfo {
+    CaptureResult capture = 5;
+  }
+}
+
+message TaskResultReply {
+  bool success = 1;
+  string message = 2;
+}
