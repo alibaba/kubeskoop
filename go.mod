@@ -42,7 +42,7 @@ require (
 	github.com/vishvananda/netns v0.0.4
 	golang.org/x/exp v0.0.0-20221204150635-6dcec336b2bb
 	golang.org/x/sys v0.8.0
-	google.golang.org/grpc v1.56.2
+	google.golang.org/grpc v1.56.3
 	google.golang.org/protobuf v1.31.0
 	k8s.io/api v0.26.0
 	k8s.io/apimachinery v0.26.0
