@@ -15,16 +15,15 @@ interface URLDialogFields {
 
 const URLDialog: React.FC<URLDialogProps> = (props: URLDialogProps): JSX.Element => {
   const { title = "URL" } = props
-  const field = Field.useField({
-    values: { 'url': props.url }
-  });
+  const field = Field.useField();
 
   const [loading, setLoading] = useState(false);
 
   const submit = async () => {
     setLoading(true);
     const { errors } = await field.validatePromise();
-    if (errors && errors.length > 0) {
+    if (errors) {
+      setLoading(false);
       return;
     }
 
@@ -45,8 +44,8 @@ const URLDialog: React.FC<URLDialogProps> = (props: URLDialogProps): JSX.Element
       onClose={props.onVisibleChange?.bind(null, false)}
     >
       <Form field={field}>
-        <Form.Item label="地址">
-          <Input defaultValue={props.url} />
+        <Form.Item label="地址" format="url">
+          <Input name="url" defaultValue={props.url}/>
         </Form.Item>
       </Form>
     </Dialog>

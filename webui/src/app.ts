@@ -3,9 +3,14 @@ import { fetchUserInfo } from './services/user';
 import { defineAuthConfig } from '@ice/plugin-auth/types';
 import { defineStoreConfig } from '@ice/plugin-store/types';
 import { defineRequestConfig } from '@ice/plugin-request/types';
+import { definePageConfig } from 'ice';
 
 // App config, see https://v3.ice.work/docs/guide/basic/app
-export default defineAppConfig(() => ({}));
+export default defineAppConfig(() => ({
+  app: {
+    strict: true
+  }
+}));
 
 export const authConfig = defineAuthConfig(async (appData) => {
   const { userInfo = {} } = appData;
@@ -31,9 +36,9 @@ export const storeConfig = defineStoreConfig(async (appData) => {
   };
 });
 
-export const request = defineRequestConfig(() => ({
-  baseURL: '/api',
-}));
+export const requestConfig = defineRequestConfig({
+  baseURL: 'http://127.0.0.1:8080',
+});
 
 export const dataLoader = defineDataLoader(async () => {
   const userInfo = await getUserInfo();

@@ -1,5 +1,4 @@
 import { Form, Input, NumberPicker, Select } from '@alifd/next';
-import IPInput from '../IPInput';
 
 interface DiagnosisFormProps {
   onSubmit: (data: DiagnosisFormData) => void;
@@ -11,16 +10,6 @@ interface DiagnosisFormData {
 
 const ipRegex = /^(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])$/;
 
-const validateIPAddress = (_: any, value: string) => {
-  return new Promise((resolve, reject) => {
-    if (ipRegex.test(value)) {
-      resolve(true);
-    } else {
-      reject([new Error('请输入正确的IP地址')]);
-    }
-  });
-}
-
 const DiagnosisForm: React.FunctionComponent<DiagnosisFormProps> = (props: DiagnosisFormProps) => {
   const { onSubmit } = props;
   const handleSubmit = (values: DiagnosisFormData, errors: any) => {
@@ -31,10 +20,10 @@ const DiagnosisForm: React.FunctionComponent<DiagnosisFormProps> = (props: Diagn
   };
   return (
     <Form inline labelAlign='left'>
-      <Form.Item label="源地址" required validator={validateIPAddress}>
+      <Form.Item label="源地址" required patternMessage="请输入正确的IP地址" pattern={ipRegex}>
         <Input name="src" placeholder="请输入源IP地址" />
       </Form.Item>
-      <Form.Item label="目的地址" required validator={validateIPAddress}>
+      <Form.Item label="目的地址" required patternMessage='请输入正确的IP地址' pattern={ipRegex}>
         <Input name="dst" placeholder="请输入目的IP地址" />
       </Form.Item>
       <Form.Item label="端口" required>
