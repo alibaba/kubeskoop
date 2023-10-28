@@ -94,7 +94,7 @@ func (s *Server) CommitDiagnoseTask(ctx *gin.Context) {
 		ctx.AsciiJSON(400, map[string]string{"error": fmt.Sprintf("error commit diagnose task: %v", err)})
 		return
 	}
-	ctx.AsciiJSON(200, map[string]string{"taskID": fmt.Sprintf("%d", taskID)})
+	ctx.AsciiJSON(200, map[string]string{"task_id": fmt.Sprintf("%d", taskID)})
 }
 
 // ListDiagnoseTask list all diagnose task
@@ -117,7 +117,7 @@ func (s *Server) CommitCaptureTask(ctx *gin.Context) {
 		ctx.AsciiJSON(400, map[string]string{"error": fmt.Sprintf("error commit capture task: %v", err)})
 		return
 	}
-	ctx.AsciiJSON(200, map[string]string{"taskID": fmt.Sprintf("%d", taskID)})
+	ctx.AsciiJSON(200, map[string]string{"task_id": fmt.Sprintf("%d", taskID)})
 }
 
 func (s *Server) ListCaptureTasks(ctx *gin.Context) {

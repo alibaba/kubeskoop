@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	router := gin.New()
+	router := gin.Default()
 	router.Use(cors.New(cors.Config{
 		AllowAllOrigins: true,
 		AllowMethods:    []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
@@ -17,6 +17,10 @@ func main() {
 
 	group := router.Group("/config")
 	handler.RegisterConfigHandler(group)
+	group = router.Group("/grafana")
+	handler.RegisterGrafanaProxyHandler(group)
+	group = router.Group("/diagnosis")
+	handler.RegisterDiagnosisHandler(group)
 
 	if err := router.Run(); err != nil {
 		log.Fatal(err)

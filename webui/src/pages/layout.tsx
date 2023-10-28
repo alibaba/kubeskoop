@@ -73,9 +73,6 @@ export default function Layout() {
         <Shell.Content>
           <Outlet />
         </Shell.Content>
-        <Shell.Footer>
-          <Footer />
-        </Shell.Footer>
       </Shell>
     </ConfigProvider>
 

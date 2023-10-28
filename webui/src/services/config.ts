@@ -2,14 +2,9 @@ import { request } from 'ice'
 
 export default {
     async getDashboardConfig(): Promise<any> {
-        const data = await request({
+        return await request({
             url: `/config/dashboard`,
         });
-
-        console.log(data)
-        return {
-            url: data.url
-        }
     },
     async setDashboardConfig(value: any): Promise<any> {
         return await request({

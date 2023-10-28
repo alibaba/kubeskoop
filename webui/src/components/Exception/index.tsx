@@ -7,7 +7,7 @@ export interface ExceptionProps {
   title: string;
   image?: string;
   description?: string;
-  extra: JSX.Element;
+  extra?: JSX.Element;
 }
 
 const Exception: React.FC<ExceptionProps> = (props: ExceptionProps) => {
@@ -24,7 +24,7 @@ const Exception: React.FC<ExceptionProps> = (props: ExceptionProps) => {
         { image ? <img src={image} className={styles.exceptionImage}/> : null }
         <h1 className={styles.statusCode}>{title}</h1>
         { description ? <div className={styles.description}>{description}</div> : null}
-        <div>{extra}</div>
+        { extra ? <div>{extra}</div> : null }
       </div>
     </Card>
   );

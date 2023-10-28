@@ -22,7 +22,7 @@ export default {
   },
   effects: (dispatch) => ({
       async fetchDashboardConfig() {
-          const { data } = await configService.getDashboardConfig()
+          const data = await configService.getDashboardConfig()
           dispatch.dashboard.update(data)
       },
       async updateDashboardConfig(data, rootState) {

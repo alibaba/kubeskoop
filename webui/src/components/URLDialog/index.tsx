@@ -44,7 +44,7 @@ const URLDialog: React.FC<URLDialogProps> = (props: URLDialogProps): JSX.Element
       onClose={props.onVisibleChange?.bind(null, false)}
     >
       <Form field={field}>
-        <Form.Item label="地址" format="url">
+        <Form.Item label="地址">
           <Input name="url" defaultValue={props.url}/>
         </Form.Item>
       </Form>

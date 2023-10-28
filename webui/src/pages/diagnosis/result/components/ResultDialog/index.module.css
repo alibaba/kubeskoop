@@ -1,0 +1,17 @@
+.attributeItem {
+    font-size: 13px;
+    color: black;
+}
+
+.attributeTitle {
+    font-size: 13px;
+    color: rgb(102, 102, 102)
+}
+
+.suspicionIcon {
+    margin-righT: 2px;
+    user-select: none;
+    color: white;
+    border-radius: 5px;
+    text-align: center;
+}

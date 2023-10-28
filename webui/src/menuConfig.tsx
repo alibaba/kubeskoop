@@ -33,8 +33,12 @@ const asideMenuConfig = [
     name: '配置',
     children: [
       {
+        name: '控制台配置',
+        path: '/config',
+      },
+      {
         name: '节点配置',
-        path: '/configuration',
+        path: '/node_config',
       }
     ],
   },

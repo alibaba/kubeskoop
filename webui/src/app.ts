@@ -6,11 +6,7 @@ import { defineRequestConfig } from '@ice/plugin-request/types';
 import { definePageConfig } from 'ice';
 
 // App config, see https://v3.ice.work/docs/guide/basic/app
-export default defineAppConfig(() => ({
-  app: {
-    strict: true
-  }
-}));
+export default defineAppConfig(() => ({}));
 
 export const authConfig = defineAuthConfig(async (appData) => {
   const { userInfo = {} } = appData;

@@ -1,6 +1,5 @@
-import { definePageConfig } from 'ice';
 import PageHeader from '@/components/PageHeader';
-import WebFrameCard from '../../components/WebFrameCard';
+import WebFrameCard from '@/components/WebFrameCard';
 import URLDialog from '@/components/UrlDialog';
 import { useEffect, useState } from 'react';
 import Exception from '@/components/Exception';
@@ -14,7 +13,6 @@ export default function Dashboard() {
   const [dashboardConfig, dashboardConfigDispatcher] = store.useModel('dashboard');
   const effectsState = store.useModelEffectsState('dashboard');
 
-  const {metrics_url} = dashboardConfig
   useEffect(() => {
       dashboardConfigDispatcher.fetchDashboardConfig()
       .then(() => {
@@ -40,18 +38,18 @@ export default function Dashboard() {
     <div>
       <PageHeader
         title='监控'
-        breadcrumbs={[{ name: 'Console' }, { name: '监控' }]}
+        breadcrumbs={[{ name: 'Console' }, { name: '主页' }]}
       />
-      {metrics_url ? (
+      {dashboardConfig.metrics_url ? (
         <div className='web-frame'>
-          <WebFrameCard src={metrics_url} onSetting={() => setVisible(true)} />
+          <WebFrameCard src={dashboardConfig.metrics_url} onSetting={() => setVisible(true)} />
         </div>
       ) : (
         <Loading visible={loading} style={{ display: 'block' }}>
         <Exception title="未配置大盘链接" description="请配置大盘链接后使用" extra={<Button type="primary" onClick={() => setVisible(true)}>配置</Button>}/>
         </Loading>
       )}
-      <URLDialog title="设置监控大盘" visible={visible} onVisibleChange={setVisible} onSubmit={onSubmit} url={metrics_url} />
+      <URLDialog title="设置监控大盘" visible={visible} onVisibleChange={setVisible} onSubmit={onSubmit} url={dashboardConfig.metrics_url} />
     </div>
   );
 }
