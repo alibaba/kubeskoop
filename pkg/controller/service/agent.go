@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"github.com/alibaba/kubeskoop/pkg/controller/rpc"
 	log "k8s.io/klog/v2"
@@ -52,7 +51,12 @@ func (c *controller) UploadTaskResult(ctx context.Context, result *rpc.TaskResul
 	if ok && result.GetType() == rpc.TaskType_Capture {
 		captureResult := value.(*CaptureTaskResult)
 		captureResult.Message = result.GetMessage()
-		captureResult.Result = base64.StdEncoding.EncodeToString(result.GetCapture().GetMessage())
+		captureResult.Status = "success"
+		captureFile, err := c.storeCaptureFile(ctx, id, result.GetCapture())
+		if err != nil {
+			return nil, fmt.Errorf("store capture file failed: %v", err)
+		}
+		captureResult.Result = captureFile
 		captureTasks.Store(id, captureResult)
 	}
 

@@ -21,6 +21,8 @@ func main() {
 	handler.RegisterGrafanaProxyHandler(group)
 	group = router.Group("/diagnosis")
 	handler.RegisterDiagnosisHandler(group)
+	group = router.Group("/controller")
+	handler.RegisterControllerHanler(group)
 
 	if err := router.Run(); err != nil {
 		log.Fatal(err)

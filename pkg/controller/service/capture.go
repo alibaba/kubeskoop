@@ -2,9 +2,13 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"github.com/alibaba/kubeskoop/pkg/controller/rpc"
+	"io"
+	"os"
 	"strconv"
 	"sync"
+	"time"
 )
 
 type CaptureArgs struct {
@@ -77,4 +81,37 @@ func (c *controller) CaptureList(ctx context.Context) ([]*CaptureTaskResult, err
 		return true
 	})
 	return results, nil
+}
+
+func (c *controller) storeCaptureFile(ctx context.Context, id int, result *rpc.CaptureResult) (string, error) {
+	captureFileName := fmt.Sprintf("capture_task_%d_%d.pcap", id, time.Now().Unix())
+	err := os.WriteFile("/tmp/"+captureFileName, result.Message, 0644)
+	if err != nil {
+		return "", err
+	}
+	return captureFileName, nil
+}
+
+func (c *controller) DownloadCaptureFile(ctx context.Context, id int) (string, int64, io.ReadCloser, error) {
+	var filename string
+	captureTasks.Range(func(key, value interface{}) bool {
+		capture := value.(*CaptureTaskResult)
+		if capture.TaskID == id {
+			filename = capture.Result
+			return false
+		}
+		return true
+	})
+	if filename == "" {
+		return "", 0, nil, fmt.Errorf("capture file for %v not found", id)
+	}
+	captureFD, err := os.Open("/tmp/" + filename)
+	if err != nil {
+		return filename, 0, nil, fmt.Errorf("open capture file %s failed: %v", filename, err)
+	}
+	fs, err := captureFD.Stat()
+	if err != nil {
+		return "", 0, nil, fmt.Errorf("stat capture file %s failed: %v", filename, err)
+	}
+	return filename, fs.Size(), captureFD, nil
 }

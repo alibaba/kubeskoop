@@ -8,10 +8,13 @@ import (
 	skoopContext "github.com/alibaba/kubeskoop/pkg/skoop/context"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc"
+	"io"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 )
 
@@ -72,6 +75,7 @@ func (s *Server) RunHTTPServer(port int, done <-chan struct{}) {
 	r.GET("/diagnoses", s.ListDiagnoseTasks)
 	r.POST("/capture", s.CommitCaptureTask)
 	r.GET("/captures", s.ListCaptureTasks)
+	r.GET("/capture/:task_id/download", s.DownloadCaptureFile)
 
 	go func() {
 		err := r.Run(fmt.Sprintf("0.0.0.0:%d", port))
@@ -106,6 +110,7 @@ func (s *Server) ListDiagnoseTasks(ctx *gin.Context) {
 	ctx.AsciiJSON(200, tasks)
 }
 
+// CommitCaptureTask commit capture task
 func (s *Server) CommitCaptureTask(ctx *gin.Context) {
 	var captureTask service.CaptureArgs
 	if err := ctx.ShouldBindJSON(&captureTask); err != nil {
@@ -120,10 +125,36 @@ func (s *Server) CommitCaptureTask(ctx *gin.Context) {
 	ctx.AsciiJSON(200, map[string]string{"task_id": fmt.Sprintf("%d", taskID)})
 }
 
+// ListCaptureTask list all capture task
 func (s *Server) ListCaptureTasks(ctx *gin.Context) {
 	tasks, err := s.controller.CaptureList(context.TODO())
 	if err != nil {
 		ctx.AsciiJSON(400, map[string]string{"error": fmt.Sprintf("error list capture task: %v", err)})
 	}
 	ctx.AsciiJSON(200, tasks)
+}
+
+// DownloadCaptureFile download capture file
+func (s *Server) DownloadCaptureFile(ctx *gin.Context) {
+	id, err := strconv.Atoi(ctx.Param("task_id"))
+	if err != nil {
+		ctx.AsciiJSON(400, map[string]string{"error": fmt.Sprintf("error get task id from request: %v", err)})
+		return
+	}
+
+	name, fl, fd, err := s.controller.DownloadCaptureFile(context.TODO(), id)
+	if err != nil {
+		ctx.AsciiJSON(400, map[string]string{"error": fmt.Sprintf("error download capture file: %v", err)})
+		return
+	}
+	defer fd.Close()
+	ctx.Header("Content-Disposition", "attachment; filename="+name)
+	ctx.Header("Content-Type", "application/text/plain")
+	ctx.Header("Accept-Length", fmt.Sprintf("%d", fl))
+	_, err = io.Copy(ctx.Writer, fd)
+	if err != nil {
+		ctx.AsciiJSON(400, map[string]string{"error": fmt.Sprintf("error transmiss capture file: %v", err)})
+		return
+	}
+	ctx.Status(http.StatusOK)
 }
