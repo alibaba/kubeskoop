@@ -363,6 +363,12 @@ spec:
         env:
           - name: GF_SECURITY_ADMIN_PASSWORD
             value: "kubeskoop"
+          - name: GF_SECURITY_ALLOW_EMBEDDING
+            value: "true"
+          - name: GF_SERVER_SERVE_FROM_SUB_PATH
+            value: "true"
+          - name: GF_SERVER_ROOT_URL
+            value: "/grafana"
         resources:
           limits:
             memory: "1Gi"

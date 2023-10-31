@@ -19,8 +19,6 @@ const wrapLine = (text: string, wrapCount: number): string => {
 }
 
 const maxSuspicionLevel = (sus: Suspicion[]): SuspicionLevel => {
-  const s = sus.map(i => i.level)
-  console.log(s)
   return Math.max(...sus.map(i => i.level))
 }
 
@@ -85,93 +83,92 @@ const DiagnosisResult: React.FC<DiagnosisResultProps> = (props: DiagnosisResultP
   let graph: Graph | null = null;
 
   const { data, onClick } = props
-  if (data) {
-    const graphData = toGraphData(data)
-    useEffect(() => {
-      graph = new Graph({
-        container: ref.current!,
-        width: ref.current?.clientWidth,
-        height: ref.current?.clientHeight,
-        fitCenter: true,
-        fitView: true,
-        layout: {
-          type: 'dagre',
-          rankdir: "LR"
-        },
-        defaultNode: {
-          size: 160,
-          labelCfg: {
-            style: {
-              lineWidth: 1,
-              fontSize: 16,
-              cursor: 'pointer'
-            }
-          },
+  const graphData = data ? toGraphData(data) : null
+  useEffect(() => {
+    if (!data) return;
+    graph = new Graph({
+      container: ref.current!,
+      width: ref.current?.clientWidth,
+      height: ref.current?.clientHeight,
+      fitCenter: true,
+      fitView: true,
+      layout: {
+        type: 'dagre',
+        rankdir: "LR"
+      },
+      defaultNode: {
+        size: 160,
+        labelCfg: {
           style: {
-            stroke: 'black',
-            cursor: 'pointer',
-            fill: "#ffffff",
-            fillOpacity: 0,
-            lineWidth: 1.7
-          }
-        },
-        nodeStateStyles: {
-          hover: {
-            lineWidth: 2.5
-          }
-        },
-        edgeStateStyles: {
-          hover: {
-            lineWidth: 2.5
-          }
-        },
-        defaultEdge: {
-          labelCfg: {
-            refY: 3,
             lineWidth: 1,
-            style: {
-              cursor: 'pointer',
-              textBaseline: 'bottom',
-              fontSize: 17
-            }
-          },
+            fontSize: 16,
+            cursor: 'pointer'
+          }
+        },
+        style: {
+          stroke: 'black',
+          cursor: 'pointer',
+          fill: "#ffffff",
+          fillOpacity: 0,
+          lineWidth: 1.7
+        }
+      },
+      nodeStateStyles: {
+        hover: {
+          lineWidth: 2.5
+        }
+      },
+      edgeStateStyles: {
+        hover: {
+          lineWidth: 2.5
+        }
+      },
+      defaultEdge: {
+        labelCfg: {
+          refY: 3,
+          lineWidth: 1,
           style: {
             cursor: 'pointer',
-            stroke: 'black',
-            endArrow: {
-              path: 'M 0,0 L 10,5 L 10,-5 Z',
-              fill: 'black',
-              stroke: 'black'
-            },
-            lineWidth: 1.7
+            textBaseline: 'bottom',
+            fontSize: 17
+          }
+        },
+        style: {
+          cursor: 'pointer',
+          stroke: 'black',
+          endArrow: {
+            path: 'M 0,0 L 10,5 L 10,-5 Z',
+            fill: 'black',
+            stroke: 'black'
           },
-        }
-      });
-
-      graph.data(graphData);
-      graph.render();
-      bindEvent(graph, onClick)
-
-      const graphResize = (entries: ResizeObserverEntry[]) => {
-        if (graph) {
-          if (!entries || entries.length === 0) return;
-          const e = entries[0]
-          console.log(e)
-          graph.changeSize(e.target.clientWidth, e.target.clientHeight);
-          graph.fitView()
-        }
+          lineWidth: 1.7
+        },
       }
+    });
 
-      const ob = new ResizeObserver(graphResize)
-      ob.observe(ref.current!);
-      return () => { graph?.destroy(); ob.disconnect() }
-    }, [])
-  }
+    graph.data(graphData);
+    graph.render();
+    bindEvent(graph, onClick)
 
-  return (
-    <div ref={ref} style={{ height: '80vh' }}>
-    </div>
-  );
+    const graphResize = (entries: ResizeObserverEntry[]) => {
+      if (graph) {
+        if (!entries || entries.length === 0) return;
+        const e = entries[0]
+        console.log(e)
+        graph.changeSize(e.target.clientWidth, e.target.clientHeight);
+        graph.fitView()
+      }
+    }
+
+    const ob = new ResizeObserver(graphResize)
+    ob.observe(ref.current!);
+    return () => { graph?.destroy(); ob.disconnect() }
+  }, [data])
+
+return (
+  <div ref={ref} style={{ height: '80vh' }}>
+  </div>
+);
 };
 
 export default DiagnosisResult;

@@ -8,12 +8,13 @@ interface DiagnosisRow {
   port: number,
   protocol: string
   status: string
-  action?: JSX.Element
+  action: JSX.Element | null
 }
 
 interface DiagnosisHistoryProps {
   data: DiagnosisRow[];
 }
+
 const columns = [
   {
     title: "ID",

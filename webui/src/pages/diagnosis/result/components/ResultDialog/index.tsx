@@ -63,8 +63,9 @@ const makeAttributes = (data?: ResultDialogData): string[][] => {
   }
 };
 
-const makeAttributeItem = (i: string[]) => {
+const makeAttributeItem = (i: string[], idx: number) => {
   return <List.Item
+    id={idx.toString()}
     style={{ padding: '2px' }}
     className={styles.attributeItem}
     title={<span className={styles.attributeTitle}>{i[0]}</span>}>
@@ -72,8 +73,9 @@ const makeAttributeItem = (i: string[]) => {
   </List.Item>
 };
 
-const makeSuspicionItem = (i: Suspicion) => {
+const makeSuspicionItem = (i: Suspicion, idx: number) => {
   return <List.Item
+    key={idx.toString()}
     style={{ padding: '2px' }}
     className={styles.attributeItem}>
     <Grid.Row>

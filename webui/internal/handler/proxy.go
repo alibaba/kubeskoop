@@ -33,7 +33,9 @@ func proxyHandler(ctx *gin.Context) {
 		req.URL.Scheme = remote.Scheme
 		req.URL.Host = remote.Host
 		req.URL.Path = remote.Path
-		req.SetBasicAuth(config.Global.Grafana.Username, config.Global.Grafana.Password)
+		if config.Global.Grafana.Username != "" && config.Global.Grafana.Password != "" {
+			req.SetBasicAuth(config.Global.Grafana.Username, config.Global.Grafana.Password)
+		}
 	}
 	proxy.ServeHTTP(ctx.Writer, ctx.Request)
 }
