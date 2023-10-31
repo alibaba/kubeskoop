@@ -4,7 +4,11 @@ import (
 	"context"
 	"fmt"
 	"github.com/alibaba/kubeskoop/pkg/controller/rpc"
+	"github.com/samber/lo"
 	"io"
+	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"net"
 	"os"
 	"strconv"
 	"sync"
@@ -24,6 +28,40 @@ type CaptureArgs struct {
 	CaptureHostNs bool `json:"capture_host_ns"`
 }
 
+type Pod struct {
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
+}
+
+type Node struct {
+	Name string `json:"name"`
+}
+
+func (c *controller) PodList(ctx context.Context) ([]*Pod, error) {
+	pods, err := c.k8sClient.CoreV1().Pods("").List(ctx, v1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("list pods failed: %v", err)
+	}
+	return lo.Map[corev1.Pod, *Pod](pods.Items, func(pod corev1.Pod, idx int) *Pod {
+		return &Pod{
+			Name:      pod.Name,
+			Namespace: pod.Namespace,
+		}
+	}), nil
+}
+
+func (c *controller) NodeList(ctx context.Context) ([]*Node, error) {
+	nodes, err := c.k8sClient.CoreV1().Nodes().List(ctx, v1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("list pods failed: %v", err)
+	}
+	return lo.Map[corev1.Node, *Node](nodes.Items, func(node corev1.Node, idx int) *Node {
+		return &Node{
+			Name: node.Name,
+		}
+	}), nil
+}
+
 // todo reflect to generic task definition
 type CaptureTaskResult struct {
 	TaskID     int          `json:"task_id"`
@@ -41,22 +79,57 @@ var (
 func (c *controller) Capture(ctx context.Context, capture *CaptureArgs) (int, error) {
 	taskID := captureIdx
 	captureIdx++
-	_, err := c.commitTask(capture.Node.Name, &rpc.Task{
+
+	captureInfo := &rpc.CaptureInfo{
+		CaptureHostNs: capture.CaptureHostNs,
+	}
+
+	if capture.Pod.Name != "" {
+		p, err := c.k8sClient.CoreV1().Pods(capture.Pod.Namespace).Get(ctx, capture.Pod.Name, v1.GetOptions{})
+		if err != nil {
+			return 0, fmt.Errorf("get pod %s/%s failed: %v", capture.Pod.Namespace, capture.Pod.Name, err)
+		}
+		if p.Status.Phase != corev1.PodRunning {
+			return 0, fmt.Errorf("pod %s/%s is not running", capture.Pod.Namespace, capture.Pod.Name)
+		}
+		var (
+			v4 net.IP
+			v6 net.IP
+		)
+		for _, ip := range p.Status.PodIPs {
+			if netIP := net.ParseIP(ip.IP); netIP != nil {
+				if netIP.To4() != nil {
+					v4 = netIP
+				} else if netIP.To16() != nil {
+					v6 = netIP
+				}
+			}
+		}
+		if v4 == nil && v6 == nil {
+			return 0, fmt.Errorf("pod %s/%s has no ip", capture.Pod.Namespace, capture.Pod.Name)
+		}
+		captureInfo.Pod = &rpc.PodInfo{
+			Name:      capture.Pod.Name,
+			Namespace: capture.Pod.Namespace,
+			Ipv4:      v4.String(),
+			Ipv6:      v6.String(),
+		}
+		captureInfo.Node = &rpc.NodeInfo{
+			Name: p.Spec.NodeName,
+		}
+	} else if capture.Node.Name != "" {
+		captureInfo.Node = &rpc.NodeInfo{
+			Name: capture.Node.Name,
+		}
+	} else {
+		return 0, fmt.Errorf("invalid capture args: %+v", capture)
+	}
+
+	_, err := c.commitTask(captureInfo.Node.Name, &rpc.Task{
 		Type: rpc.TaskType_Capture,
 		Id:   strconv.Itoa(taskID),
 		TaskInfo: &rpc.Task_Capture{
-			Capture: &rpc.CaptureInfo{
-				Pod: &rpc.PodInfo{
-					Name:      capture.Pod.Name,
-					Namespace: capture.Pod.Namespace,
-					Ipv4:      capture.Pod.IPv4,
-					Ipv6:      capture.Pod.IPv6,
-				},
-				Node: &rpc.NodeInfo{
-					Name: capture.Node.Name,
-				},
-				CaptureHostNs: capture.CaptureHostNs,
-			},
+			Capture: captureInfo,
 		},
 	})
 	if err != nil {

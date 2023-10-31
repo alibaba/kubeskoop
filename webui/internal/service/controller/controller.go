@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/imroc/req/v3"
 	"github.com/kubeskoop/webconsole/internal/config"
-	"io"
 	"net/http"
 )
 
@@ -42,7 +41,6 @@ type Svc interface {
 	CreateDiagnosis(task DiagnosisTask) (string, error)
 	ListDiagnosisResult() ([]DiagnosisTaskResult, error)
 	GetDiagnosisResult(taskID int) (DiagnosisTaskResult, error)
-	Proxy(path, method string, body []byte) (int, io.ReadCloser, error)
 }
 
 func init() {
@@ -125,18 +123,4 @@ func (d *defaultService) GetDiagnosisResult(taskID int) (DiagnosisTaskResult, er
 	}
 
 	return DiagnosisTaskResult{}, fmt.Errorf("cannot find diagnosis result by id %d", taskID)
-}
-
-func (d *defaultService) Proxy(path, method string, body []byte) (int, io.ReadCloser, error) {
-	url := fmt.Sprintf("%s/%s", config.Global.Controller.Endpoint, path)
-	r := req.NewRequest()
-	r.SetURL(url)
-	if len(body) > 0 {
-		r.SetBody(body)
-	}
-	resp, err := r.Send(method, url)
-	if err != nil {
-		return 0, nil, fmt.Errorf("error sending request: %s", err.Error())
-	}
-	return resp.StatusCode, resp.Body, nil
 }

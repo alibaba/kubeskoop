@@ -1,6 +1,7 @@
 import {Form, Input, Select, Radio, Checkbox, TimePicker} from '@alifd/next';
-import {useState} from "react";
+import {useEffect, useState} from "react";
 import moment from 'moment';
+import k8sService from "@/services/k8s";
 
 interface CaptureFormProps {
   onSubmit: (data: CaptureFormData) => void;
@@ -17,6 +18,8 @@ const CaptureForm: React.FunctionComponent<CaptureFormProps> = (props: CaptureFo
   const [formCaptureType, setformCaptureType] = useState("Pod")
   const [formNamespace, setformNamespace] = useState("")
   const [formName, setformName] = useState("")
+  const [nameList, setNameList] = useState([])
+  const [namespaces, setNameSpaces] = useState([])
   const handleSubmit = (values: CaptureFormData, errors: any) => {
     if (errors) {
       return;
@@ -29,7 +32,23 @@ const CaptureForm: React.FunctionComponent<CaptureFormProps> = (props: CaptureFo
     values["duration"] = values["duration"].minutes() * 60 + values["duration"].seconds()
     onSubmit(values);
   };
-  const filterCaptureObject = () => formCaptureType == "Node"? nodes : pods.filter(item => item.namespace == formNamespace)
+
+  const filterCaptureObject = (type, ns) => {
+    if (type == "Node") {
+      k8sService.list_nodes().then((res) => {
+        setNameList(res)
+      })
+    } else {
+      k8sService.list_pods().then((res) => {
+        setNameSpaces([...new Set(res.map(item => item.namespace))].map(item => ({name: item})))
+        setNameList(res.filter(item => item.namespace == ns))
+      })
+    }
+  }
+
+  useEffect(() => {
+    filterCaptureObject(formCaptureType, formNamespace)
+  }, []);
 
   return (
     <Form inline labelAlign='left'>
@@ -37,7 +56,7 @@ const CaptureForm: React.FunctionComponent<CaptureFormProps> = (props: CaptureFo
         <Radio.Group
           shape="button"
           value={formCaptureType}
-          onChange={(value) => {setformCaptureType(value); setformNamespace(""); setformName("")}}
+          onChange={(value) => {setformCaptureType(value); setformNamespace(""); setformName(""); filterCaptureObject(value)}}
         >
           <Radio value="Node">Node</Radio>
           <Radio value="Pod">Pod</Radio>
@@ -46,14 +65,14 @@ const CaptureForm: React.FunctionComponent<CaptureFormProps> = (props: CaptureFo
       {formCaptureType == "Pod" &&
         <Form.Item label="Namespace" required >
           <Select name="namespace" placeholder="请选择Namespace" dataSource={namespaces} useDetailValue
-                  onChange={function (value) {setformNamespace(value.name); setformName("")}}
+                  onChange={function (value) {setformNamespace(value.name); setformName(""); filterCaptureObject(formCaptureType, value.name);}}
                   itemRender={(item) => `${item.name}`} valueRender={(item) => `${item.name}`} />
         </Form.Item>
       }
       <Form.Item label="Name" required>
         <Select name="name" placeholder="选择抓包的对象" useDetailValue
                 value = {formName}
-                dataSource={filterCaptureObject()}
+                dataSource={nameList}
                 itemRender={(item) => `${item.name}`} valueRender={(item) => `${item.name}`}
                 onChange={(value) => {setformName(value)}}
         />
@@ -81,38 +100,3 @@ const CaptureForm: React.FunctionComponent<CaptureFormProps> = (props: CaptureFo
 };
 
 export default CaptureForm;
-
-
-//fixme obtain pods from api
-const pods = [
-  {
-    name: "nginx",
-    namespace: "default",
-    host: "cn-hangzhou.172.16.0.1"
-  },
-  {
-    name: "redis",
-    namespace: "default",
-    host: "cn-hangzhou.172.16.0.2"
-  }
-];
-
-const namespaces = [
-  {
-    name: "default"
-  },
-  {
-    name: "kube-system"
-  }
-];
-
-const nodes = [
-  {
-    name: "cn-hangzhou.172.16.0.1",
-    ip: "172.16.0.1"
-  },
-  {
-    name: "cn-hangzhou.172.16.0.2",
-    ip: "172.16.0.2"
-  }
-]

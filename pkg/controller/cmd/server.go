@@ -28,8 +28,12 @@ type Server struct {
 }
 
 func NewServer() *Server {
+	ctrlSVC, err := service.NewControllerService()
+	if err != nil {
+		log.Fatalf("error create controller service: %v", err)
+	}
 	return &Server{
-		controller: service.NewControllerService(),
+		controller: ctrlSVC,
 	}
 }
 
@@ -76,6 +80,8 @@ func (s *Server) RunHTTPServer(port int, done <-chan struct{}) {
 	r.POST("/capture", s.CommitCaptureTask)
 	r.GET("/captures", s.ListCaptureTasks)
 	r.GET("/capture/:task_id/download", s.DownloadCaptureFile)
+	r.GET("/pods", s.ListPods)
+	r.GET("/nodes", s.ListNodes)
 
 	go func() {
 		err := r.Run(fmt.Sprintf("0.0.0.0:%d", port))
@@ -157,4 +163,22 @@ func (s *Server) DownloadCaptureFile(ctx *gin.Context) {
 		return
 	}
 	ctx.Status(http.StatusOK)
+}
+
+func (s *Server) ListPods(ctx *gin.Context) {
+	pods, err := s.controller.PodList(context.TODO())
+	if err != nil {
+		ctx.AsciiJSON(400, map[string]string{"error": fmt.Sprintf("error list pods: %v", err)})
+		return
+	}
+	ctx.AsciiJSON(200, pods)
+}
+
+func (s *Server) ListNodes(ctx *gin.Context) {
+	nodes, err := s.controller.NodeList(context.TODO())
+	if err != nil {
+		ctx.AsciiJSON(400, map[string]string{"error": fmt.Sprintf("error list nodes: %v", err)})
+		return
+	}
+	ctx.AsciiJSON(200, nodes)
 }

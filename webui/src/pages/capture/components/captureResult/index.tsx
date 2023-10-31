@@ -1,28 +1,41 @@
-import {Button, Table, Icon} from '@alifd/next';
-import {useState} from "react";
+import {Button, Table, Icon, Message} from '@alifd/next';
+import {useEffect, useState} from "react";
 import moment from 'moment';
+import {CaptureResult} from "@/services/capture";
+import captureService from "@/services/capture";
+import {requestConfig} from "@/app";
 
-interface CaptureListProps {
 
+const convertToTable = (res)=> {
+  return res.map((i: CaptureResult) => {
+      return {
+        capture_id: i.task_id,
+        capture_type: i.task_config.pod.name == "" ? "Node": "Pods",
+        capture_name: i.task_config.pod.name == "" ? i.task_config.node.name: i.task_config.pod.namespace+"/"+i.task_config.pod.name,
+        task_status: i.status,
+        message: i.message,
+      }
+    })
 }
 
+interface CaptureTableProps {
+  captureResult: CaptureResult[];
+}
 
-
-const CaptureForm: React.FunctionComponent<CaptureListProps> = (props: CaptureListProps) => {
-
+const CaptureHistory: React.FunctionComponent<CaptureTableProps> = (props: CaptureTableProps) => {
   const render = (value, index, record) => {
     if (record.task_status === "success") {
-      return <a href="javascript:;">Download</a>;
+      return <a href={requestConfig.baseURL+"/controller/capture/"+record.capture_id+"/download"} target="_blank">Download</a>;
     } else if (record.task_status === "running") {
-      return <span style={{color: "green"}}>Running<a href="javascript:;">  Logs</a></span>;
+      return <span style={{color: "green"}}>Running</span>;
     } else {
-      return <span style={{color: "red"}}>Failed<a href="javascript:;">  Logs</a></span>;;
+      return <span style={{color: "red"}}>Failed {record.message}</span>;;
     }
   };
   return (
     <div>
       <Table
-        dataSource={captureList}
+        dataSource={convertToTable(props.captureResult)}
       >
         <Table.Column title="Id" dataIndex="capture_id" sortable />
         <Table.Column
@@ -30,35 +43,11 @@ const CaptureForm: React.FunctionComponent<CaptureListProps> = (props: CaptureLi
           dataIndex="capture_type"
         />
         <Table.Column title="Name" dataIndex="capture_name" />
+        <Table.Column title="Status" dataIndex="task_status" />
         <Table.Column title="Result" cell={render} width={200} />
       </Table>
     </div>
   );
 };
 
-export default CaptureForm;
-
-
-const captureList = [
-  {
-    capture_id: 1,
-    capture_type: "pod",
-    capture_name: "default/nginx",
-    task_status: "success",
-    files: "kubeskoop_capture_1596880000000_default_nginx_nginx-deployment-6666666666.zip"
-  },
-  {
-    capture_id: 2,
-    capture_type: "node",
-    capture_name: "cn-hangzhou.192.168.0.2",
-    task_status: "failed",
-    files: "kubeskoop_capture_1596880000000_cn-hangzhou.192.168.0.2.zip"
-  },
-  {
-    capture_id: 3,
-    capture_type: "node",
-    capture_name: "cn-hangzhou.192.168.0.2",
-    task_status: "running",
-    files: "kubeskoop_capture_1596880000000_cn-hangzhou.192.168.0.2.zip"
-  },
-];
+export default CaptureHistory;
