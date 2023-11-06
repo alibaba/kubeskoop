@@ -24,22 +24,27 @@ const maxSuspicionLevel = (sus: Suspicion[]): SuspicionLevel => {
 
 const toGraphData = (data: DiagnosisResultData): GraphData => {
   let graphData: GraphData = {}
-  graphData.nodes = data.nodes.map(node => {
-    return {
-      id: node.id,
-      label: wrapLine(node.id, 17),
-      style: node.suspicions && node.suspicions.length > 0 ? suspicionStyles[maxSuspicionLevel(node.suspicions)] : undefined,
-    }
-  })
 
-  graphData.edges = data.links.map(link => {
-    return {
-      id: link.id,
-      source: link.source,
-      target: link.destination,
-      label: link.type
-    }
-  })
+  if (data.nodes) {
+    graphData.nodes = data.nodes.map(node => {
+      return {
+        id: node.id,
+        label: wrapLine(node.id, 17),
+        style: node.suspicions && node.suspicions.length > 0 ? suspicionStyles[maxSuspicionLevel(node.suspicions)] : undefined,
+      }
+    })
+  }
+
+  if (data.links) {
+    graphData.edges = data.links.map(link => {
+      return {
+        id: link.id,
+        source: link.source,
+        target: link.destination,
+        label: link.type
+      }
+    })
+  }
 
   return graphData
 }
@@ -85,7 +90,7 @@ const DiagnosisResult: React.FC<DiagnosisResultProps> = (props: DiagnosisResultP
   const { data, onClick } = props
   const graphData = data ? toGraphData(data) : null
   useEffect(() => {
-    if (!data) return;
+    if (!data || !graphData) return;
     graph = new Graph({
       container: ref.current!,
       width: ref.current?.clientWidth,
@@ -165,10 +170,10 @@ const DiagnosisResult: React.FC<DiagnosisResultProps> = (props: DiagnosisResultP
     return () => { graph?.destroy(); ob.disconnect() }
   }, [data])
 
-return (
-  <div ref={ref} style={{ height: '80vh' }}>
-  </div>
-);
+  return (
+    <div ref={ref} style={{ height: '80vh' }}>
+    </div>
+  );
 };
 
 export default DiagnosisResult;

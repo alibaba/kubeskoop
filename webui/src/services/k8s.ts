@@ -10,13 +10,13 @@ export interface NodeInfo {
 }
 
 export default {
-    async list_pods(): Promise<PodInfo[]> {
+    async listPods(): Promise<PodInfo[]> {
         return await request({
             url: '/controller/pods',
             method: 'GET',
         });
     },
-    async list_nodes(): Promise<NodeInfo[]> {
+    async listNodes(): Promise<NodeInfo[]> {
         return await request({
             url: '/controller/nodes',
             method: 'GET',

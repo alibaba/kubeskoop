@@ -1,13 +1,15 @@
 package handler
 
 import (
+	jwt "github.com/appleboy/gin-jwt/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/kubeskoop/webconsole/internal/service/config"
 	"net/http"
 	"strings"
 )
 
-func RegisterConfigHandler(g *gin.RouterGroup) {
+func RegisterConfigHandler(g *gin.RouterGroup, auth *jwt.GinJWTMiddleware) {
+	g.Use(auth.MiddlewareFunc())
 	g.GET("/dashboard", getDashboardConfig)
 	g.PUT("/dashboard", setDashboardConfig)
 }

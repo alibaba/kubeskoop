@@ -64,7 +64,7 @@ export default function Layout() {
         </Shell.Branding>
         <Shell.Action>
           <HeaderAvatar
-            name={userState.currentUser.name}
+            name={userState.currentUser.user}
           />
         </Shell.Action>
         <Shell.Navigation>

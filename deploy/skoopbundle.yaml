@@ -579,3 +579,56 @@ spec:
     - name: http
       port: 10264
       targetPort: 10264
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webconsole
+  namespace: kubeskoop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: webconsole
+  template:
+    metadata:
+      name: webconsole
+      labels:
+        app: webconsole
+    spec:
+      containers:
+      - name: controller
+        image: registry.aliyuncs.com/wangbs/kubeskoop:latest
+        command: ["/bin/webconsole"]
+        env:
+          - name: CONTROLLER_ENDPOINT
+            value: "http://controller:10264"
+          - name: GRAFANA_PROXY
+            value: "true"
+          - name: GRAFANA_ENDPOINT
+            value: "http://grafana/grafana"
+          - name: GRAFANA_USERNAME
+            value: "admin"
+          - name: GRAFANA_PASSWORD
+            value: "kubeskoop"
+          - name: AUTH_USERNAME
+            value: "admin"
+          - name: AUTH_PASSWORD
+            value: "kubeskoop"
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: webconsole
+  namespace: kubeskoop
+spec:
+  selector:
+    app: webconsole
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080

@@ -13,4 +13,13 @@ export default defineConfig(() => ({
     ignoreFiles: ['**/components/**'],
   },
   compileDependencies: false,
+  proxy: {
+    '/api': {
+      target: 'http://localhost:8080',
+      changeOrigin: true,
+    },
+    '/grafana': {
+      target: 'http://localhost:8080',
+      changeOrigin: true,
+    }, }
 }));

@@ -1,5 +1,5 @@
 import { request } from 'ice'
-import {NodeInfo, PodInfo} from "@/services/k8s";
+import { NodeInfo, PodInfo } from "@/services/k8s";
 
 export interface CaptureTask {
     pod: PodInfo

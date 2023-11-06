@@ -35,11 +35,11 @@ const CaptureForm: React.FunctionComponent<CaptureFormProps> = (props: CaptureFo
 
   const filterCaptureObject = (type, ns) => {
     if (type == "Node") {
-      k8sService.list_nodes().then((res) => {
+      k8sService.listNodes().then((res) => {
         setNameList(res)
       })
     } else {
-      k8sService.list_pods().then((res) => {
+      k8sService.listPods().then((res) => {
         setNameSpaces([...new Set(res.map(item => item.namespace))].map(item => ({name: item})))
         setNameList(res.filter(item => item.namespace == ns))
       })

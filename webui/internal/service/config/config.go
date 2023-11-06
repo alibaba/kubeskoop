@@ -42,7 +42,7 @@ func newDefaultService() (*defaultService, error) {
 	cfg := DashboardConfig{}
 	if config.Global.Grafana.Endpoint != "" {
 		if config.Global.Grafana.Proxy {
-			cfg.MetricsURL = fmt.Sprintf("http://127.0.0.1:8080/grafana%s", fmt.Sprintf(metricsDashboardURL, dashboardUID))
+			cfg.MetricsURL = fmt.Sprintf("/grafana%s", fmt.Sprintf(metricsDashboardURL, dashboardUID))
 		} else {
 			u, err := url.JoinPath(config.Global.Grafana.Endpoint, fmt.Sprintf(metricsDashboardURL, dashboardUID))
 			if err != nil {

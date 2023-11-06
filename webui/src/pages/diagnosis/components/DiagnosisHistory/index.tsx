@@ -7,7 +7,7 @@ interface DiagnosisRow {
   dst: string,
   port: number,
   protocol: string
-  status: string
+  status: string | JSX.Element
   action: JSX.Element | null
 }
 

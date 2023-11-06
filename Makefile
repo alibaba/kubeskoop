@@ -14,7 +14,7 @@ GIT_COMMIT=${shell git rev-parse HEAD}
 ldflags="-X $(VERSION_PKG).Version=$(TAG) -X $(VERSION_PKG).Commit=${GIT_COMMIT}"
 
 .PHONY: all
-all: build-exporter build-skoop build-controller build-collector build-btfhack
+all: build-exporter build-skoop build-controller build-collector build-btfhack build-webconsole
 
 .PHONY: fmt
 fmt:
@@ -43,6 +43,10 @@ build-controller:
 .PHONY: build-btfhack
 build-btfhack:
 	CGO_ENABLED=0 go build -o bin/btfhack -ldflags $(ldflags) ./cmd/btfhack
+
+.PHONY: build-btfhack
+build-webconsole:
+	cd webui && CGO_ENABLED=0 go build -o ../bin/webconsole -ldflags $(ldflags) .
 
 .PHONY: image
 image: ## build kubeskoop image

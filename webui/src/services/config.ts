@@ -8,7 +8,7 @@ export default {
     },
     async setDashboardConfig(value: any): Promise<any> {
         return await request({
-            url: `http://127.0.0.1:8080/config/dashboard`,
+            url: `/config/dashboard`,
             method: 'PUT',
             data: value,
         });

@@ -6,7 +6,11 @@ import { defineRequestConfig } from '@ice/plugin-request/types';
 import { definePageConfig } from 'ice';
 
 // App config, see https://v3.ice.work/docs/guide/basic/app
-export default defineAppConfig(() => ({}));
+export default defineAppConfig(() => ({
+  router: {
+    type: 'hash',
+  }
+}));
 
 export const authConfig = defineAuthConfig(async (appData) => {
   const { userInfo = {} } = appData;
@@ -15,8 +19,7 @@ export const authConfig = defineAuthConfig(async (appData) => {
   }
   return {
     initialAuth: {
-      admin: userInfo.userType === 'admin',
-      user: userInfo.userType === 'user',
+      login: false,
     },
   };
 });
@@ -33,7 +36,7 @@ export const storeConfig = defineStoreConfig(async (appData) => {
 });
 
 export const requestConfig = defineRequestConfig({
-  baseURL: 'http://127.0.0.1:8080',
+  baseURL: '/api',
 });
 
 export const dataLoader = defineDataLoader(async () => {

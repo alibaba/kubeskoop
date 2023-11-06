@@ -2,13 +2,12 @@ import { useState } from 'react';
 import type { FunctionComponent } from 'react';
 import { useAuth, history } from 'ice';
 import { Input, Message, Form, Divider, Checkbox, Icon } from '@alifd/next';
-import { useInterval } from '@/hooks/useInterval';
 import styles from './index.module.css';
 import { fetchUserInfo, login } from '@/services/user';
 import store from '@/store';
 import { LoginParams, LoginResult } from '@/interfaces/user';
 import Logo from '@/components/Logo';
-import logo from '@/assets/logo.png';
+import { getErrorMessage } from '@/utils';
 
 const { Item } = Form;
 
@@ -32,9 +31,6 @@ const LoginMessage: FunctionComponent<{
 const DEFAULT_DATA: LoginParams = {
   username: '',
   password: '',
-  autoLogin: true,
-  phone: '',
-  code: '',
 };
 
 interface LoginProps {
@@ -51,20 +47,7 @@ const LoginBlock: FunctionComponent<LoginProps> = (
 
   const [postData, setValue] = useState(dataSource);
   const [isRunning, checkRunning] = useState(false);
-  const [isPhone, checkPhone] = useState(false);
-  const [second, setSecond] = useState(59);
   const [loginResult, setLoginResult] = useState<LoginResult>({});
-
-  useInterval(
-    () => {
-      setSecond(second - 1);
-      if (second <= 0) {
-        checkRunning(false);
-        setSecond(59);
-      }
-    },
-    isRunning ? 1000 : null,
-  );
 
   const formChange = (values: LoginParams) => {
     setValue(values);
@@ -90,126 +73,40 @@ const LoginBlock: FunctionComponent<LoginProps> = (
     }
     try {
       const result = await login(values);
-      if (result.success) {
+      if (result) {
         Message.success('登录成功！');
         setAuth({
-          admin: result.userType === 'admin',
-          user: result.userType === 'user',
+          login: true,
         });
         await updateUserInfo();
         const urlParams = new URL(window.location.href).searchParams;
         history?.push(urlParams.get('redirect') || '/');
         return;
       }
-      console.log(result);
-      // 如果失败去设置用户错误信息，显示提示信息
       setLoginResult(result);
     } catch (error) {
-      Message.error('登录失败，请重试！');
-      console.log(error);
+      Message.error(`登录失败：${getErrorMessage(error)}`);
     }
-  };
-
-  const phoneForm = (
-    <>
-      <Item format="tel" required requiredMessage="必填" asterisk={false}>
-        <Input
-          name="phone"
-          innerBefore={
-            <span className={styles.innerBeforeInput}>
-              +86
-              <span className={styles.line} />
-            </span>
-          }
-          maxLength={20}
-          placeholder="手机号"
-        />
-      </Item>
-      <Item required requiredMessage="必填" style={{ marginBottom: 0 }}>
-        <Input
-          name="code"
-          innerAfter={
-            <span className={styles.innerAfterInput}>
-              <span className={styles.line} />
-              <Form.Submit
-                text
-                type="primary"
-                style={{ width: 64 }}
-                disabled={!!isRunning}
-                validate={['phone']}
-                onClick={sendCode}
-                className={styles.sendCode}
-              >
-                {isRunning ? `${second}秒后再试` : '获取验证码'}
-              </Form.Submit>
-            </span>
-          }
-          maxLength={20}
-          placeholder="验证码"
-        />
-      </Item>
-    </>
-  );
-
-  const accountForm = (
-    <>
-      <Item required requiredMessage="必填">
-        <Input name="username" maxLength={20} placeholder="用户名: admin or user" />
-      </Item>
-      <Item required requiredMessage="必填" style={{ marginBottom: 0 }}>
-        <Input.Password name="password" htmlType="password" placeholder="密码: ice" />
-      </Item>
-    </>
-  );
-
-  const byAccount = () => {
-    checkPhone(false);
-  };
-
-  const byForm = () => {
-    checkPhone(true);
   };
 
   return (
     <div className={styles.loginBlock}>
       <div className={styles.innerBlock}>
         <Logo
-          image={logo}
-          text="ICE Pro"
+          text="KubeSkoop"
           imageStyle={{ height: 48 }}
           textStyle={{ color: '#000', fontSize: 24 }}
         />
-        <div className={styles.desc}>
-          <span onClick={byAccount} className={isPhone ? undefined : styles.active}>
-            账户密码登录
-          </span>
-          <Divider direction="ver" />
-          <span onClick={byForm} className={isPhone ? styles.active : undefined}>
-            手机号登录
-          </span>
-        </div>
-        {loginResult.success === false && (
-          <LoginMessage
-            content="账户或密码错误(admin/ice)"
-          />
-        )}
         <Form value={postData} onChange={formChange} size="large">
-          {isPhone ? phoneForm : accountForm}
-
-          <div className={styles.infoLine}>
-            <Item style={{ marginBottom: 0 }}>
-              <Checkbox name="autoLogin" className={styles.infoLeft}>
-                自动登录
-              </Checkbox>
+          <>
+            <Item required requiredMessage="必填">
+              <Input name="username" maxLength={20} placeholder="用户名" />
             </Item>
-            <div>
-              <a href="/" className={styles.link}>
-                忘记密码
-              </a>
-            </div>
-          </div>
-
-          <Item style={{ marginBottom: 10 }}>
+            <Item required requiredMessage="必填" style={{ marginBottom: 0 }}>
+              <Input.Password name="password" htmlType="password" placeholder="密码" />
+            </Item>
+          </>
+          <Item style={{ marginBottom: 10, marginTop: 20 }}>
             <Form.Submit
               htmlType="submit"
               type="primary"
@@ -220,15 +117,6 @@ const LoginBlock: FunctionComponent<LoginProps> = (
               登录
             </Form.Submit>
           </Item>
-          <div className={styles.infoLine}>
-            <div className={styles.infoLeft}>
-              其他登录方式 <Icon type="atm" size="small" /> <Icon type="atm" size="small" />{' '}
-              <Icon type="atm" size="small" />
-            </div>
-            <a href="/" className={styles.link}>
-              注册账号
-            </a>
-          </div>
         </Form>
       </div>
     </div>

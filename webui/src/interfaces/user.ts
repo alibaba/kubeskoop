@@ -1,18 +1,16 @@
 export interface UserInfo {
   name: string;
-  avatar: string;
-  id: string;
+  role: string;
 }
 
 export interface LoginParams {
   username?: string;
   password?: string;
-  autoLogin?: boolean;
-  phone?: string;
-  code?: string;
 }
 
 export interface LoginResult {
-  success?: boolean;
-  userType?: 'user' | 'admin' | 'guest';
+  exp: number;
+  orig_iat: number;
+  role: string;
+  user: string;
 }
