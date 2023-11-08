@@ -137,7 +137,7 @@ int net_dev_start_xmit(struct net_dev_start_xmit_args *ctx)
     if( latency>THRESH ){
         report_txlat_events(ctx,skb,latency,ACTION_QDISC);
     }
-    bpf_map_delete_elem(&insp_txs, &skb);
+    bpf_map_update_elem(&insp_txs, &skb, &ts, 0);
     return 0;
 }
 
