@@ -4,11 +4,10 @@ import (
 	"context"
 	"fmt"
 	"github.com/alibaba/kubeskoop/pkg/controller/rpc"
+	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"os"
-	"os/exec"
-	"syscall"
 	"time"
 )
 
@@ -18,8 +17,8 @@ var (
 	//controllerAddr = "127.0.0.1:10263"
 )
 
-func NewTaskAgent(nodename string) *Agent {
-	return &Agent{NodeName: nodename}
+func NewTaskAgent() *Agent {
+	return &Agent{NodeName: nettop.GetNodeName()}
 }
 
 type Agent struct {
@@ -28,21 +27,23 @@ type Agent struct {
 }
 
 func (a *Agent) Run() error {
-	conn, err := grpc.Dial(controllerAddr, grpc.WithInsecure())
+	var opts []grpc.CallOption
+	opts = append(opts, grpc.MaxCallSendMsgSize(102*1024*1024))
+	conn, err := grpc.Dial(controllerAddr, grpc.WithDefaultCallOptions(opts...), grpc.WithInsecure())
 	if err != nil {
 		return fmt.Errorf("failed to connect: %v", err)
 	}
 	a.grpcClient = rpc.NewControllerRegisterServiceClient(conn)
 	watchClient, err := a.grpcClient.WatchTasks(context.TODO(), &rpc.TaskFilter{
 		NodeName: a.NodeName,
-		Type:     rpc.TaskType_Capture,
+		Type:     []rpc.TaskType{rpc.TaskType_Capture},
 	})
 	if err != nil {
 		return fmt.Errorf("failed to watch tasks: %v", err)
 	}
 	reconn := func() {
 		time.Sleep(1 * time.Second)
-		conn, err = grpc.Dial(controllerAddr, grpc.WithInsecure())
+		conn, err = grpc.Dial(controllerAddr, grpc.WithDefaultCallOptions(opts...), grpc.WithInsecure())
 		if err != nil {
 			log.Errorf("failed to connect: %v", err)
 			return
@@ -50,7 +51,7 @@ func (a *Agent) Run() error {
 		a.grpcClient = rpc.NewControllerRegisterServiceClient(conn)
 		watchClient, err = a.grpcClient.WatchTasks(context.TODO(), &rpc.TaskFilter{
 			NodeName: a.NodeName,
-			Type:     rpc.TaskType_Capture,
+			Type:     []rpc.TaskType{rpc.TaskType_Capture},
 		})
 		if err != nil {
 			log.Errorf("failed to watch: %v", err)
@@ -81,42 +82,10 @@ func (a *Agent) Run() error {
 
 func (a *Agent) ProcessTasks(task *rpc.ServerTask) error {
 	log.Infof("process task: %v", task)
-	pcapFile := "/tmp/" + task.Task.Id + ".pcap"
-	cmd := exec.Command("tcpdump", "-i", "any", "-w", pcapFile, "host", task.GetTask().GetCapture().GetPod().GetIpv4())
-	var (
-		output         []byte
-		err            error
-		captureContent []byte
-	)
-	go func() {
-		output, err = cmd.CombinedOutput()
-	}()
-	time.Sleep(10 * time.Second)
-	cmd.Process.Signal(syscall.SIGTERM)
-	time.Sleep(time.Second)
-	if err == nil {
-		captureContent, err = os.ReadFile(pcapFile)
+	switch task.GetTask().GetType() {
+	case rpc.TaskType_Capture:
+		go a.ProcessCapture(task)
+		return nil
 	}
-	if err != nil {
-		log.Errorf("failed to run command: %v, output: %s", err, output)
-		a.grpcClient.UploadTaskResult(context.TODO(), &rpc.TaskResult{
-			Id:      task.Task.Id,
-			Type:    task.Task.Type,
-			Success: false,
-			Message: fmt.Sprintf("failed to run command: %v, output: %s", err, string(output)),
-		})
-		return err
-	}
-
-	a.grpcClient.UploadTaskResult(context.TODO(), &rpc.TaskResult{
-		Id:      task.Task.Id,
-		Type:    task.Task.Type,
-		Success: true,
-		Message: "success",
-		TaskResultInfo: &rpc.TaskResult_Capture{Capture: &rpc.CaptureResult{
-			Message: captureContent,
-		}},
-	})
-
 	return nil
 }

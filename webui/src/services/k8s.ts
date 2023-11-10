@@ -3,10 +3,13 @@ import { request } from 'ice'
 export interface PodInfo {
     name: string
     namespace: string
+    nodename: string
+    labels: object
 }
 
 export interface NodeInfo {
     name: string
+    labels: object
 }
 
 export default {

@@ -18,7 +18,7 @@ type ControllerService interface {
 	rpc.ControllerRegisterServiceServer
 	GetAgentList() []*rpc.AgentInfo
 	Capture(ctx context.Context, capture *CaptureArgs) (int, error)
-	CaptureList(ctx context.Context) ([]*CaptureTaskResult, error)
+	CaptureList(ctx context.Context) (map[int][]*CaptureTaskResult, error)
 	WatchEvents() <-chan *rpc.Event
 	Diagnose(ctx context.Context, args *skoopContext.TaskConfig) (int, error)
 	DiagnoseList(ctx context.Context) ([]DiagnoseTaskResult, error)

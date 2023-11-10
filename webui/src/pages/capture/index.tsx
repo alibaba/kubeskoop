@@ -8,19 +8,10 @@ import {useEffect, useState} from "react";
 
 const submitCapture = (props, callback) => {
   const task: CaptureTask = {
-    capture_host_ns: props.capture_host_ns,
-    capture_duration_seconds: props.duration
-  }
-  if(props.capture_type == "Pod") {
-    task.pod = {
-      name: props.name,
-      namespace: props.namespace
-    }
-  }
-  if(props.capture_type == "Node") {
-    task.node = {
-      name: props.name,
-    }
+    capture_list: props.capture_list,
+    capture_host_ns: props.capture_node,
+    capture_duration_seconds: props.duration,
+    filter: props.filter
   }
 
   captureService.createCapture(task)
@@ -41,8 +32,10 @@ export default function Capture() {
         if(res == null) {
           res = []
         }
-        setCaptureList(res)
-        if (res.find(i => i.status == 'running')) setTimeout(refreshCaptureList, 3000)
+        setCaptureList(Object.values(res))
+        if (Object.values(res).filter(i => i != null).reduce(
+          (prev, i) => prev && i.reduce((prev, item)=>{return prev || item.status==="running"}, true)
+          ,true)) {setTimeout(refreshCaptureList, 3000)}
       })
       .catch(err => {
         Message.error(`Error when fetching diagnosis: ${err.response.data.error}`)

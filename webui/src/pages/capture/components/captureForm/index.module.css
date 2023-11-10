@@ -1,0 +1,8 @@
+.btn {
+    margin-left: 5px;
+}
+.custom {
+    border: 1px dashed;
+    padding: 4px;
+    display: inline-block;
+}

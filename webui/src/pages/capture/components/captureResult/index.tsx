@@ -7,43 +7,37 @@ import {requestConfig} from "@/app";
 
 
 const convertToTable = (res)=> {
-  return res.map((i: CaptureResult) => {
+  return res.map((i: CaptureResult[]) => {
       return {
-        capture_id: i.task_id,
-        capture_type: i.task_config.pod.name == "" ? "Node": "Pods",
-        capture_name: i.task_config.pod.name == "" ? i.task_config.node.name: i.task_config.pod.namespace+"/"+i.task_config.pod.name,
-        task_status: i.status,
-        message: i.message,
+        capture_id: i[0].task_id,
+        capture_names: i.map((capture) => capture.spec.task_type+": "+capture.spec.name).join(", "),
+        capture_results: i
       }
     })
 }
 
 interface CaptureTableProps {
-  captureResult: CaptureResult[];
+  captureResult: CaptureResult[][];
 }
 
 const CaptureHistory: React.FunctionComponent<CaptureTableProps> = (props: CaptureTableProps) => {
   const render = (value, index, record) => {
-    if (record.task_status === "success") {
+    if (record.capture_results.reduce((prev, item)=> {
+      return prev && item.status==="success"},true)) {
       return <a href={requestConfig.baseURL+"/controller/capture/"+record.capture_id+"/download"} target="_blank">Download</a>;
-    } else if (record.task_status === "running") {
+    } else if (record.capture_results.reduce((prev, item)=>{return prev || item.status==="running"}, false)) {
       return <span style={{color: "green"}}>Running</span>;
     } else {
-      return <span style={{color: "red"}}>Failed {record.message}</span>;;
+      return <div style={{color: "red"}}>Failed {record.capture_results.map(item => item.message).join(",")}</div>
     }
   };
   return (
     <div>
       <Table
-        dataSource={convertToTable(props.captureResult)}
+        dataSource={convertToTable(props.captureResult.filter((i)=>i!=null))}
       >
         <Table.Column title="Id" dataIndex="capture_id" sortable />
-        <Table.Column
-          title="Type"
-          dataIndex="capture_type"
-        />
-        <Table.Column title="Name" dataIndex="capture_name" />
-        <Table.Column title="Status" dataIndex="task_status" />
+        <Table.Column title="CaptureObjects" dataIndex="capture_names" />
         <Table.Column title="Result" cell={render} width={200} />
       </Table>
     </div>

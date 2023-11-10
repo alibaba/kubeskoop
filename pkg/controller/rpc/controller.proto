@@ -34,7 +34,7 @@ message EventReply {
 
 message TaskFilter {
   string node_name = 1;
-  TaskType type = 2;
+  repeated TaskType type = 2;
 }
 
 message ServerTask {
@@ -57,8 +57,6 @@ message Task {
 message PodInfo {
   string name = 1;
   string namespace = 2;
-  string ipv4 = 3;
-  string ipv6 = 4;
 }
 
 message NodeInfo {
@@ -68,10 +66,13 @@ message NodeInfo {
 message CaptureInfo {
   PodInfo pod = 1;
   NodeInfo node = 2;
-  bool capture_host_ns = 4;
+  string filter = 3;
+  string capture_type = 4;
+  int32 capture_duration_seconds = 5;
 }
 
 message CaptureResult {
+  string file_type = 1;
   bytes message = 2;
 }
 
@@ -80,8 +81,9 @@ message TaskResult {
   TaskType type = 2;
   bool success = 3;
   string message = 4;
+  CaptureInfo task = 5;
   oneof TaskResultInfo {
-    CaptureResult capture = 5;
+    CaptureResult capture = 6;
   }
 }
 

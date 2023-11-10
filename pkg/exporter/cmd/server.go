@@ -76,7 +76,7 @@ var (
 			insp.v.WatchConfig()
 
 			if insp.config.EnableController {
-				err = task_agent.NewTaskAgent(nettop.GetNodeName()).Run()
+				err = task_agent.NewTaskAgent().Run()
 				if err != nil {
 					log.Errorf("start task agent err: %v", err)
 					return

@@ -2,15 +2,14 @@ import { request } from 'ice'
 import { NodeInfo, PodInfo } from "@/services/k8s";
 
 export interface CaptureTask {
-    pod: PodInfo
-    node: NodeInfo
-    capture_host_ns: boolean
-    capture_duration_seconds: number
+    task_type: string
+    name: string
+    namespace: string
 }
 
 export interface CaptureResult {
     task_id: number,
-    task_config: CaptureTask,
+    spec: CaptureTask,
     status: string,
     result: string,
     message: string

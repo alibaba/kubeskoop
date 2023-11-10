@@ -52,7 +52,7 @@ func (s *Server) RunAgentServer(port int, done <-chan struct{}) {
 	if port == 0 {
 		port = defaultAgentPort
 	}
-	grpcServer := grpc.NewServer()
+	grpcServer := grpc.NewServer(grpc.MaxRecvMsgSize(102 * 1024 * 1024))
 	rpc.RegisterControllerRegisterServiceServer(grpcServer, s.controller)
 	listener, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", port))
 	if err != nil {
