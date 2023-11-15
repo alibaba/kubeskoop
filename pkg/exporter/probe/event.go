@@ -49,26 +49,34 @@ func newEventProbeCreator(creator interface{}) (*eventProbeCreator, error) {
 	return ret, nil
 }
 
-func (e *eventProbeCreator) Call(sink chan<- *Event, args map[string]interface{}) (EventProbe, error) {
+func (e *eventProbeCreator) Call(sink chan<- *Event, args map[string]interface{}) (ep EventProbe, err error) {
 	in := []reflect.Value{
 		reflect.ValueOf(sink),
 	}
 	if e.s != nil {
-		s, err := createStructFromTypeWithArgs(*e.s, args)
-		if err != nil {
-			return nil, err
+		s, e := createStructFromTypeWithArgs(*e.s, args)
+		if e != nil {
+			return nil, e
 		}
 		in = append(in, s)
 	}
 
 	result := e.f.Call(in)
 	// return parameter count and type has been checked in newEventProbeCreator
-	ret := result[0].Interface().(EventProbe)
-	err := result[1].Interface()
-	if err == nil {
-		return ret, nil
+
+	if result[0].Interface() == nil {
+		ep = nil
+	} else {
+		ep = result[0].Interface().(EventProbe)
 	}
-	return ret, err.(error)
+
+	if result[1].Interface() == nil {
+		err = nil
+	} else {
+		err = result[1].Interface().(error)
+	}
+
+	return
 }
 
 // MustRegisterEventProbe registers the event probe by given name and creator.
