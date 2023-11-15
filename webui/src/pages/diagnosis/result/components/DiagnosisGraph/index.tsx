@@ -1,11 +1,17 @@
-import { Graph, GraphData, NodeConfig } from "@antv/g6";
+import { Graph, GraphData } from "@antv/g6";
 import { useEffect, useRef } from "react";
+import registerDiagnosisNode from "./node";
 
-const suspicionStyles = {
-  0: { stroke: '#30BD61' },
-  1: { stroke: '#FFB369' },
-  2: { stroke: '#F76D76' },
-  3: { stroke: '#F76D76' }
+const suspicionColors = {
+  0: '#30BD61',
+  1: '#FFB369',
+  2: '#F76D76',
+  3: '#F76D76'
+}
+
+const nodeTypeIcon = {
+  'pod': '/img/pod.svg',
+  'node': '/img/node.svg',
 }
 
 interface DiagnosisResultProps {
@@ -27,10 +33,16 @@ const toGraphData = (data: DiagnosisResultData): GraphData => {
 
   if (data.nodes) {
     graphData.nodes = data.nodes.map(node => {
+      const nodeData = {
+        color: node.suspicions && node.suspicions.length > 0 ?
+          suspicionColors[maxSuspicionLevel(node.suspicions)] : suspicionColors[0],
+        count: node.suspicions?.length || 0,
+        img: nodeTypeIcon[node.type] || '/img/default.svg',
+      }
       return {
         id: node.id,
         label: wrapLine(node.id, 17),
-        style: node.suspicions && node.suspicions.length > 0 ? suspicionStyles[maxSuspicionLevel(node.suspicions)] : undefined,
+        nodeData: nodeData,
       }
     })
   }
@@ -87,6 +99,8 @@ const DiagnosisResult: React.FC<DiagnosisResultProps> = (props: DiagnosisResultP
   const ref = useRef<HTMLDivElement>(null)
   let graph: Graph | null = null;
 
+  registerDiagnosisNode()
+
   const { data, onClick } = props
   const graphData = data ? toGraphData(data) : null
   useEffect(() => {
@@ -97,11 +111,13 @@ const DiagnosisResult: React.FC<DiagnosisResultProps> = (props: DiagnosisResultP
       height: ref.current?.clientHeight,
       fitCenter: true,
       fitView: true,
+      fitViewPadding: [0, 100],
       layout: {
         type: 'dagre',
         rankdir: "LR"
       },
       defaultNode: {
+        type: "diagnosis-node",
         size: 160,
         labelCfg: {
           style: {

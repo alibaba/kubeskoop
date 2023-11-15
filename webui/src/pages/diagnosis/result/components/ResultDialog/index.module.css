@@ -8,8 +8,14 @@
     color: rgb(102, 102, 102)
 }
 
+.attributeSuspicionItem {
+    font-size: 14px;
+    color: black;
+}
+
 .suspicionIcon {
-    margin-righT: 2px;
+    padding: 2px 4px;
+    margin-right: 5px;
     user-select: none;
     color: white;
     border-radius: 5px;

@@ -22,7 +22,6 @@ export default function Result() {
         })
     }, [])
 
-
     const showResultDialog = (type, id) => {
         let newDialogData: DiagnosisNode | DiagnosisLink | undefined;
         switch(type) {
@@ -47,7 +46,7 @@ export default function Result() {
         <div>
             <PageHeader
                 title="诊断结果"
-                breadcrumbs={[{ name: 'Console' }, { name: '诊断' }, { name: '连通性诊断',  path: '/diagnosis'}, { name: '诊断结果' }]}
+                breadcrumbs={[{ name: 'Console' }, { name: '诊断' }, { name: '连通性诊断',  path: '#/diagnosis'}, { name: '诊断结果' }]}
             />
             <Card title="链路图" contentHeight="auto">
                 <Card.Content>

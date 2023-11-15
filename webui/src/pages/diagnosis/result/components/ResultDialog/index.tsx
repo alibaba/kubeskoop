@@ -38,7 +38,7 @@ const suspicionColors = {
 
 const makeAttributes = (data?: ResultDialogData): string[][] => {
   if (!data) return [];
-  switch(data.type) {
+  switch (data.type) {
     case "node":
       const n = data.data as DiagnosisNode;
       return [
@@ -65,7 +65,7 @@ const makeAttributes = (data?: ResultDialogData): string[][] => {
 
 const makeAttributeItem = (i: string[], idx: number) => {
   return <List.Item
-    id={idx.toString()}
+    key={idx.toString()}
     style={{ padding: '2px' }}
     className={styles.attributeItem}
     title={<span className={styles.attributeTitle}>{i[0]}</span>}>
@@ -78,14 +78,14 @@ const makeSuspicionItem = (i: Suspicion, idx: number) => {
     key={idx.toString()}
     style={{ padding: '2px' }}
     className={styles.attributeItem}>
-    <Grid.Row>
-      <Grid.Col span={3}
-      style={{backgroundColor: suspicionColors[i.level] ? suspicionColors[i.level] : '#525252' }}
-      className={styles.suspicionIcon}>
+    <div>
+      <span
+        style={{ backgroundColor: suspicionColors[i.level] ? suspicionColors[i.level] : '#525252' }}
+        className={styles.suspicionIcon}>
         {levelToString(i.level)}
-      </Grid.Col>
-      <Grid.Col span={24} className={styles.attributeItem}>{i.message}</Grid.Col>
-    </Grid.Row>
+      </span>
+      <span className={styles.attributeSuspicionItem}>{i.message}</span>
+    </div>
   </List.Item>
 };
 
