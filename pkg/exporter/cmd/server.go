@@ -359,7 +359,7 @@ func (i *inspServer) start() error {
 		}
 	}()
 
-	WaitSignals(i.ctx, syscall.SIGHUP, syscall.SIGINT)
+	WaitSignals(i, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM)
 	return nil
 }
 
@@ -375,10 +375,17 @@ func createSink(sinkConfigs []EventSinkConfig) ([]sink.Sink, error) {
 	return ret, nil
 }
 
-func WaitSignals(_ context.Context, sgs ...os.Signal) {
+func WaitSignals(i *inspServer, sgs ...os.Signal) {
 	s := make(chan os.Signal, 1)
 	signal.Notify(s, sgs...)
-	<-s
+	sig := <-s
+	log.Warnf("recive signal %s, stopping", sig.String())
+	if err := i.metricsServer.Stop(i.ctx); err != nil {
+		log.Errorf("failed stop metrics server, err: %v", err)
+	}
+	if err := i.eventServer.Stop(i.ctx); err != nil {
+		log.Errorf("failed stop event server, err: %v", err)
+	}
 }
 
 func defaultPage(w http.ResponseWriter, _ *http.Request) {
