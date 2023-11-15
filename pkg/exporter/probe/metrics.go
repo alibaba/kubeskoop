@@ -50,24 +50,31 @@ func newMetricProbeCreator(creator interface{}) (*metricsProbeCreator, error) {
 	return ret, nil
 }
 
-func (m *metricsProbeCreator) Call(args map[string]interface{}) (MetricsProbe, error) {
+func (m *metricsProbeCreator) Call(args map[string]interface{}) (mp MetricsProbe, err error) {
 	var in []reflect.Value
 	if m.s != nil {
-		s, err := createStructFromTypeWithArgs(*m.s, args)
-		if err != nil {
-			return nil, err
+		s, e := createStructFromTypeWithArgs(*m.s, args)
+		if e != nil {
+			return nil, e
 		}
 		in = append(in, s)
 	}
 
 	result := m.f.Call(in)
 	// return parameter count and type has been checked in newMetricProbeCreator
-	ret := result[0].Interface().(MetricsProbe)
-	err := result[1].Interface()
-	if err == nil {
-		return ret, nil
+	if result[0].Interface() == nil {
+		mp = nil
+	} else {
+		mp = result[0].Interface().(MetricsProbe)
 	}
-	return ret, err.(error)
+
+	if result[1].Interface() == nil {
+		err = nil
+	} else {
+		err = result[1].Interface().(error)
+	}
+
+	return
 }
 
 // MustRegisterMetricsProbe registers the metrics probe by given name and creator.
