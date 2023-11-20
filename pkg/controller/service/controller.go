@@ -20,7 +20,7 @@ type ControllerService interface {
 	Capture(ctx context.Context, capture *CaptureArgs) (int, error)
 	CaptureList(ctx context.Context) (map[int][]*CaptureTaskResult, error)
 	WatchEvents() <-chan *rpc.Event
-	Diagnose(ctx context.Context, args *skoopContext.TaskConfig) (int, error)
+	Diagnose(ctx context.Context, args *skoopContext.TaskConfig) (int64, error)
 	DiagnoseList(ctx context.Context) ([]DiagnoseTaskResult, error)
 	DownloadCaptureFile(ctx context.Context, id int) (string, int64, io.ReadCloser, error)
 	PodList(ctx context.Context) ([]*Pod, error)
