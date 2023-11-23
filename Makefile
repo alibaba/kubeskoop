@@ -38,7 +38,7 @@ build-collector:
 
 .PHONY: build-controller
 build-controller:
-	CGO_ENABLED=0 go build -o bin/controller -ldflags $(ldflags) ./cmd/controller
+	go build -o bin/controller -ldflags $(ldflags) ./cmd/controller
 
 .PHONY: build-btfhack
 build-btfhack:

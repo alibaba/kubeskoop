@@ -7,14 +7,14 @@ const asideMenuConfig = [
     name: '监控',
     children: [
       {
-        name: "事件",
-        path: "/monitoring/events"
+        name: "大盘",
+        path: "/monitoring/dashboard"
       },
       {
-        name: "flow",
-        path: "/monitoring/flow"
+        name: "事件",
+        path: "/monitoring/events"
       }
-    ]
+      ]
   },
   {
     name: '诊断',

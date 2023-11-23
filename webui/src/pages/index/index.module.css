@@ -1,0 +1,10 @@
+
+.contentBox {
+    margin-bottom: 10px;
+}
+
+.optionLabel{
+    display: flex;
+    align-items: center;
+    margin-right: 10px;
+}

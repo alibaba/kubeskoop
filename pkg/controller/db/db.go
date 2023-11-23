@@ -41,12 +41,10 @@ func prepareDDL(engine string) {
 }
 
 func init() {
-
 	engine := "sqlite3"
 	prepareDDL(engine)
 
-	//path := "/var/lib/kubeskoop/controller_db.sqlite3"
-	path := ":memory:"
+	path := "/var/lib/kubeskoop/controller_db.sqlite3"
 
 	var err error
 	db, err = sqlx.Connect("sqlite3", path)

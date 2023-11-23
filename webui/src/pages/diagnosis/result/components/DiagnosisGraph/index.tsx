@@ -95,7 +95,7 @@ const bindEvent = (graph: Graph, onClick: ((type: "node" | "edge", id: string) =
   }
 }
 
-const DiagnosisResult: React.FC<DiagnosisResultProps> = (props: DiagnosisResultProps): JSX.Element => {
+const DiagnosisGraph: React.FC<DiagnosisResultProps> = (props: DiagnosisResultProps): JSX.Element => {
   const ref = useRef<HTMLDivElement>(null)
   let graph: Graph | null = null;
 
@@ -192,4 +192,4 @@ const DiagnosisResult: React.FC<DiagnosisResultProps> = (props: DiagnosisResultP
   );
 };
 
-export default DiagnosisResult;
+export default DiagnosisGraph;

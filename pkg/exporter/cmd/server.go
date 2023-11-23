@@ -226,7 +226,7 @@ func init() {
 type inspServerConfig struct {
 	DebugMode        bool          `yaml:"debugmode" mapstructure:"debugmode"`
 	Port             uint16        `yaml:"port" mapstructure:"port"`
-	EnableController bool          `yaml:"enablecontroller" mapstructure:"enablecontroller"`
+	EnableController bool          `yaml:"enable_controller" mapstructure:"enable_controller"`
 	MetricsConfig    MetricsConfig `yaml:"metrics" mapstructure:"metrics"`
 	EventConfig      EventConfig   `yaml:"event" mapstructure:"event"`
 }

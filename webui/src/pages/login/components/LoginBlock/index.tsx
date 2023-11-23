@@ -93,9 +93,8 @@ const LoginBlock: FunctionComponent<LoginProps> = (
     <div className={styles.loginBlock}>
       <div className={styles.innerBlock}>
         <Logo
-          text="KubeSkoop"
-          imageStyle={{ height: 48 }}
-          textStyle={{ color: '#000', fontSize: 24 }}
+          image='/logo.svg'
+          imageStyle={{ height: 53, margin: "16px 0" }}
         />
         <Form value={postData} onChange={formChange} size="large">
           <>

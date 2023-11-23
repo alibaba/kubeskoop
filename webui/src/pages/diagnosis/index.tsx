@@ -24,6 +24,7 @@ const makeAction = (d: DiagnosisResult, showMessageDialog: (message: string) => 
 }
 
 const toTableData = (data: DiagnosisResult[], showMessageDialog: (message: string) => void) => {
+  if (!data) return [];
   return data.map(d => {
     return {
       id: d.task_id,
@@ -77,7 +78,6 @@ export default function Diagnosis() {
     setMessage(message)
     setDialogVisible(true)
   }
-
 
   useEffect(refreshDiagnosisList, [])
 

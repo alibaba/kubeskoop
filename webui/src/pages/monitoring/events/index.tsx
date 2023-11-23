@@ -1,6 +1,5 @@
 import PageHeader from '@/components/PageHeader';
 import WebFrameCard from '@/components/WebFrameCard';
-import URLDialog from '@/components/UrlDialog';
 import { useEffect, useState } from 'react';
 import Exception from '@/components/Exception';
 import { Button, Loading, Message } from '@alifd/next';
@@ -49,7 +48,6 @@ export default function Events() {
           <Exception title="未配置大盘链接" description="请配置大盘链接后使用" extra={<Button type="primary" onClick={() => setVisible(true)}>配置</Button>} />
         </Loading>
       )}
-      <URLDialog title="设置监控大盘" visible={visible} onVisibleChange={setVisible} onSubmit={onSubmit} url={dashboardConfig.event_url} />
     </div>
   );
 }

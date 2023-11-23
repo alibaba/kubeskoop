@@ -3,10 +3,12 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"github.com/alibaba/kubeskoop/pkg/controller/graph"
 	"github.com/alibaba/kubeskoop/pkg/controller/rpc"
 	"github.com/alibaba/kubeskoop/pkg/controller/service"
 	skoopContext "github.com/alibaba/kubeskoop/pkg/skoop/context"
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/common/model"
 	"google.golang.org/grpc"
 	"io"
 	"log"
@@ -16,6 +18,7 @@ import (
 	"os/signal"
 	"strconv"
 	"syscall"
+	"time"
 )
 
 const (
@@ -68,6 +71,8 @@ func (s *Server) RunAgentServer(port int, done <-chan struct{}) {
 	grpcServer.Stop()
 }
 
+const metricURL = "http://127.0.0.1:8888"
+
 func (s *Server) RunHTTPServer(port int, done <-chan struct{}) {
 	if port == 0 {
 		port = defaultHttpPort
@@ -82,6 +87,7 @@ func (s *Server) RunHTTPServer(port int, done <-chan struct{}) {
 	r.GET("/capture/:task_id/download", s.DownloadCaptureFile)
 	r.GET("/pods", s.ListPods)
 	r.GET("/nodes", s.ListNodes)
+	r.GET("/flow", s.GetFlowGraph)
 
 	go func() {
 		err := r.Run(fmt.Sprintf("0.0.0.0:%d", port))
@@ -112,6 +118,7 @@ func (s *Server) ListDiagnoseTasks(ctx *gin.Context) {
 	tasks, err := s.controller.DiagnoseList(context.TODO())
 	if err != nil {
 		ctx.AsciiJSON(400, map[string]string{"error": fmt.Sprintf("error list diagnose task: %v", err)})
+		return
 	}
 	ctx.AsciiJSON(200, tasks)
 }
@@ -181,4 +188,43 @@ func (s *Server) ListNodes(ctx *gin.Context) {
 		return
 	}
 	ctx.AsciiJSON(200, nodes)
+}
+
+func (s *Server) GetFlowGraph(ctx *gin.Context) {
+	ts := time.Now()
+	result, _, err := s.controller.QueryPrometheus(ctx, "kubeskoop_flow_bytes", ts)
+	if err != nil {
+		ctx.AsciiJSON(500, map[string]string{"error": fmt.Sprintf("error query flow metrics: %v", err)})
+		return
+	}
+	vector := result.(model.Vector)
+
+	podInfo, nodeInfo, err := s.controller.GetPodNodeInfoFromMetrics(ctx, ts)
+	if err != nil {
+		ctx.AsciiJSON(500, map[string]string{"error": fmt.Sprintf("error get pod info from metrics: %v", err)})
+		return
+	}
+
+	g, err := graph.FromVector(vector, podInfo, nodeInfo)
+	if err != nil {
+		ctx.AsciiJSON(500, map[string]string{"error": fmt.Sprintf("error convert flow metrics to graph: %v", err)})
+		return
+	}
+	g.SetEdgeBytesFromVector(vector)
+
+	result, _, err = s.controller.QueryPrometheus(ctx, "kubeskoop_flow_packets", ts)
+	if err != nil {
+		ctx.AsciiJSON(500, map[string]string{"error": fmt.Sprintf("error query flow metrics: %v", err)})
+		return
+	}
+	vector = result.(model.Vector)
+	g.SetEdgePacketsFromVector(vector)
+
+	jstr, err := g.ToJSON()
+	if err != nil {
+		ctx.AsciiJSON(500, map[string]string{"error": fmt.Sprintf("error marshalling to json: %v", err)})
+		return
+	}
+
+	ctx.Data(http.StatusOK, gin.MIMEJSON, jstr)
 }

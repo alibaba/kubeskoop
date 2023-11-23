@@ -30,7 +30,7 @@ const getDevice: IGetDevice = (width) => {
 };
 
 export default function Layout() {
-  const location = useLocation();
+  const location = useLocation()
   const [device, setDevice] = useState(getDevice(NaN));
 
   if (typeof window !== 'undefined') {
@@ -58,8 +58,7 @@ export default function Layout() {
       >
         <Shell.Branding>
           <Logo
-            image={logo}
-            text="KubeSkoop"
+            image="/header.svg"
           />
         </Shell.Branding>
         <Shell.Action>
@@ -67,7 +66,7 @@ export default function Layout() {
             name={userState.currentUser.user}
           />
         </Shell.Action>
-        <Shell.Navigation>
+        <Shell.Navigation collapse={false} trigger={null}>
           <PageNav />
         </Shell.Navigation>
         <Shell.Content>
