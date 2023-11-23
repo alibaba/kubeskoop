@@ -244,9 +244,8 @@ func mergeArray(labels []string, labels2 []string) []string {
 	}
 
 	var ret []string
-	for k := range m {
-		ret = append(ret, k)
-	}
+	ret = append(ret, labels...)
+	ret = append(ret, labels2...)
 
 	return ret
 }
