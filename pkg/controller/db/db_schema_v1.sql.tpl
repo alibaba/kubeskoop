@@ -1,5 +1,5 @@
 /*for sqlite*/
-create table tasks
+create table if not exists tasks
 (
     id          integer primary key autoincrement,
     config      text        not null,
