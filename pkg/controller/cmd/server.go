@@ -85,6 +85,7 @@ func (s *Server) RunHTTPServer(port int, done <-chan struct{}) {
 	r.POST("/capture", s.CommitCaptureTask)
 	r.GET("/captures", s.ListCaptureTasks)
 	r.GET("/capture/:task_id/download", s.DownloadCaptureFile)
+	r.POST("/pingmesh", s.PingMesh)
 	r.GET("/pods", s.ListPods)
 	r.GET("/nodes", s.ListNodes)
 	r.GET("/flow", s.GetFlowGraph)
@@ -188,6 +189,20 @@ func (s *Server) ListNodes(ctx *gin.Context) {
 		return
 	}
 	ctx.AsciiJSON(200, nodes)
+}
+
+func (s *Server) PingMesh(ctx *gin.Context) {
+	var pingmesh service.PingMeshArgs
+	if err := ctx.ShouldBindJSON(&pingmesh); err != nil {
+		ctx.AsciiJSON(400, map[string]string{"error": fmt.Sprintf("error get task config from request: %v", err)})
+		return
+	}
+	result, err := s.controller.PingMesh(context.TODO(), &pingmesh)
+	if err != nil {
+		ctx.AsciiJSON(400, map[string]string{"error": fmt.Sprintf("error do pingmesh: %v", err)})
+		return
+	}
+	ctx.JSON(200, result)
 }
 
 func (s *Server) GetFlowGraph(ctx *gin.Context) {

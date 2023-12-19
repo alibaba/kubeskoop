@@ -4,13 +4,10 @@ import styles from "./index.module.css"
 import moment from 'moment';
 import k8sService from "@/services/k8s";
 import SelectorDialog from "./selectorDialog.tsx"
+import {PingMeshArgs} from "@/services/pingmesh";
 
 interface PingFormProps {
-  onSubmit: (data: PingFormData) => void;
-}
-
-interface PingFormData {
-  [key: string]: any;
+  onSubmit: (data: PingMeshArgs) => void;
 }
 
 const PingForm: React.FunctionComponent<PingFormProps> = (props: PingFormProps) => {
@@ -18,7 +15,7 @@ const PingForm: React.FunctionComponent<PingFormProps> = (props: PingFormProps) 
   const [showSelectorDialog, setshowSelectorDialog] = useState(false)
 
   const [pingMeshList, setPingMeshList] = useState([])
-  const handleSubmit = (values: PingFormData, errors: any) => {
+  const handleSubmit = (values: PingMeshArgs, errors: any) => {
     if (errors) {
       return
     }
@@ -26,9 +23,8 @@ const PingForm: React.FunctionComponent<PingFormProps> = (props: PingFormProps) 
       Message.error("至少选择两个以上的对象用来做延迟探测")
       return
     }
-    values["capture_list"] = pingMeshList
+    values.ping_mesh_list = pingMeshList
     onSubmit(values);
-    console.log(values)
   };
 
   return (

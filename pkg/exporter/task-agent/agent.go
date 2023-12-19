@@ -36,7 +36,7 @@ func (a *Agent) Run() error {
 	a.grpcClient = rpc.NewControllerRegisterServiceClient(conn)
 	watchClient, err := a.grpcClient.WatchTasks(context.TODO(), &rpc.TaskFilter{
 		NodeName: a.NodeName,
-		Type:     []rpc.TaskType{rpc.TaskType_Capture},
+		Type:     []rpc.TaskType{rpc.TaskType_Capture, rpc.TaskType_Ping},
 	})
 	if err != nil {
 		return fmt.Errorf("failed to watch tasks: %v", err)
@@ -51,7 +51,7 @@ func (a *Agent) Run() error {
 		a.grpcClient = rpc.NewControllerRegisterServiceClient(conn)
 		watchClient, err = a.grpcClient.WatchTasks(context.TODO(), &rpc.TaskFilter{
 			NodeName: a.NodeName,
-			Type:     []rpc.TaskType{rpc.TaskType_Capture},
+			Type:     []rpc.TaskType{rpc.TaskType_Capture, rpc.TaskType_Ping},
 		})
 		if err != nil {
 			log.Errorf("failed to watch: %v", err)
@@ -85,6 +85,9 @@ func (a *Agent) ProcessTasks(task *rpc.ServerTask) error {
 	switch task.GetTask().GetType() {
 	case rpc.TaskType_Capture:
 		go a.ProcessCapture(task)
+		return nil
+	case rpc.TaskType_Ping:
+		go a.ProcessPing(task)
 		return nil
 	}
 	return nil

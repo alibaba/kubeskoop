@@ -1,174 +1,179 @@
 import { useRef, useEffect } from "react"
-import { Graph } from "@antv/g6"
-import { Layout } from "@antv/g6"
+import ForceGraph2D from 'react-force-graph-2d';
+
 
 interface GraphData {
-  combos: string[],
   nodes: any[],
-  edges: any[]
-  clusterCount: number,
+  links: any[]
 }
 
-interface FlowGraphProps {
+interface PingGraphProps {
   data: any
 }
 
-const removeDuplicateEdge = (edges: any[]): any[] => {
-  const result: any[] = [];
-  const map: any = {};
-  edges.forEach((edge: any) => {
-    const key = `${edge.source}-${edge.target}`
-    const reverseKey = `${edge.target}-${edge.source}`
-    if (!map[key] && !map[reverseKey]) {
-      result.push(edge)
-      map[key] = true
-    }
-  });
-  return result;
-}
-
-const getComboName = (n: any): string => {
-  switch (n.type) {
-    case 'pod':
-      return n.namespace
-    case 'node':
-      return '<Node>'
-    case 'external':
-      return '<External>'
+const nodeID = (node: any) => {
+  let id = node.name
+  switch (node.type) {
+    case 'Pod':
+      id = `${node.type}/${node.namespace}/${node.name}`
+      break
+    case 'Node':
+      id = `${node.type}/${node.name}`
+      break
   }
+  return id
 }
 
 const toGraphData = (data: any): GraphData => {
   let nodes = data.nodes
     .map((item: any) => {
-      let label = item.id
+      let label = item.name
       switch (item.type) {
-        case 'pod':
+        case 'Pod':
           label = `${item.namespace}/${item.name}`
           break
-        case 'node':
-          label = item.node_name
+        case 'Node':
+          label = item.name
           break
       }
+      let id = `${item.type}/${label}`
       return {
-        id: item.id,
+        id: id,
+        name: id,
         label: label,
-        comboId: getComboName(item),
         ...item,
       }
     });
-
-  const combos = nodes
-    .map(v => v.comboId)
-    .filter((i, j, a) => a.indexOf(i) === j)
-    .map(v => {
-      return {
-        id: v,
-        label: v,
-        padding: 5,
-      }
-    });
-
-  const edges = removeDuplicateEdge(data.edges.map((item: any) => {
+  const links = data.latencies.map((item: any) => {
     return {
       id: item.id,
-      source: item.src,
-      target: item.dst,
+      source: nodeID(item.source),
+      target: nodeID(item.destination),
+      latency_avg: item.latency_avg.toFixed(3),
+      latency_max: item.latency_max.toFixed(3),
+      latency_min: item.latency_min.toFixed(3),
+      curvature: 0.3,
     }
-  }));
-
-  const clusterCount = nodes.map(i => i.cluster).filter((v, i, a) => a.indexOf(v) === i).length
+  });
 
   return {
-    combos,
     nodes,
-    edges,
-    clusterCount,
+    links,
   };
 }
 
-const FlowGraph: React.FC<FlowGraphProps> = (props: FlowGraphProps): JSX.Element => {
+const PingGraph: React.FC<PingGraphProps> = (props: PingGraphProps): JSX.Element => {
   const ref = useRef(null);
   const { data } = props
   const graphData = data ? toGraphData(data) : null
   useEffect(() => {
-    if (!data || !graphData) return;
-    const graph = new Graph({
-      container: ref.current!,
-      width: ref.current!.clientWidth,
-      height: ref.current!.clientHeight,
-      fitView: true,
-      // fitViewPadding: 100,
-      groupByTypes: false,
-      layout: {
-        type: 'comboCombined',
-        animate: true,
-        outerLayout: new Layout['forceAtlas2']({
-          preventOverlap: true,
-          kr: 100,
-        }),
-        innerLayout: new Layout['force2']({
-          preventOverlap: true,
-          gravity: Math.min(graphData.nodes.length * 150, 2000),
-        })
-      },
-      defaultNode: {
-        labelCfg: {
-          position: 'bottom',
-          style: {
-            fontSize: 6,
-            fill: 'none',
-          },
-        }
-      },
-      defaultEdge: {
-        style: {
-          radius: 20,
-          stroke: '#bec0c2',
-          lineWidth: 1.2,
-          lineDash: [0, 3, 6],
-        },
-      },
-      defaultCombo: {
-      },
-      modes: {
-        default: [
-          {
-            type: 'drag-canvas',
-            enableOptimize: true,
-          },
-          {
-            type: 'zoom-canvas',
-            enableOptimize: true,
-            optimizeZoom: 0.01,
-          },
-          'drag-node',
-          'drag-combo',
-          // 'shortcuts-call',
-        ]
-      },
-    });
-
-    graph.data(graphData);
-    graph.render();
-
-    const graphResize = (entries: ResizeObserverEntry[]) => {
-      if (graph) {
-        if (!entries || entries.length === 0) return;
-        const e = entries[0]
-        graph.changeSize(e.target.clientWidth, e.target.clientHeight);
-        graph.fitView();
-      }
-    };
-
-    const ob = new ResizeObserver(graphResize)
-    ob.observe(ref.current!);
-    return () => { graph?.destroy(); ob.disconnect() };
-  }, [props])
-
+    const fg = ref.current;
+    fg.d3Force('link').distance(link => 100);
+  }, []);
   return (
-    <div ref={ref} style={{ height: '80vh' }} />
+    <div style={{
+      height: "400px",
+      width: "900px",
+      display: "inline-flex",
+    }}>
+      <div style={{
+        height: "400px",
+        width: "600px",
+      }}>
+      <ForceGraph2D ref={ref} graphData={graphData}
+                    linkCurveRotation="rotation"
+                    linkDirectionalArrowLength={3}
+                    linkDirectionalArrowRelPos={1}
+                    linkDirectionalParticles={2}
+                    linkCurvature={0.3}
+                    nodeRelSize={6}
+                    width={600}
+                    height={400}
+                    enableNodeDrag={true}
+                    onNodeDragEnd={node => {
+                      node.fx = node.x;
+                      node.fy = node.y;
+                    }}
+                    nodeLabel={(node) => node.name}
+                    nodeCanvasObjectMode={() => 'after'}
+                    nodeCanvasObject={(node, ctx, globalScale) => {
+                      const label = node.name;
+                      const fontSize = 12 / globalScale;
+                      ctx.font = `${fontSize}px Sans-Serif`;
+                      ctx.textAlign = 'center';
+                      ctx.textBaseline = 'middle';
+                      ctx.fillStyle = 'black'; //node.color;
+                      ctx.fillText(label, node.x, node.y + 6);
+                    }}
+                    linkCanvasObjectMode={() => 'after'}
+                    linkLabel={(link) => `${link.source.name}->${link.target.name} max/avg/min ${link.latency_max}/${link.latency_avg}/${link.latency_min} ms`}
+                    linkColor={(link) => {
+                      return link.latency_avg > 1 ? (link.latency_avg > 100 ? 'red' : 'orange') : 'green'
+                    }}
+                    linkCanvasObject={(link, ctx) => {
+                      const MAX_FONT_SIZE = 4;
+                      const LABEL_NODE_MARGIN = 6 * 1.5;
+                      const start = link.source;
+                      const end = link.target;
+                      // ignore unbound links
+                      if (typeof start !== 'object' || typeof end !== 'object') return;
+                      // calculate label positioning
+                      function getQuadraticXY(t, sx, sy, cp1x, cp1y, ex, ey) {
+                        return {
+                          x: (1 - t) * (1 - t) * sx + 2 * (1 - t) * t * cp1x + t * t * ex,
+                          y: (1 - t) * (1 - t) * sy + 2 * (1 - t) * t * cp1y + t * t * ey,
+                        };
+                      }
+                      let textPos = Object.assign({},...['x', 'y'].map(c => ({
+                        [c]: start[c] + (end[c] - start[c]) / 2 // calc middle point
+                      })));
+                      if (+link.curvature > 0) {
+                        textPos = getQuadraticXY(
+                          0.5,
+                          start.x,
+                          start.y,
+                          link.__controlPoints[0],
+                          link.__controlPoints[1],
+                          end.x,
+                          end.y
+                        );
+                      }
+
+                      const relLink = { x: end.x - start.x, y: end.y - start.y };
+                      const maxTextLength = Math.sqrt(Math.pow(relLink.x, 2) + Math.pow(relLink.y, 2)) - LABEL_NODE_MARGIN * 2;
+                      let textAngle = Math.atan2(relLink.y, relLink.x);
+                      // maintain label vertical orientation for legibility
+                      if (textAngle > Math.PI / 2) textAngle = -(Math.PI - textAngle);
+                      if (textAngle < -Math.PI / 2) textAngle = -(-Math.PI - textAngle);
+                      const label = `${link.latency_avg}ms`;
+                      // estimate fontSize to fit in link length
+                      ctx.font = '1px Sans-Serif';
+                      const fontSize = Math.min(MAX_FONT_SIZE, maxTextLength / ctx.measureText(label).width);
+                      ctx.font = `${fontSize}px Sans-Serif`;
+                      const textWidth = ctx.measureText(label).width;
+                      const bckgDimensions = [textWidth, fontSize].map(n => n + fontSize * 0.2); // some padding
+                      // draw text label (with background rect)
+                      ctx.save();
+                      ctx.translate(textPos.x, textPos.y);
+                      ctx.rotate(textAngle);
+                      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                      ctx.fillRect(- bckgDimensions[0] / 2, - bckgDimensions[1] / 2, ...bckgDimensions);
+                      ctx.textAlign = 'center';
+                      ctx.textBaseline = 'middle';
+                      ctx.fillStyle = 'darkgrey';
+                      ctx.setLineDash([5, 5]);
+                      ctx.fillText(label, 0, 0);
+                      ctx.restore();
+                    }}
+      />
+      </div>
+      <div style={{float: 'right', width: '200px', display: 'inline-block'}}>
+        <div><span style={{color: 'red'}}>---  </span><span>latency &gt; 100ms or failed</span></div>
+        <div><span style={{color: 'orange'}}>---  </span><span>1ms &lt; latency &lt; 100ms</span></div>
+        <div><span style={{color: 'green'}}>---  </span><span>latency &lt; 1ms</span></div>
+      </div>
+    </div>
   )
 }
 
-export default FlowGraph;
+export default PingGraph;

@@ -84,12 +84,10 @@ type CaptureTaskResult struct {
 
 var (
 	captureTasks = sync.Map{}
-	captureIdx   = 0
 )
 
 func (c *controller) Capture(ctx context.Context, capture *CaptureArgs) (int, error) {
-	taskID := captureIdx
-	captureIdx++
+	taskID := int(getTaskIdx())
 
 	var tasksToCommit []*rpc.CaptureInfo
 	for _, captureItem := range capture.CaptureList {
@@ -99,19 +97,10 @@ func (c *controller) Capture(ctx context.Context, capture *CaptureArgs) (int, er
 		}
 		switch captureItem.Type {
 		case "Pod":
-			p, err := c.k8sClient.CoreV1().Pods(captureItem.Namespace).Get(ctx, captureItem.Name, v1.GetOptions{})
+			var err error
+			task.Pod, task.Node, _, err = c.getPodInfo(ctx, captureItem.Namespace, captureItem.Name)
 			if err != nil {
-				return 0, fmt.Errorf("get pod %s/%s failed: %v", captureItem.Namespace, captureItem.Name, err)
-			}
-			if p.Status.Phase != corev1.PodRunning {
-				return 0, fmt.Errorf("pod %s/%s is not running", captureItem.Namespace, captureItem.Name)
-			}
-			task.Pod = &rpc.PodInfo{
-				Name:      captureItem.Name,
-				Namespace: captureItem.Namespace,
-			}
-			task.Node = &rpc.NodeInfo{
-				Name: captureItem.Nodename,
+				return 0, err
 			}
 			task.CaptureType = "Pod"
 		case "Node":

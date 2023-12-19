@@ -6,6 +6,7 @@ import (
 	"github.com/alibaba/kubeskoop/pkg/controller/rpc"
 	"github.com/samber/lo"
 	log "k8s.io/klog/v2"
+	"sync/atomic"
 )
 
 type taskWatcher struct {
@@ -46,6 +47,17 @@ func (c *controller) WatchTasks(filter *rpc.TaskFilter, server rpc.ControllerReg
 }
 
 func (c *controller) UploadTaskResult(ctx context.Context, result *rpc.TaskResult) (*rpc.TaskResultReply, error) {
+	id := result.Id
+	if watcher, ok := c.resultWatchers.Load(id); ok {
+		wchan := watcher.(chan *rpc.TaskResult)
+		wchan <- result
+		close(wchan)
+		return &rpc.TaskResultReply{
+			Success: true,
+			Message: "",
+		}, nil
+	}
+
 	switch result.GetType() {
 	case rpc.TaskType_Capture:
 		return c.storeCaptureResult(ctx, result)
@@ -56,6 +68,14 @@ func (c *controller) UploadTaskResult(ctx context.Context, result *rpc.TaskResul
 func (c *controller) GetAgentList() []*rpc.AgentInfo {
 	//TODO implement me
 	panic("implement me")
+}
+
+var (
+	taskIdx int64 = 0
+)
+
+func getTaskIdx() int64 {
+	return atomic.AddInt64(&taskIdx, 1)
 }
 
 func (c *controller) commitTask(node string, task *rpc.Task) ([]string, error) {
@@ -79,5 +99,20 @@ func (c *controller) commitTask(node string, task *rpc.Task) ([]string, error) {
 		return commitedNode, nil
 	} else {
 		return nil, fmt.Errorf("there is no client to process task: %v", task)
+	}
+}
+
+func (c *controller) waitTaskResult(ctx context.Context, id string) (*rpc.TaskResult, error) {
+	resultChan := make(chan *rpc.TaskResult, 1)
+	c.resultWatchers.Store(id, resultChan)
+	defer c.resultWatchers.Delete(id)
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case result, ok := <-resultChan:
+		if !ok {
+			return nil, fmt.Errorf("task result channel closed")
+		}
+		return result, nil
 	}
 }

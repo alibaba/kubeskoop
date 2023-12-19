@@ -44,6 +44,7 @@ message ServerTask {
 
 enum TaskType {
   Capture = 0;
+  Ping = 1;
 }
 
 message Task {
@@ -51,6 +52,7 @@ message Task {
   string id = 2;
   oneof TaskInfo {
     CaptureInfo capture = 3;
+    PingInfo ping = 4;
   }
 }
 
@@ -61,6 +63,19 @@ message PodInfo {
 
 message NodeInfo {
   string name = 1;
+}
+
+message PingInfo {
+  PodInfo pod = 1;
+  NodeInfo node = 2;
+  string destination = 3;
+}
+
+message PingResult {
+  float max = 1;
+  float avg = 2;
+  float min = 3;
+  bytes message = 4;
 }
 
 message CaptureInfo {
@@ -84,6 +99,7 @@ message TaskResult {
   CaptureInfo task = 5;
   oneof TaskResultInfo {
     CaptureResult capture = 6;
+    PingResult ping = 7;
   }
 }
 

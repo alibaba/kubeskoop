@@ -26,6 +26,10 @@ const asideMenuConfig = [
       {
         name: "抓包",
         path: "/capture"
+      },
+      {
+        name: "延迟探测(PingMesh)",
+        path: "/pingmesh"
       }
     ]
   },

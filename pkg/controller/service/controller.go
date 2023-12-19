@@ -31,12 +31,14 @@ type ControllerService interface {
 	NodeList(ctx context.Context) ([]*Node, error)
 	QueryPrometheus(ctx context.Context, query string, ts time.Time) (model.Value, promv1.Warnings, error)
 	GetPodNodeInfoFromMetrics(ctx context.Context, ts time.Time) (model.Vector, model.Vector, error)
+	PingMesh(ctx context.Context, pingmesh *PingMeshArgs) (*PingMeshResult, error)
 }
 
 func NewControllerService() (ControllerService, error) {
 	ctrl := &controller{
-		diagnosor:   diagnose.NewDiagnoseController(),
-		taskWatcher: sync.Map{},
+		diagnosor:      diagnose.NewDiagnoseController(),
+		taskWatcher:    sync.Map{},
+		resultWatchers: sync.Map{},
 	}
 	var (
 		restConfig *rest.Config
@@ -70,8 +72,9 @@ func NewControllerService() (ControllerService, error) {
 
 type controller struct {
 	rpc.UnimplementedControllerRegisterServiceServer
-	diagnosor   diagnose.DiagnoseController
-	k8sClient   *kubernetes.Clientset
-	taskWatcher sync.Map
-	promClient  api.Client
+	diagnosor      diagnose.DiagnoseController
+	k8sClient      *kubernetes.Clientset
+	resultWatchers sync.Map
+	taskWatcher    sync.Map
+	promClient     api.Client
 }
