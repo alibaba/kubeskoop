@@ -57,7 +57,11 @@ var (
 			}
 
 			// nolint
-			go nettop.StartCache(insp.ctx)
+			if err := nettop.StartCache(insp.ctx, sidecar); err != nil {
+				log.Errorf("failed start cache: %v", err)
+				return
+			}
+
 			defer nettop.StopCache()
 
 			// config hot reload process

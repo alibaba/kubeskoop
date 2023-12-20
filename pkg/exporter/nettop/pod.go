@@ -1,14 +1,6 @@
 package nettop
 
-import (
-	"encoding/json"
-
-	log "github.com/sirupsen/logrus"
-
-	internalapi "k8s.io/cri-api/pkg/apis"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-)
-
+// from containerd sandbox status
 type NamespacesSpec struct {
 	Type string `json:"type"`
 	Path string `json:"path"`
@@ -22,65 +14,21 @@ type RuntimeSpec struct {
 	Linux LinuxSpec `json:"linux"`
 }
 
-type InfoSpec struct {
-	Pid         int         `json:"pid"`
-	RuntimeSpec RuntimeSpec `json:"runtimeSpec"`
+type RuntimeOptions struct {
+	SystemdCGroup bool `json:"systemd_cgroup"`
 }
 
-func getPodMetas(client internalapi.RuntimeService) (map[string]podMeta, error) {
-	if client == nil {
-		return nil, nil
-	}
-	// only list live pods
-	filter := runtimeapi.PodSandboxFilter{
-		State: &runtimeapi.PodSandboxStateValue{
-			State: runtimeapi.PodSandboxState_SANDBOX_READY,
-		},
-	}
-	listresponse, err := client.ListPodSandbox(&filter)
-	if err != nil {
-		return nil, err
-	}
-	resMap := make(map[string]podMeta)
-	for _, sandbox := range listresponse {
-		status, err := client.PodSandboxStatus(sandbox.GetId(), true)
-		if err != nil {
-			log.Debugf("get pod sandbox %s status failed with %s", sandbox.GetId(), err)
-			continue
-		}
-		pm := podMeta{
-			sandbox:   sandbox.GetId(),
-			name:      status.GetStatus().GetMetadata().GetName(),
-			namespace: status.GetStatus().GetMetadata().GetNamespace(),
-			ip:        status.GetStatus().GetNetwork().GetIp(),
-			labels:    status.GetStatus().GetLabels(),
-		}
+type Linux struct {
+	CgroupParent string `json:"cgroup_parent"`
+}
 
-		if v, ok := status.GetStatus().GetLabels()["app"]; ok {
-			pm.app = v
-		}
+type Config struct {
+	Linux Linux `json:"linux"`
+}
 
-		// get process pid
-		info := status.GetInfo()["info"]
-		if info != "" {
-			infospec := InfoSpec{}
-			err := json.Unmarshal([]byte(info), &infospec)
-			if err != nil {
-				log.Warnf("parse info spec %s failed with %v", pm.name, err)
-				continue
-			}
-			pm.pid = infospec.Pid
-			if infospec.RuntimeSpec.Linux.NamespaceSpec != nil && len(infospec.RuntimeSpec.Linux.NamespaceSpec) > 0 {
-				for _, ns := range infospec.RuntimeSpec.Linux.NamespaceSpec {
-					if ns.Type == "network" {
-						pm.nspath = ns.Path
-					}
-				}
-			}
-		}
-
-		resMap[sandbox.GetId()] = pm
-
-	}
-	return resMap, nil
+type sandboxInfoSpec struct {
+	Pid            int            `json:"pid"`
+	RuntimeSpec    RuntimeSpec    `json:"runtimeSpec"`
+	RuntimeOptions RuntimeOptions `json:"runtimeOptions"`
+	Config         Config         `json:"config"`
 }

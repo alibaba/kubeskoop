@@ -2,8 +2,14 @@ package nettop
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"github.com/vishvananda/netlink"
+	"golang.org/x/sys/unix"
+	internalapi "k8s.io/cri-api/pkg/apis"
+	v1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"os"
+	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -22,96 +28,126 @@ var (
 	podCache            = cache.New(20*cacheUpdateInterval, 20*cacheUpdateInterval)
 	nsCache             = cache.New(20*cacheUpdateInterval, 20*cacheUpdateInterval)
 	pidCache            = cache.New(20*cacheUpdateInterval, 20*cacheUpdateInterval)
+	ipCache             = cache.New(20*cacheUpdateInterval, 20*cacheUpdateInterval)
 
-	control = make(chan struct{})
+	control   = make(chan struct{})
+	lock      sync.Mutex
+	criClient internalapi.RuntimeService
+
+	defaultEntity = &Entity{}
 )
+
+func currentPodInfo() (string, string, error) {
+	namespace, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+	if err != nil {
+		return "", "", fmt.Errorf("failed get namespace in sidecar mode, err: %v", err)
+	}
+
+	name, err := os.ReadFile("/etc/hostname")
+	if err != nil {
+		return "", "", fmt.Errorf("failed get namespace in sidecar mode, err: %v", err)
+	}
+	return string(namespace), string(name), nil
+}
+
+func initDefaultEntity(sidecarMode bool) error {
+	self := os.Getpid()
+	hostNetNSId, err := getNsInumByPid(self)
+	if err != nil {
+		return fmt.Errorf("failed get host nsnum id, err: %w", err)
+	}
+
+	ipList, err := hostIPList()
+	if err != nil {
+		return err
+	}
+
+	//add host network
+	defaultEntity = &Entity{
+		netnsMeta: netnsMeta{
+			inum:          hostNetNSId,
+			mountPath:     fmt.Sprintf("/proc/%d/ns/net", self),
+			isHostNetwork: !sidecarMode,
+			ipList:        ipList,
+		},
+		initPid: self,
+	}
+
+	if sidecarMode {
+		namespace, name, err := currentPodInfo()
+		if err != nil {
+			return fmt.Errorf("failed get current pod info: %w", err)
+		}
+
+		podIp := ""
+		if len(ipList) > 0 {
+			podIp = ipList[0]
+		}
+
+		defaultEntity.podMeta = podMeta{
+			namespace: namespace,
+			name:      name,
+			ip:        podIp,
+		}
+	}
+
+	return nil
+}
+
+func hostIPList() ([]string, error) {
+	links, err := netlink.LinkList()
+	if err != nil {
+		return nil, fmt.Errorf("failed get host link list: %w", err)
+	}
+
+	var ret []string
+
+	for _, link := range links {
+		addrs, err := netlink.AddrList(link, unix.AF_INET)
+		if err != nil {
+			log.Errorf("failed get addr from link %s: %v", link.Attrs().Name, err)
+			continue
+		}
+		for _, addr := range addrs {
+			if !addr.IP.IsGlobalUnicast() {
+				continue
+			}
+			ret = append(ret, addr.IP.String())
+		}
+	}
+	return ret, nil
+}
 
 type netnsMeta struct {
 	inum          int
 	mountPath     string
-	pids          []int
 	isHostNetwork bool
+	ipList        []string
 }
 
 type podMeta struct {
 	name      string
 	namespace string
-	sandbox   string
-	pid       int
-	nspath    string
-	app       string // app label from cri response
-	ip        string // ip addr from cri response
-	labels    map[string]string
+	ip        string
 }
 
 type Entity struct {
 	netnsMeta
 	podMeta
-	pids []int
+	initPid int
+	pids    []int
 }
 
 func (e *Entity) GetIP() string {
 	return e.podMeta.ip
 }
 
-func (e *Entity) GetAppLabel() string {
-	if e.netnsMeta.isHostNetwork {
-		return hostNetwork
-	}
-	return e.podMeta.app
-}
-
-func (e *Entity) GetLabel(labelkey string) (string, bool) {
-	if e.podMeta.labels != nil {
-		if v, ok := e.podMeta.labels[labelkey]; ok {
-			return v, true
-		}
-	}
-
-	return "", false
-}
-
 func (e *Entity) GetPodName() string {
-	if env := os.Getenv("INSPECTOR_PODNAME"); env != "" {
-		return env
-	}
-
-	if e.netnsMeta.isHostNetwork {
-		return hostNetwork
-	}
-
-	if e.podMeta.name != "" {
-		return e.podMeta.name
-	}
-
-	return unknowNetwork
+	return e.podMeta.name
 }
 
 func (e *Entity) GetPodNamespace() string {
-	if env := os.Getenv("INSPECTOR_PODNAMESPACE"); env != "" {
-		return env
-	}
-
-	if e.netnsMeta.isHostNetwork {
-		return hostNetwork
-	}
-
-	if e.podMeta.namespace != "" {
-		return e.podMeta.namespace
-	}
-
-	return unknowNetwork
-}
-
-func (e *Entity) GetMeta(name string) (string, error) {
-	switch name {
-	case "ip":
-		return e.GetIP(), nil
-	case "netns":
-		return fmt.Sprintf("ns%d", e.GetNetns()), nil
-	default:
-		return "", fmt.Errorf("unkonw or unsupported meta %s", name)
-	}
+	return e.podMeta.namespace
 }
 
 func (e *Entity) IsHostNetwork() bool {
@@ -126,15 +162,8 @@ func (e *Entity) GetNetnsMountPoint() string {
 	return e.netnsMeta.mountPath
 }
 
-func (e *Entity) GetPodSandboxID() string {
-	return e.podMeta.sandbox
-}
-
 func (e *Entity) GetNsHandle() (netns.NsHandle, error) {
-	if len(e.pids) != 0 {
-		return netns.GetFromPid(e.pids[0])
-	}
-
+	//TODO check whether we should close the opened file
 	return netns.GetFromPath(e.netnsMeta.mountPath)
 }
 
@@ -147,27 +176,40 @@ func (e *Entity) GetNetNsFd() (int, error) {
 	return int(h), nil
 }
 
-// GetPid return a random pid of entify, if no process in netns,return 0
+// GetPid return a random initPid of entify, if no process in netns,return 0
 func (e *Entity) GetPid() int {
-	if len(e.pids) == 0 {
-		return 0
-	}
-	return e.pids[0]
+	return e.initPid
 }
 func (e *Entity) GetPids() []int {
 	return e.pids
 }
 
-func StartCache(ctx context.Context) error {
-	log.Infof("nettop cache loop start, interval: %d", cacheUpdateInterval)
-	return cacheDaemonLoop(ctx, control)
+func StartCache(ctx context.Context, sidecarMode bool) error {
+	if err := initCriClient(runtimeEndpoints); err != nil {
+		return err
+	}
+	if err := initDefaultEntity(sidecarMode); err != nil {
+		return err
+	}
+	if sidecarMode {
+		return nil
+	}
+
+	if err := cachePodsWithTimeout(cacheUpdateInterval); err != nil {
+		return fmt.Errorf("failed cache pods, err: %v", err)
+	}
+
+	go cacheDaemonLoop(ctx, control)
+	return nil
 }
 
 func StopCache() {
 	control <- struct{}{}
 }
 
-func cacheDaemonLoop(_ context.Context, control chan struct{}) error {
+func cacheDaemonLoop(_ context.Context, control chan struct{}) {
+	log.Infof("nettop cache loop start")
+
 	t := time.NewTicker(cacheUpdateInterval)
 	defer t.Stop()
 
@@ -175,178 +217,145 @@ func cacheDaemonLoop(_ context.Context, control chan struct{}) error {
 		select {
 		case <-control:
 			log.Info("cache daemon loop exit of control signal")
-			return nil
 		case <-t.C:
-			go cacheProcess()
+			if err := cachePodsWithTimeout(cacheUpdateInterval); err != nil {
+				log.Errorf("failed cache pods: %v", err)
+			}
 		}
-
 	}
 
 }
 
-func cacheProcess() {
+func cachePodsWithTimeout(timeout time.Duration) error {
 	start := time.Now()
-	ctx, cancelf := context.WithTimeout(context.Background(), cacheUpdateInterval)
-	defer cancelf()
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	var err error
 
 	cacheDone := make(chan struct{})
 	go func(done chan struct{}) {
-		err := cacheNetTopology()
-		if err != nil {
-			log.Errorf("failed cache process, err: %v", err)
-		}
+		err = cacheNetTopology(ctx)
 		done <- struct{}{}
 	}(cacheDone)
 
 	select {
 	case <-ctx.Done():
 		log.Infof("cache process time exceeded, latency: %fs", time.Since(start).Seconds())
-		return
+		return fmt.Errorf("timeout process pods")
 	case <-cacheDone:
 		log.Infof("cache process finished, latency: %fs", time.Since(start).Seconds())
-	}
-
-}
-
-func SyncNetTopology() error {
-	return cacheNetTopology()
-}
-
-func cacheNetTopology() error {
-	// get all process
-	pids, err := getAllPids()
-	if err != nil {
-		log.Warnf("cache pids failed %s", err)
 		return err
 	}
+}
 
-	log.Debug("finished get all pids")
-	// get all netns by process
-	netnsMap := map[int]netnsMeta{}
-	for _, pid := range pids {
-		nsinum, err := getNsInumByPid(pid)
-		if err != nil {
-			log.Warnf("get ns inum of %d failed %s", pid, err)
+func addEntityToCache(e *Entity) {
+	nsCache.Set(fmt.Sprintf("%d", e.inum), e, 3*cacheUpdateInterval)
+	for _, ip := range e.ipList {
+		ipCache.Set(ip, e, 3*cacheUpdateInterval)
+	}
+}
+
+func contextDone(ctx context.Context) bool {
+	select {
+	case <-ctx.Done():
+		return true
+	default:
+		return false
+	}
+}
+
+func cacheNetTopology(ctx context.Context) error {
+	lock.Lock()
+	defer lock.Unlock()
+
+	addEntityToCache(defaultEntity)
+
+	sandboxList, err := criClient.ListPodSandbox(nil)
+	if err != nil {
+		return fmt.Errorf("failed list pod sandboxes: %w", err)
+	}
+
+	for _, sandbox := range sandboxList {
+
+		if contextDone(ctx) {
+			return fmt.Errorf("timeout")
+		}
+		if sandbox.Metadata == nil {
+			log.Errorf("invalid sandbox who has no metadata, id %s", sandbox.Id)
+		}
+
+		namespace := sandbox.Metadata.Namespace
+		name := sandbox.Metadata.Name
+
+		if sandbox.State != v1.PodSandboxState_SANDBOX_READY {
+			log.Infof("sandbox %s/%s is not ready ,skip", namespace, name)
 			continue
 		}
 
-		if v, ok := netnsMap[nsinum]; !ok {
-			nsm := netnsMeta{
-				inum: nsinum,
-				pids: []int{pid},
-			}
-			if pid == 1 {
-				nsm.isHostNetwork = true
-			}
-			netnsMap[nsinum] = nsm
-		} else {
-			v.pids = append(v.pids, pid)
-			if pid == 1 {
-				v.isHostNetwork = true
-			}
-			netnsMap[nsinum] = v
-		}
-
-	}
-
-	log.Debug("finished get all netns")
-
-	// get netns mount point aka cni presentation
-	namedns, err := findNsfsMountpoint()
-	if err != nil {
-		log.Warnf("get nsfs mount point failed %s", err)
-	} else {
-		for _, mp := range namedns {
-			nsinum, err := getNsInumByNsfsMountPoint(mp)
-			if err != nil {
-				log.Warnf("get ns inum from %s point failed %s", mp, err)
-				continue
-			}
-			if v, ok := netnsMap[nsinum]; !ok {
-				// in rund case, netns does not have any live process
-				netnsMap[nsinum] = netnsMeta{
-					inum:      nsinum,
-					mountPath: mp,
-				}
-			} else {
-				v.mountPath = mp
-				netnsMap[nsinum] = v
-			}
-		}
-	}
-
-	log.Debug("finished get all nsfs mount point")
-
-	var podMap map[string]podMeta
-	if !sidecarEnabled {
-		// get pod meta info
-		podMap, err = getPodMetas(rcrisvc)
+		sandboxStatus, err := criClient.PodSandboxStatus(sandbox.Id, true)
 		if err != nil {
-			log.Warnf("get pod meta failed %s", err)
-			return err
+			log.Errorf("failed get sandbox status for %s/%s, err: %v", namespace, name, err)
+			continue
 		}
 
-		// if use docker, get docker sandbox
-		if top.Crimeta != nil && top.Crimeta.RuntimeName == "docker" {
-			for sandbox, pm := range podMap {
-				if pm.nspath == "" && pm.pid == 0 {
-					pid, err := getPidForContainerBySock(sandbox)
-					if err != nil {
-						log.Warnf("get docker container error, sandbox: %s, err: %v", sandbox, err)
-						continue
-					}
-					pm.pid = pid
-				}
-				podMap[sandbox] = pm
-			}
+		if sandboxStatus.Status == nil || sandboxStatus.Info == nil {
+			log.Errorf("sandbox %s/%s: invalid sandbox status", sandbox.Metadata.Namespace, sandbox.Metadata.Name)
+			continue
 		}
-	}
 
-	// combine netns and pod cache,
-	for nsinum, nsmeta := range netnsMap {
-		ent := &Entity{
-			netnsMeta: nsmeta,
-			pids:      nsmeta.pids,
+		infoString := sandboxStatus.Info["info"]
+		if infoString == "" {
+			log.Errorf("sandbox status does not contains \"info\" field, sandbox id %s", sandbox.Id)
+			continue
 		}
-		log.Debugf("try associate pod with netns %d (%s)", nsinum, nsmeta.mountPath)
-		for sandbox, pm := range podMap {
-			// 1. use cri infospec/nspath to match
-			if pm.nspath != "" && pm.nspath == nsmeta.mountPath {
-				ent.podMeta = pm
-				log.Debugf("associate pod %s with mount point %d", pm.name, nsmeta.inum)
-				podCache.Set(sandbox, ent, 3*cacheUpdateInterval)
-				for _, pid := range nsmeta.pids {
-					pidCache.Set(fmt.Sprintf("%d", pid), ent, 3*cacheUpdateInterval)
-				}
-				continue
-			}
+		info := sandboxInfoSpec{}
+		if err := json.Unmarshal([]byte(infoString), &info); err != nil {
+			log.Errorf("failed unmarsh info to struct, err: %v", err)
+			continue
+		}
 
-			// 2. use pid nsinum to match
-			pidns, err := getNsInumByPid(pm.pid)
-			if err == nil {
-				if nsinum == pidns {
-					ent.podMeta = pm
-					log.Debugf("associate pod %s with netns %d", pm.name, nsmeta.inum)
-					podCache.Set(sandbox, ent, 3*cacheUpdateInterval)
-					for _, pid := range nsmeta.pids {
-						pidCache.Set(fmt.Sprintf("%d", pid), ent, 3*cacheUpdateInterval)
-					}
-				}
-			} else {
-				// 3. try to use pid to match
-				for _, pid := range nsmeta.pids {
-					if pm.pid == pid {
-						ent.podMeta = pm
-						log.Debugf("associate pod pid, pod: %s, netns %d", pm.name, nsmeta.inum)
-						podCache.Set(sandbox, ent, 3*cacheUpdateInterval)
-						for _, pid := range nsmeta.pids {
-							pidCache.Set(fmt.Sprintf("%d", pid), ent, 3*cacheUpdateInterval)
-						}
-					}
-				}
-			}
+		netnsNum, err := getNsInumByPid(info.Pid)
+		if err != nil {
+			log.Errorf("failed get netns for initPid %d, err: %v", info.Pid, err)
+			continue
 		}
-		nsCache.Set(fmt.Sprintf("%d", nsinum), ent, 3*cacheUpdateInterval)
+
+		podCgroupPath := info.Config.Linux.CgroupParent
+		var pids []int
+		if podCgroupPath != "" {
+			pids = tasksInsidePodCgroup(podCgroupPath)
+		}
+
+		status := sandboxStatus.Status
+
+		if netnsNum == defaultEntity.inum {
+			log.Infof("skip host network pod %s/%s", namespace, name)
+			continue
+		}
+
+		if sandboxStatus.Status.Network == nil || sandboxStatus.Status.Network.Ip == "" {
+			log.Errorf("sanbox %s/%s: invalid sandbox status, no ip", sandbox.Metadata.Namespace, sandbox.Metadata.Name)
+			continue
+		}
+
+		e := &Entity{
+			netnsMeta: netnsMeta{
+				inum:          netnsNum,
+				mountPath:     fmt.Sprintf("/proc/%d/ns/net", info.Pid),
+				isHostNetwork: false,
+				ipList:        []string{status.Network.Ip},
+			},
+			podMeta: podMeta{
+				name:      name,
+				namespace: namespace,
+				ip:        sandboxStatus.Status.Network.Ip,
+			},
+			initPid: info.Pid,
+			pids:    pids,
+		}
+
+		addEntityToCache(e)
 	}
 
 	log.Debug("finished cache process")

@@ -23,33 +23,40 @@ import (
 )
 
 const (
-	unixProtocol   = "unix"
-	maxMsgSize     = 1024 * 1024 * 16
-	kubeAPIVersion = "0.1.0"
+	unixProtocol = "unix"
+	maxMsgSize   = 1024 * 1024 * 16
 )
 
-var (
-	rcrisvc internalapi.RuntimeService
-)
+var runtimeEndpoints = []string{"/var/run/dockershim.sock", "/run/containerd/containerd.sock", "/run/k3s/containerd/containerd.sock"}
 
-func (c *CriMeta) Update() error {
-	criclient, crisock, err := getCriClient(runtimeEndpoints)
-	if err != nil {
-		return err
+func initCriClient(eps []string) (err error) {
+	if criClient != nil {
+		return
 	}
 
-	c.RuntimeSock = crisock
-	rcrisvc = criclient
-
-	version, err := rcrisvc.Version(kubeAPIVersion)
-	if err != nil {
-		return err
+	if sock, ok := os.LookupEnv("RUNTIME_SOCK"); ok {
+		if _, err = os.Stat(sock); os.IsNotExist(err) {
+			return fmt.Errorf("cannot find cri sock %s", sock)
+		}
+		criClient, err = NewRemoteRuntimeService(sock, 10*time.Second)
+		if err != nil {
+			return fmt.Errorf("connect cri sock %s error: %w", sock, err)
+		}
+		return
 	}
 
-	c.RuntimeName = version.RuntimeName
-	c.RuntimeVersion = version.RuntimeVersion
-	c.Version = version.RuntimeApiVersion
-	return nil
+	for _, candidate := range eps {
+		if _, err := os.Stat(candidate); os.IsNotExist(err) {
+			continue
+		}
+		criClient, err = NewRemoteRuntimeService(candidate, 10*time.Second)
+		if err != nil {
+			continue
+		}
+		return
+	}
+
+	return fmt.Errorf("cannot find valid cri sock in %s", strings.Join(eps, ","))
 }
 
 // remoteRuntimeService is a gRPC implementation of internalapi.RuntimeService.
@@ -57,32 +64,6 @@ type remoteRuntimeService struct {
 	timeout               time.Duration
 	runtimeClient         runtimeapi.RuntimeServiceClient
 	runtimeClientV1alpha2 runtimeapiV1alpha2.RuntimeServiceClient
-}
-
-func getCriClient(eps []string) (internalapi.RuntimeService, string, error) {
-	if sock, ok := os.LookupEnv("RUNTIME_SOCK"); ok {
-		if _, err := os.Stat(sock); os.IsNotExist(err) {
-			return nil, "", fmt.Errorf("cannot find cri sock %s", sock)
-		}
-		client, err := NewRemoteRuntimeService(sock, 10*time.Second)
-		if err != nil {
-			return nil, "", fmt.Errorf("connect cri sock %s error: %w", sock, err)
-		}
-		return client, sock, nil
-	}
-
-	for _, candidate := range eps {
-		if _, err := os.Stat(candidate); os.IsNotExist(err) {
-			continue
-		}
-		client, err := NewRemoteRuntimeService(candidate, 10*time.Second)
-		if err != nil {
-			continue
-		}
-		return client, candidate, nil
-	}
-
-	return nil, "", fmt.Errorf("cannot find valid cri sock in %s", strings.Join(eps, ","))
 }
 
 // useV1API returns true if the v1 CRI API should be used instead of v1alpha2.

@@ -5,8 +5,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
-
 	"github.com/spf13/cobra"
 )
 
@@ -16,7 +14,6 @@ var (
 		Use:   "inspector",
 		Short: "network inspection tool",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			nettop.Init(sidecar)
 			if debug {
 				log.SetLevel(log.DebugLevel)
 			} else {

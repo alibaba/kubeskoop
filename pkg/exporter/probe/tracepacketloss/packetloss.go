@@ -293,7 +293,7 @@ func (p *packetLossProbe) loadAndAttachBPF() error {
 
 func (p *packetLossProbe) perfLoop() {
 	for {
-	anothor_loop:
+	anothorLoop:
 		record, err := p.perfReader.Read()
 		if err != nil {
 			if errors.Is(err, ringbuf.ErrClosed) {
@@ -335,7 +335,7 @@ func (p *packetLossProbe) perfLoop() {
 		strs := []string{}
 		for _, sym := range stacks {
 			if _, ok := ignoreSymbolList[sym.GetName()]; ok {
-				goto anothor_loop
+				goto anothorLoop
 			}
 			if _, ok := uselessSymbolList[sym.GetName()]; ok {
 				continue
