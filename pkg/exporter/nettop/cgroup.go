@@ -2,12 +2,13 @@ package nettop
 
 import (
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -64,7 +65,7 @@ func tasksInsidePodCgroup(path string) []int {
 	}
 
 	var ret []int
-	for k, _ := range m {
+	for k := range m {
 		ret = append(ret, k)
 	}
 	return ret

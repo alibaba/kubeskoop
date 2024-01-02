@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"sync"
+	"time"
+
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	v1 "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"os"
-	"sync"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -18,14 +19,8 @@ import (
 	"github.com/vishvananda/netns"
 )
 
-const (
-	hostNetwork   = "hostNetwork"
-	unknowNetwork = "unknow"
-)
-
 var (
 	cacheUpdateInterval = 10 * time.Second
-	podCache            = cache.New(20*cacheUpdateInterval, 20*cacheUpdateInterval)
 	nsCache             = cache.New(20*cacheUpdateInterval, 20*cacheUpdateInterval)
 	pidCache            = cache.New(20*cacheUpdateInterval, 20*cacheUpdateInterval)
 	ipCache             = cache.New(20*cacheUpdateInterval, 20*cacheUpdateInterval)
@@ -79,15 +74,15 @@ func initDefaultEntity(sidecarMode bool) error {
 			return fmt.Errorf("failed get current pod info: %w", err)
 		}
 
-		podIp := ""
+		podIP := ""
 		if len(ipList) > 0 {
-			podIp = ipList[0]
+			podIP = ipList[0]
 		}
 
 		defaultEntity.podMeta = podMeta{
 			namespace: namespace,
 			name:      name,
-			ip:        podIp,
+			ip:        podIP,
 		}
 	}
 
@@ -253,6 +248,9 @@ func addEntityToCache(e *Entity) {
 	nsCache.Set(fmt.Sprintf("%d", e.inum), e, 3*cacheUpdateInterval)
 	for _, ip := range e.ipList {
 		ipCache.Set(ip, e, 3*cacheUpdateInterval)
+	}
+	for _, pid := range e.pids {
+		pidCache.Set(fmt.Sprintf("%d", pid), e, 3*cacheUpdateInterval)
 	}
 }
 
