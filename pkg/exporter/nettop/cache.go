@@ -10,7 +10,6 @@ import (
 
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
-	internalapi "k8s.io/cri-api/pkg/apis"
 	v1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	log "github.com/sirupsen/logrus"
@@ -25,9 +24,8 @@ var (
 	pidCache            = cache.New(20*cacheUpdateInterval, 20*cacheUpdateInterval)
 	ipCache             = cache.New(20*cacheUpdateInterval, 20*cacheUpdateInterval)
 
-	control   = make(chan struct{})
-	lock      sync.Mutex
-	criClient internalapi.RuntimeService
+	control = make(chan struct{})
+	lock    sync.Mutex
 
 	defaultEntity = &Entity{}
 )
@@ -183,6 +181,10 @@ func StartCache(ctx context.Context, sidecarMode bool) error {
 	if err := initCriClient(runtimeEndpoints); err != nil {
 		return err
 	}
+	if err := initCriInfo(); err != nil {
+		return err
+	}
+
 	if err := initDefaultEntity(sidecarMode); err != nil {
 		return err
 	}
@@ -263,13 +265,41 @@ func contextDone(ctx context.Context) bool {
 	}
 }
 
+type CRIInfo struct {
+	Version        string
+	RuntimeName    string
+	RuntimeVersion string
+}
+
+func getSandboxInfoSpec(sandboxStatus *v1.PodSandboxStatusResponse) (*sandboxInfoSpec, error) {
+	if criInfo.RuntimeName == "docker" {
+		return getSandboxInfoSpecForDocker(sandboxStatus.Status.Id)
+	}
+
+	infoString := sandboxStatus.Info["info"]
+	if infoString == "" {
+		return nil, fmt.Errorf("sandbox status does not contains \"info\" field")
+	}
+	info := &sandboxInfoSpec{}
+	if err := json.Unmarshal([]byte(infoString), info); err != nil {
+		return nil, fmt.Errorf("failed unmarsh info to struct, err: %v", err)
+	}
+
+	return info, nil
+}
+
 func cacheNetTopology(ctx context.Context) error {
 	lock.Lock()
 	defer lock.Unlock()
 
 	addEntityToCache(defaultEntity)
 
-	sandboxList, err := criClient.ListPodSandbox(nil)
+	sandboxList, err := criClient.ListPodSandbox(&v1.PodSandboxFilter{
+		State: &v1.PodSandboxStateValue{
+			State: v1.PodSandboxState_SANDBOX_READY,
+		},
+	})
+
 	if err != nil {
 		return fmt.Errorf("failed list pod sandboxes: %w", err)
 	}
@@ -286,30 +316,20 @@ func cacheNetTopology(ctx context.Context) error {
 		namespace := sandbox.Metadata.Namespace
 		name := sandbox.Metadata.Name
 
-		if sandbox.State != v1.PodSandboxState_SANDBOX_READY {
-			log.Infof("sandbox %s/%s is not ready ,skip", namespace, name)
-			continue
-		}
-
 		sandboxStatus, err := criClient.PodSandboxStatus(sandbox.Id, true)
 		if err != nil {
-			log.Errorf("failed get sandbox status for %s/%s, err: %v", namespace, name, err)
+			log.Errorf("sandbox: %s/%s failed get status err: %v", namespace, name, err)
 			continue
 		}
 
-		if sandboxStatus.Status == nil || sandboxStatus.Info == nil {
+		if sandboxStatus.Status == nil {
 			log.Errorf("sandbox %s/%s: invalid sandbox status", sandbox.Metadata.Namespace, sandbox.Metadata.Name)
 			continue
 		}
 
-		infoString := sandboxStatus.Info["info"]
-		if infoString == "" {
-			log.Errorf("sandbox status does not contains \"info\" field, sandbox id %s", sandbox.Id)
-			continue
-		}
-		info := sandboxInfoSpec{}
-		if err := json.Unmarshal([]byte(infoString), &info); err != nil {
-			log.Errorf("failed unmarsh info to struct, err: %v", err)
+		info, err := getSandboxInfoSpec(sandboxStatus)
+		if err != nil {
+			log.Errorf("failed get sandbox info: %v", err)
 			continue
 		}
 
@@ -323,6 +343,7 @@ func cacheNetTopology(ctx context.Context) error {
 		var pids []int
 		if podCgroupPath != "" {
 			pids = tasksInsidePodCgroup(podCgroupPath)
+			log.Debugf("found %d pids under cgroup %s", len(pids), podCgroupPath)
 		}
 
 		status := sandboxStatus.Status
