@@ -25,4 +25,10 @@ export default {
             method: 'GET',
         });
     },
+    async listNamespace(): Promise<string[]> {
+        return await request({
+            url: '/controller/namespaces',
+            method: 'GET',
+        });
+    },
 };

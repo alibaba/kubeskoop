@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"github.com/alibaba/kubeskoop/pkg/controller/graph"
 	"github.com/alibaba/kubeskoop/pkg/controller/rpc"
@@ -16,7 +15,9 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sort"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -71,8 +72,6 @@ func (s *Server) RunAgentServer(port int, done <-chan struct{}) {
 	grpcServer.Stop()
 }
 
-const metricURL = "http://127.0.0.1:8888"
-
 func (s *Server) RunHTTPServer(port int, done <-chan struct{}) {
 	if port == 0 {
 		port = defaultHttpPort
@@ -88,7 +87,9 @@ func (s *Server) RunHTTPServer(port int, done <-chan struct{}) {
 	r.POST("/pingmesh", s.PingMesh)
 	r.GET("/pods", s.ListPods)
 	r.GET("/nodes", s.ListNodes)
+	r.GET("/namespaces", s.ListNamespaces)
 	r.GET("/flow", s.GetFlowGraph)
+	r.GET("/events", s.GetEvent)
 
 	go func() {
 		err := r.Run(fmt.Sprintf("0.0.0.0:%d", port))
@@ -103,62 +104,62 @@ func (s *Server) RunHTTPServer(port int, done <-chan struct{}) {
 func (s *Server) CommitDiagnoseTask(ctx *gin.Context) {
 	var task skoopContext.TaskConfig
 	if err := ctx.ShouldBindJSON(&task); err != nil {
-		ctx.AsciiJSON(400, map[string]string{"error": fmt.Sprintf("error get task config from request: %v", err)})
+		ctx.AsciiJSON(http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("error get task config from request: %v", err)})
 		return
 	}
-	taskID, err := s.controller.Diagnose(context.TODO(), &task)
+	taskID, err := s.controller.Diagnose(ctx, &task)
 	if err != nil {
-		ctx.AsciiJSON(400, map[string]string{"error": fmt.Sprintf("error commit diagnose task: %v", err)})
+		ctx.AsciiJSON(http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("error commit diagnose task: %v", err)})
 		return
 	}
-	ctx.AsciiJSON(200, map[string]string{"task_id": fmt.Sprintf("%d", taskID)})
+	ctx.AsciiJSON(http.StatusOK, map[string]string{"task_id": fmt.Sprintf("%d", taskID)})
 }
 
-// ListDiagnoseTask list all diagnose task
+// ListDiagnoseTasks list all diagnose task
 func (s *Server) ListDiagnoseTasks(ctx *gin.Context) {
-	tasks, err := s.controller.DiagnoseList(context.TODO())
+	tasks, err := s.controller.DiagnoseList(ctx)
 	if err != nil {
-		ctx.AsciiJSON(400, map[string]string{"error": fmt.Sprintf("error list diagnose task: %v", err)})
+		ctx.AsciiJSON(http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("error list diagnose task: %v", err)})
 		return
 	}
-	ctx.AsciiJSON(200, tasks)
+	ctx.AsciiJSON(http.StatusOK, tasks)
 }
 
 // CommitCaptureTask commit capture task
 func (s *Server) CommitCaptureTask(ctx *gin.Context) {
 	var captureTask service.CaptureArgs
 	if err := ctx.ShouldBindJSON(&captureTask); err != nil {
-		ctx.AsciiJSON(400, map[string]string{"error": fmt.Sprintf("error get task config from request: %v", err)})
+		ctx.AsciiJSON(http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("error get task config from request: %v", err)})
 		return
 	}
-	taskID, err := s.controller.Capture(context.TODO(), &captureTask)
+	taskID, err := s.controller.Capture(ctx, &captureTask)
 	if err != nil {
-		ctx.AsciiJSON(400, map[string]string{"error": fmt.Sprintf("error commit capture task: %v", err)})
+		ctx.AsciiJSON(http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("error commit capture task: %v", err)})
 		return
 	}
-	ctx.AsciiJSON(200, map[string]string{"task_id": fmt.Sprintf("%d", taskID)})
+	ctx.AsciiJSON(http.StatusOK, map[string]string{"task_id": fmt.Sprintf("%d", taskID)})
 }
 
-// ListCaptureTask list all capture task
+// ListCaptureTasks list all capture task
 func (s *Server) ListCaptureTasks(ctx *gin.Context) {
-	tasks, err := s.controller.CaptureList(context.TODO())
+	tasks, err := s.controller.CaptureList(ctx)
 	if err != nil {
-		ctx.AsciiJSON(400, map[string]string{"error": fmt.Sprintf("error list capture task: %v", err)})
+		ctx.AsciiJSON(http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("error list capture task: %v", err)})
 	}
-	ctx.AsciiJSON(200, tasks)
+	ctx.AsciiJSON(http.StatusOK, tasks)
 }
 
 // DownloadCaptureFile download capture file
 func (s *Server) DownloadCaptureFile(ctx *gin.Context) {
 	id, err := strconv.Atoi(ctx.Param("task_id"))
 	if err != nil {
-		ctx.AsciiJSON(400, map[string]string{"error": fmt.Sprintf("error get task id from request: %v", err)})
+		ctx.AsciiJSON(http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("error get task id from request: %v", err)})
 		return
 	}
 
-	name, fl, fd, err := s.controller.DownloadCaptureFile(context.TODO(), id)
+	name, fl, fd, err := s.controller.DownloadCaptureFile(ctx, id)
 	if err != nil {
-		ctx.AsciiJSON(400, map[string]string{"error": fmt.Sprintf("error download capture file: %v", err)})
+		ctx.AsciiJSON(http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("error download capture file: %v", err)})
 		return
 	}
 	defer fd.Close()
@@ -167,28 +168,37 @@ func (s *Server) DownloadCaptureFile(ctx *gin.Context) {
 	ctx.Header("Accept-Length", fmt.Sprintf("%d", fl))
 	_, err = io.Copy(ctx.Writer, fd)
 	if err != nil {
-		ctx.AsciiJSON(400, map[string]string{"error": fmt.Sprintf("error transmiss capture file: %v", err)})
+		ctx.AsciiJSON(http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("error transmiss capture file: %v", err)})
 		return
 	}
 	ctx.Status(http.StatusOK)
 }
 
 func (s *Server) ListPods(ctx *gin.Context) {
-	pods, err := s.controller.PodList(context.TODO())
+	pods, err := s.controller.PodList(ctx)
 	if err != nil {
-		ctx.AsciiJSON(400, map[string]string{"error": fmt.Sprintf("error list pods: %v", err)})
+		ctx.AsciiJSON(http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("error list pods: %v", err)})
 		return
 	}
-	ctx.AsciiJSON(200, pods)
+	ctx.AsciiJSON(http.StatusOK, pods)
 }
 
 func (s *Server) ListNodes(ctx *gin.Context) {
-	nodes, err := s.controller.NodeList(context.TODO())
+	nodes, err := s.controller.NodeList(ctx)
 	if err != nil {
-		ctx.AsciiJSON(400, map[string]string{"error": fmt.Sprintf("error list nodes: %v", err)})
+		ctx.AsciiJSON(http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("error list nodes: %v", err)})
 		return
 	}
-	ctx.AsciiJSON(200, nodes)
+	ctx.AsciiJSON(http.StatusOK, nodes)
+}
+
+func (s *Server) ListNamespaces(ctx *gin.Context) {
+	namespaces, err := s.controller.NamespaceList(ctx)
+	if err != nil {
+		ctx.AsciiJSON(http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("error list namespaces: %v", err)})
+		return
+	}
+	ctx.AsciiJSON(http.StatusOK, namespaces)
 }
 
 func (s *Server) PingMesh(ctx *gin.Context) {
@@ -197,7 +207,7 @@ func (s *Server) PingMesh(ctx *gin.Context) {
 		ctx.AsciiJSON(400, map[string]string{"error": fmt.Sprintf("error get task config from request: %v", err)})
 		return
 	}
-	result, err := s.controller.PingMesh(context.TODO(), &pingmesh)
+	result, err := s.controller.PingMesh(ctx, &pingmesh)
 	if err != nil {
 		ctx.AsciiJSON(400, map[string]string{"error": fmt.Sprintf("error do pingmesh: %v", err)})
 		return
@@ -209,27 +219,27 @@ func (s *Server) GetFlowGraph(ctx *gin.Context) {
 	ts := time.Now()
 	result, _, err := s.controller.QueryPrometheus(ctx, "kubeskoop_flow_bytes", ts)
 	if err != nil {
-		ctx.AsciiJSON(500, map[string]string{"error": fmt.Sprintf("error query flow metrics: %v", err)})
+		ctx.AsciiJSON(http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("error query flow metrics: %v", err)})
 		return
 	}
 	vector := result.(model.Vector)
 
 	podInfo, nodeInfo, err := s.controller.GetPodNodeInfoFromMetrics(ctx, ts)
 	if err != nil {
-		ctx.AsciiJSON(500, map[string]string{"error": fmt.Sprintf("error get pod info from metrics: %v", err)})
+		ctx.AsciiJSON(http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("error get pod info from metrics: %v", err)})
 		return
 	}
 
 	g, err := graph.FromVector(vector, podInfo, nodeInfo)
 	if err != nil {
-		ctx.AsciiJSON(500, map[string]string{"error": fmt.Sprintf("error convert flow metrics to graph: %v", err)})
+		ctx.AsciiJSON(http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("error convert flow metrics to graph: %v", err)})
 		return
 	}
 	g.SetEdgeBytesFromVector(vector)
 
 	result, _, err = s.controller.QueryPrometheus(ctx, "kubeskoop_flow_packets", ts)
 	if err != nil {
-		ctx.AsciiJSON(500, map[string]string{"error": fmt.Sprintf("error query flow metrics: %v", err)})
+		ctx.AsciiJSON(http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("error query flow metrics: %v", err)})
 		return
 	}
 	vector = result.(model.Vector)
@@ -237,9 +247,86 @@ func (s *Server) GetFlowGraph(ctx *gin.Context) {
 
 	jstr, err := g.ToJSON()
 	if err != nil {
-		ctx.AsciiJSON(500, map[string]string{"error": fmt.Sprintf("error marshalling to json: %v", err)})
+		ctx.AsciiJSON(http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("error marshalling to json: %v", err)})
 		return
 	}
 
 	ctx.Data(http.StatusOK, gin.MIMEJSON, jstr)
+}
+
+func (s *Server) GetEvent(ctx *gin.Context) {
+	start := ctx.Query("start")
+	end := ctx.Query("end")
+	limit := ctx.Query("limit")
+	nodes := ctx.Query("nodes")
+	namespaces := ctx.Query("namespaces")
+	pods := ctx.Query("pods")
+	types := ctx.Query("types")
+
+	var startTime, endTime time.Time
+	var limitCnt int
+	var err error
+
+	if start != "" {
+		s, err := strconv.Atoi(start)
+		if err != nil {
+			ctx.AsciiJSON(http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("start time format error: %v", err)})
+			return
+		}
+		startTime = time.Unix(int64(s), 0)
+	} else {
+		startTime = time.Now().Add(-10 * time.Minute)
+	}
+
+	if end != "" {
+		e, err := strconv.Atoi(end)
+		if err != nil {
+			ctx.AsciiJSON(http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("end time format error: %v", err)})
+			return
+		}
+		endTime = time.Unix(int64(e), 0)
+	} else {
+		endTime = time.Now()
+	}
+
+	if limit != "" {
+		l, err := strconv.Atoi(limit)
+		if err != nil {
+			ctx.AsciiJSON(http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("limit time format error: %v", err)})
+			return
+		}
+		limitCnt = l
+	} else {
+		limitCnt = 100
+	}
+
+	filters := map[string][]string{}
+	if nodes != "" {
+		filters["instance"] = strings.Split(nodes, ",")
+	}
+
+	if namespaces != "" {
+		filters["namespace"] = strings.Split(namespaces, ",")
+	}
+
+	if pods != "" {
+		filters["pod"] = strings.Split(pods, ",")
+	}
+
+	if types != "" {
+		filters["type"] = strings.Split(types, ",")
+	}
+
+	evts, err := s.controller.QueryRangeEvent(ctx, startTime, endTime, filters, limitCnt)
+	if err != nil {
+		ctx.AsciiJSON(http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("error query event: %v", err)})
+		return
+	}
+
+	// sort events by timestamp in descending order
+	sort.Slice(evts, func(i, j int) bool {
+		return evts[i].Timestamp > evts[j].Timestamp
+	})
+
+	ctx.AsciiJSON(http.StatusOK, evts)
 }

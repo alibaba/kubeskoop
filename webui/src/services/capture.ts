@@ -1,5 +1,4 @@
 import { request } from 'ice'
-import { NodeInfo, PodInfo } from "@/services/k8s";
 
 export interface CaptureTask {
     task_type: string

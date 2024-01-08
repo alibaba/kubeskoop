@@ -3,33 +3,15 @@ package sink
 import (
 	"encoding/json"
 	"fmt"
+	lokiwrapper "github.com/alibaba/kubeskoop/pkg/exporter/loki"
 	"net/url"
 	"strings"
-	"time"
 
-	log "github.com/sirupsen/logrus"
-
-	"github.com/afiskon/promtail-client/promtail"
 	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
 )
 
 func NewLokiSink(addr string, node string) (*LokiSink, error) {
-	url, err := buildURL(addr)
-	if err != nil {
-		return nil, fmt.Errorf("failed parse addr, not a valild url, err: %w", err)
-	}
-	log.Infof("create loki client with url %s", url)
-
-	labels := `{instance = "%s",job = "kubeskoop"}`
-	conf := promtail.ClientConfig{
-		PushURL:            url,
-		Labels:             fmt.Sprintf(labels, node),
-		BatchWait:          5 * time.Second,
-		BatchEntriesNumber: 10000,
-		SendLevel:          promtail.DEBUG,
-		PrintLevel:         promtail.DEBUG,
-	}
-	client, err := promtail.NewClientProto(conf)
+	client, err := lokiwrapper.NewLokiIngester(addr, node)
 	if err != nil {
 		return nil, fmt.Errorf("failed create loki client, err: %s", err)
 	}
@@ -59,7 +41,7 @@ func buildURL(addr string) (string, error) {
 }
 
 type LokiSink struct {
-	client promtail.Client
+	client *lokiwrapper.Ingester
 }
 
 func (l *LokiSink) String() string {
@@ -72,7 +54,7 @@ func (l *LokiSink) Write(event *probe.Event) error {
 		return fmt.Errorf("failed marshal event, err: %w", err)
 	}
 
-	l.client.Infof(string(data))
+	l.client.Send(string(data))
 	return nil
 }
 

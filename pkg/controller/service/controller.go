@@ -3,6 +3,12 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/alibaba/kubeskoop/pkg/exporter/loki"
+	"io"
+	"os"
+	"sync"
+	"time"
+
 	"github.com/alibaba/kubeskoop/pkg/controller/diagnose"
 	"github.com/alibaba/kubeskoop/pkg/controller/rpc"
 	skoopContext "github.com/alibaba/kubeskoop/pkg/skoop/context"
@@ -10,12 +16,8 @@ import (
 	"github.com/prometheus/client_golang/api"
 	promv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
-	"io"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"os"
-	"sync"
-	"time"
 )
 
 type ControllerService interface {
@@ -23,12 +25,13 @@ type ControllerService interface {
 	GetAgentList() []*rpc.AgentInfo
 	Capture(ctx context.Context, capture *CaptureArgs) (int, error)
 	CaptureList(ctx context.Context) (map[int][]*CaptureTaskResult, error)
-	WatchEvents() <-chan *rpc.Event
+	QueryRangeEvent(ctx context.Context, start, end time.Time, filters map[string][]string, limit int) ([]Event, error)
 	Diagnose(ctx context.Context, args *skoopContext.TaskConfig) (int64, error)
 	DiagnoseList(ctx context.Context) ([]DiagnoseTaskResult, error)
 	DownloadCaptureFile(ctx context.Context, id int) (string, int64, io.ReadCloser, error)
 	PodList(ctx context.Context) ([]*Pod, error)
 	NodeList(ctx context.Context) ([]*Node, error)
+	NamespaceList(ctx context.Context) ([]string, error)
 	QueryPrometheus(ctx context.Context, query string, ts time.Time) (model.Value, promv1.Warnings, error)
 	GetPodNodeInfoFromMetrics(ctx context.Context, ts time.Time) (model.Vector, model.Vector, error)
 	PingMesh(ctx context.Context, pingmesh *PingMeshArgs) (*PingMeshResult, error)
@@ -57,14 +60,22 @@ func NewControllerService() (ControllerService, error) {
 		return nil, fmt.Errorf("error create k8s client, err: %v", err)
 	}
 
-	if promURL, ok := os.LookupEnv("PROMETHEUS_ENDPOINT"); ok {
+	if promEndpoint, ok := os.LookupEnv("PROMETHEUS_ENDPOINT"); ok {
 		promClient, err := api.NewClient(api.Config{
-			Address: promURL,
+			Address: promEndpoint,
 		})
 		if err != nil {
 			return nil, err
 		}
 		ctrl.promClient = promClient
+	}
+
+	if lokiEndpoint, ok := os.LookupEnv("LOKI_ENDPOINT"); ok {
+		lokiClient, err := lokiwrapper.NewClient(lokiEndpoint)
+		if err != nil {
+			return nil, err
+		}
+		ctrl.lokiClient = lokiClient
 	}
 
 	return ctrl, nil
@@ -74,7 +85,8 @@ type controller struct {
 	rpc.UnimplementedControllerRegisterServiceServer
 	diagnosor      diagnose.DiagnoseController
 	k8sClient      *kubernetes.Clientset
-	resultWatchers sync.Map
 	taskWatcher    sync.Map
+	resultWatchers sync.Map
 	promClient     api.Client
+	lokiClient     *lokiwrapper.Client
 }

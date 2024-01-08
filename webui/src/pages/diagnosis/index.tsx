@@ -47,6 +47,7 @@ export default function Diagnosis() {
   const refreshDiagnosisList = () => {
     diagnosisService.listDiagnosis()
       .then(res => {
+        res = res || []
         setData(res)
         if (res.find(i => i.status == 'running')) setTimeout(refreshDiagnosisList, 3000)
       })

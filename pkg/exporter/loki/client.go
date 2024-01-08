@@ -2,8 +2,8 @@ package lokiwrapper
 
 import (
 	"bytes"
-	"context"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"io"
 	"net"
 	"net/http"
@@ -15,7 +15,6 @@ import (
 	"github.com/alibaba/kubeskoop/pkg/exporter/loki/logproto"
 	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 	"github.com/golang/snappy"
-	"golang.org/x/exp/slog"
 	"google.golang.org/protobuf/proto"
 	timestamp "google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -37,12 +36,12 @@ type httpClient struct {
 	parent http.Client
 }
 
-func NewLokiIngester(ctx context.Context, addr string, node string) (*Ingester, error) {
+func NewLokiIngester(addr string, node string) (*Ingester, error) {
 	var remote string
 
 	c := &Ingester{
 		name:    fmt.Sprintf("loki_%s", node),
-		Labels:  fmt.Sprintf(`{instance = "%s",job = "inspector"}`, node),
+		Labels:  fmt.Sprintf(`{instance = "%s",job = "kubeskoop"}`, node),
 		quit:    make(chan struct{}),
 		entries: make(chan *logproto.Entry, LogEntriesChanSize),
 		client:  httpClient{},
@@ -55,27 +54,27 @@ func NewLokiIngester(ctx context.Context, addr string, node string) (*Ingester, 
 		// try to resolve the addr as a domain name
 		svr, err := net.LookupIP(addr)
 		if err != nil {
-			slog.Ctx(ctx).Warn("new loki ingester", "err", err, "addr", addr)
+			log.Warn("new loki ingester", "err", err, "addr", addr)
 			return c, fmt.Errorf("invalid loki remote address %s", addr)
 		}
 		if len(svr) == 0 {
-			slog.Ctx(ctx).Warn("new loki ingester", "err", "no such host", "addr", addr)
+			log.Warn("new loki ingester", "err", "no such host", "addr", addr)
 			return c, fmt.Errorf("invalid loki remote address %s", addr)
 		}
 		remote = fmt.Sprintf("http://%s:3100/api/prom/push", svr[0].String())
 	}
 	c.PushURL = remote
 	c.waitGroup.Add(1)
-	go c.startLoop(ctx)
+	go c.startLoop()
 
 	return c, nil
 }
 
-func (i *Ingester) Watch(ctx context.Context, datach chan inspproto.RawEvent) {
+func (i *Ingester) Watch(datach chan inspproto.RawEvent) {
 	for evt := range datach {
 		et, err := nettop.GetEntityByNetns(int(evt.Netns))
 		if err != nil {
-			slog.Ctx(ctx).Warn("watch get entity", "err", err, "netns", evt.Netns, "client", i.Name())
+			log.Warn("watch get entity", "err", err, "netns", evt.Netns, "client", i.Name())
 			continue
 		}
 
@@ -88,6 +87,17 @@ func (i *Ingester) Watch(ctx context.Context, datach chan inspproto.RawEvent) {
 			},
 			Line: evtStr,
 		}
+	}
+}
+
+func (i *Ingester) Send(data string) {
+	now := time.Now().UnixNano()
+	i.entries <- &logproto.Entry{
+		Timestamp: &timestamp.Timestamp{
+			Seconds: now / int64(time.Second),
+			Nanos:   int32(now % int64(time.Second)),
+		},
+		Line: data,
 	}
 }
 
@@ -111,14 +121,14 @@ type Ingester struct {
 	client    httpClient
 }
 
-func (i *Ingester) startLoop(ctx context.Context) {
+func (i *Ingester) startLoop() {
 	var batch []*logproto.Entry
 	batchSize := 0
 	maxWait := time.NewTimer(5 * time.Second)
 
 	defer func() {
 		if batchSize > 0 {
-			i.send(ctx, batch)
+			i.send(batch)
 		}
 		i.waitGroup.Done()
 	}()
@@ -131,25 +141,25 @@ func (i *Ingester) startLoop(ctx context.Context) {
 			batch = append(batch, entry)
 			batchSize++
 			if batchSize >= BatchEntriesNumber {
-				slog.Ctx(ctx).Debug("loki ingester send of size")
-				i.send(ctx, batch)
+				log.Debug("loki ingester send of size")
+				i.send(batch)
 				batch = []*logproto.Entry{}
 				batchSize = 0
 				maxWait.Reset(BatchWait)
 			}
 		case <-maxWait.C:
 			if batchSize > 0 {
-				i.send(ctx, batch)
+				i.send(batch)
 				batch = []*logproto.Entry{}
 				batchSize = 0
 			}
-			slog.Ctx(ctx).Debug("loki ingester send of maxwait")
+			log.Debug("loki ingester send of maxwait")
 			maxWait.Reset(BatchWait)
 		}
 	}
 }
 
-func (i *Ingester) send(ctx context.Context, entries []*logproto.Entry) {
+func (i *Ingester) send(entries []*logproto.Entry) {
 	var streams []*logproto.Stream
 	streams = append(streams, &logproto.Stream{
 		Labels:  i.Labels,
@@ -162,7 +172,7 @@ func (i *Ingester) send(ctx context.Context, entries []*logproto.Entry) {
 
 	buf, err := proto.Marshal(&req)
 	if err != nil {
-		slog.Ctx(ctx).Warn("loki ingester marshal request", "err", err)
+		log.Warn("loki ingester marshal request", "err", err)
 		return
 	}
 
@@ -170,12 +180,12 @@ func (i *Ingester) send(ctx context.Context, entries []*logproto.Entry) {
 
 	resp, body, err := i.client.sendJSONReq("POST", i.PushURL, "application/x-protobuf", buf)
 	if err != nil {
-		slog.Ctx(ctx).Warn("loki ingester request error", "err", err)
+		log.Warn("loki ingester request error", "err", err)
 		return
 	}
 
 	if resp.StatusCode != 204 {
-		slog.Ctx(ctx).Warn("loki ingester response error", "status", resp.StatusCode, "body", body)
+		log.Warn("loki ingester response error", "status", resp.StatusCode, "body", body)
 		return
 	}
 }

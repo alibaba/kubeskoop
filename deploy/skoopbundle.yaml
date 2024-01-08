@@ -521,11 +521,6 @@ rules:
 - apiGroups: [""]
   resources: ["pods/exec", "pods/attach", "pods/portforward"]
   verbs: ["create", "get", "list", "update", "delete"]
-- apiGroups:
-  - extensions
-  resources:
-  - ingresses
-  verbs: ["get", "list", "watch"]
 - nonResourceURLs: ["/metrics"]
   verbs: ["get"]
 ---

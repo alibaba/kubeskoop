@@ -67,6 +67,16 @@ func (c *controller) NodeList(ctx context.Context) ([]*Node, error) {
 	}), nil
 }
 
+func (c *controller) NamespaceList(ctx context.Context) ([]string, error) {
+	namespaces, err := c.k8sClient.CoreV1().Namespaces().List(ctx, v1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("list pods failed: %v", err)
+	}
+	return lo.Map[corev1.Namespace, string](namespaces.Items, func(namespace corev1.Namespace, idx int) string {
+		return namespace.Name
+	}), nil
+}
+
 type TaskSpec struct {
 	TaskType  string `json:"task_type"`
 	Name      string `json:"name"`
