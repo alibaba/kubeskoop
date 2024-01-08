@@ -22,9 +22,15 @@ import (
 	runtimeapiV1alpha2 "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
+var (
+	criClient internalapi.RuntimeService
+	criInfo   *CRIInfo
+)
+
 const (
-	unixProtocol = "unix"
-	maxMsgSize   = 1024 * 1024 * 16
+	unixProtocol   = "unix"
+	maxMsgSize     = 1024 * 1024 * 16
+	kubeAPIVersion = "0.1.0"
 )
 
 var runtimeEndpoints = []string{"/var/run/dockershim.sock", "/run/containerd/containerd.sock", "/run/k3s/containerd/containerd.sock"}
@@ -57,6 +63,24 @@ func initCriClient(eps []string) (err error) {
 	}
 
 	return fmt.Errorf("cannot find valid cri sock in %s", strings.Join(eps, ","))
+}
+
+func initCriInfo() error {
+	if criInfo != nil {
+		return nil
+	}
+
+	version, err := criClient.Version(kubeAPIVersion)
+	if err != nil {
+		return fmt.Errorf("failed get runtime version: %w", err)
+	}
+	criInfo = &CRIInfo{
+		Version:        version.RuntimeApiVersion,
+		RuntimeName:    version.RuntimeName,
+		RuntimeVersion: version.RuntimeVersion,
+	}
+	log.Infof("cri info: version=%s runtime=%s runtimeVersion=%s", criInfo.Version, criInfo.RuntimeName, criInfo.RuntimeVersion)
+	return nil
 }
 
 // remoteRuntimeService is a gRPC implementation of internalapi.RuntimeService.
@@ -575,6 +599,7 @@ func (r *remoteRuntimeService) determineAPIVersion(conn *grpc.ClientConn) error 
 	if _, err := r.runtimeClient.Version(ctx, &runtimeapi.VersionRequest{}); err == nil {
 		log.Warn("Using CRI v1 runtime API")
 	} else if status.Code(err) == codes.Unimplemented {
+		log.Warn("Using CRI v1alpha2 runtime API")
 		r.runtimeClientV1alpha2 = runtimeapiV1alpha2.NewRuntimeServiceClient(conn)
 	} else {
 		return fmt.Errorf("unable to determine runtime API version: %w", err)
