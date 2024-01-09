@@ -2,9 +2,11 @@ package nettop
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -30,17 +32,54 @@ var (
 	defaultEntity = &Entity{}
 )
 
+func podNameFromServiceAccountToken() (string, error) {
+	token, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
+	if err != nil {
+		return "", fmt.Errorf("failed get pod token, err: %w", err)
+	}
+	arr := strings.Split(string(token), ".")
+	if len(arr) != 3 {
+		return "", fmt.Errorf("invalid serviceaccount token format")
+	}
+
+	data, err := base64.RawStdEncoding.DecodeString(arr[1])
+	if err != nil {
+		return "", fmt.Errorf("failed decode serviceaccount token: %w", err)
+	}
+
+	s := struct {
+		K8s struct {
+			Pod struct {
+				Name string `json:"name"`
+			} `json:"pod"`
+		} `json:"kubernetes.io"`
+	}{}
+
+	if err := json.Unmarshal(data, &s); err != nil {
+		return "", fmt.Errorf("failed unmarshal serviceaccount token: %w", err)
+	}
+	return s.K8s.Pod.Name, nil
+}
+
 func currentPodInfo() (string, string, error) {
 	namespace, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
 	if err != nil {
 		return "", "", fmt.Errorf("failed get namespace in sidecar mode, err: %v", err)
 	}
 
-	name, err := os.ReadFile("/etc/hostname")
+	name, err := podNameFromServiceAccountToken()
 	if err != nil {
-		return "", "", fmt.Errorf("failed get namespace in sidecar mode, err: %v", err)
+		log.Warnf("failed get pod name from /var/run/secrets/kubernetes.io/serviceaccount/token, fallback to hostname")
+
+		name, err := os.ReadFile("/etc/hostname")
+		if err != nil {
+			return "", "", fmt.Errorf("failed get namespace in sidecar mode, err: %v", err)
+		}
+
+		return string(namespace), string(name), nil
 	}
-	return string(namespace), string(name), nil
+
+	return string(namespace), name, nil
 }
 
 func initDefaultEntity(sidecarMode bool) error {
@@ -233,7 +272,7 @@ func cachePodsWithTimeout(timeout time.Duration) error {
 	cacheDone := make(chan struct{})
 	go func(done chan struct{}) {
 		err = cacheNetTopology(ctx)
-		done <- struct{}{}
+		close(done)
 	}(cacheDone)
 
 	select {
