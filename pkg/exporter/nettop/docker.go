@@ -74,6 +74,8 @@ func dockerHTTPRequest(path string) ([]byte, error) {
 		return nil, fmt.Errorf("failed request docker %s: %w", url, err)
 	}
 
+	defer resp.Body.Close()
+
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed read docker response: %w", err)

@@ -25,7 +25,7 @@ func init() {
 }
 
 func lookupCgroupRoot() (string, error) {
-	//TODO lookup from /proc/mount
+	// TODO lookup from /proc/mount
 	return "/sys/fs/cgroup", nil
 }
 
