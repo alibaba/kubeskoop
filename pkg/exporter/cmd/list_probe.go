@@ -25,7 +25,6 @@ var (
 				indent := "    "
 				for _, s := range l {
 					fmt.Printf("%s%s\n", indent, s)
-
 				}
 			}
 		},

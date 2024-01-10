@@ -95,7 +95,7 @@ func (l *legacyBatchMetrics) Collect(metrics chan<- prometheus.Metric) {
 
 func LagacyEventLabels(netns uint32) []Label {
 	et, err := nettop.GetEntityByNetns(int(netns))
-	if err != nil {
+	if err != nil || et == nil {
 		log.Infof("nettop get entity failed, netns: %d, err: %v", netns, err)
 		return nil
 	}

@@ -2,8 +2,7 @@ package nettop
 
 import (
 	"fmt"
-
-	"github.com/vishvananda/netns"
+	"os"
 )
 
 var (
@@ -14,7 +13,7 @@ var (
 func GetEntityByNetns(nsinum int) (*Entity, error) {
 	// if use nsinum 0, represent node level metrics
 	if nsinum == 0 {
-		return GetHostnetworlEntity()
+		return GetHostNetworkEntity()
 	}
 	v, found := nsCache.Get(fmt.Sprintf("%d", nsinum))
 	if found {
@@ -23,25 +22,8 @@ func GetEntityByNetns(nsinum int) (*Entity, error) {
 	return nil, fmt.Errorf("entify for netns %d not found", nsinum)
 }
 
-func GetHostnetworlEntity() (*Entity, error) {
-	return GetEntityByPid(1)
-}
-
-func GetHostnetworkNetnsFd() (int, error) {
-	nsh, err := netns.GetFromPid(1)
-	if err != nil {
-		return 0, err
-	}
-
-	return int(nsh), nil
-}
-
-func GetEntityByPod(sandbox string) (*Entity, error) {
-	v, found := podCache.Get(sandbox)
-	if found {
-		return v.(*Entity), nil
-	}
-	return nil, fmt.Errorf("entify for pod %s not found", sandbox)
+func GetHostNetworkEntity() (*Entity, error) {
+	return defaultEntity, nil
 }
 
 func GetEntityByPid(pid int) (*Entity, error) {
@@ -68,6 +50,14 @@ func GetAllEntity() []*Entity {
 	return res
 }
 
-func GetEntityNetnsByPid(pid int) (int, error) {
-	return getNsInumByPid(pid)
+func GetNodeName() string {
+	if os.Getenv("INSPECTOR_NODENAME") != "" {
+		return os.Getenv("INSPECTOR_NODENAME")
+	}
+	node, err := os.Hostname()
+	if err != nil {
+		return "Unknow"
+	}
+
+	return node
 }
