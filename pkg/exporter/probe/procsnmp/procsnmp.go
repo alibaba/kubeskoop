@@ -141,7 +141,7 @@ func (c *snmpCache) reload() {
 }
 
 func collect() (map[string]map[string]map[uint32]uint64, error) {
-	entitys := nettop.GetAllEntity()
+	entitys := nettop.GetAllUniqueNetNSEntity()
 
 	res := make(map[string]map[string]map[uint32]uint64)
 

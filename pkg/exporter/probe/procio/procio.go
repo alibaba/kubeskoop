@@ -57,13 +57,13 @@ func (s *ProcIO) CollectOnce() (map[string]map[uint32]uint64, error) {
 	return collect(ets)
 }
 
-func collect(_ []*nettop.Entity) (map[string]map[uint32]uint64, error) {
+func collect(ets []*nettop.Entity) (map[string]map[uint32]uint64, error) {
 	resMap := make(map[string]map[uint32]uint64)
 	for _, stat := range IOMetrics {
 		resMap[stat] = map[uint32]uint64{}
 	}
 
-	procios, err := getAllProcessIO(nettop.GetAllEntity())
+	procios, err := getAllProcessIO(ets)
 	if err != nil {
 		return resMap, err
 	}

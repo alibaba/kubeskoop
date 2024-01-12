@@ -96,7 +96,7 @@ func (s *ProcTCP) Stop(_ context.Context) error {
 }
 
 func (s *ProcTCP) CollectOnce() (map[string]map[uint32]uint64, error) {
-	ets := nettop.GetAllEntity()
+	ets := nettop.GetAllUniqueNetNSEntity()
 	if len(ets) == 0 {
 		log.Infof("failed collect tcp summary, no entity found")
 	}

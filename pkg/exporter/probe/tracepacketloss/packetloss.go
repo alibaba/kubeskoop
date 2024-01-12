@@ -208,7 +208,7 @@ func (p *packetLossProbe) collect() (map[string]map[uint32]uint64, error) {
 	)
 
 	// if no entity found, do not report metric
-	ets := nettop.GetAllEntity()
+	ets := nettop.GetAllUniqueNetNSEntity()
 	if len(ets) == 0 {
 		return resMap, nil
 	}

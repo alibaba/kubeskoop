@@ -34,20 +34,33 @@ func GetEntityByPid(pid int) (*Entity, error) {
 	return nil, fmt.Errorf("entify for process %d not found", pid)
 }
 
-func GetAllEntity() []*Entity {
+// GetAllUniqueNetNSEntity returns entities that has unique network namespace (exclude host network pods)
+func GetAllUniqueNetNSEntity() []*Entity {
+	return filterEntities(func(entity *Entity) bool {
+		return !entity.isHostNetwork || entity == defaultEntity
+	})
+}
+
+func filterEntities(filter func(entity *Entity) bool) []*Entity {
 	v := nsCache.Items()
 
-	res := []*Entity{}
+	var ret []*Entity
 	for _, item := range v {
 		et := item.Object.(*Entity)
-		// filter unknow netns, such as extra test netns created by cni-plugin, cilium/calico etc..
-		if et == nil || et.GetPodName() == "unknow" {
+		if et == nil {
 			continue
 		}
-		res = append(res, et)
+		if filter == nil || filter(et) {
+			ret = append(ret, et)
+		}
 	}
+	return ret
+}
 
-	return res
+// GetAllEntity returns all entities include host network pods
+func GetAllEntity() []*Entity {
+	return filterEntities(nil)
+
 }
 
 func GetNodeName() string {

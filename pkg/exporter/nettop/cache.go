@@ -392,25 +392,25 @@ func cacheNetTopology(ctx context.Context) error {
 			continue
 		}
 
-		if sandboxStatus.Status.Network == nil || sandboxStatus.Status.Network.Ip == "" {
-			log.Errorf("sanbox %s/%s: invalid sandbox status, no ip", sandbox.Metadata.Namespace, sandbox.Metadata.Name)
-			continue
-		}
+		hostNetwork := sandboxStatus.Status.Network == nil
 
 		e := &Entity{
 			netnsMeta: netnsMeta{
 				inum:          netnsNum,
 				mountPath:     fmt.Sprintf("/proc/%d/ns/net", info.Pid),
-				isHostNetwork: false,
+				isHostNetwork: hostNetwork,
 				ipList:        []string{status.Network.Ip},
 			},
 			podMeta: podMeta{
 				name:      name,
 				namespace: namespace,
-				ip:        sandboxStatus.Status.Network.Ip,
 			},
 			initPid: info.Pid,
 			pids:    pids,
+		}
+
+		if !hostNetwork {
+			e.ip = sandboxStatus.Status.Network.Ip
 		}
 
 		addEntityToCache(e)
