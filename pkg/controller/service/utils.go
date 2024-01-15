@@ -46,3 +46,19 @@ func (c *controller) getNodeInfo(ctx context.Context, nodeName string) (*rpc.Nod
 
 	return ni, p.Status.Addresses[0].Address, nil
 }
+
+func (c *controller) getConfigMap(ctx context.Context, namespace, name string) (*corev1.ConfigMap, error) {
+	cm, err := c.k8sClient.CoreV1().ConfigMaps(namespace).Get(ctx, name, v1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("get configmap %s/%s failed: %v", namespace, name, err)
+	}
+	return cm, nil
+}
+
+func (c *controller) updateConfigMap(ctx context.Context, namespace, name string, cm *corev1.ConfigMap) error {
+	_, err := c.k8sClient.CoreV1().ConfigMaps(namespace).Update(ctx, cm, v1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("update configmap %s/%s failed: %v", namespace, name, err)
+	}
+	return nil
+}

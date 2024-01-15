@@ -3,9 +3,11 @@ package service
 import (
 	"context"
 	"fmt"
+	exporter "github.com/alibaba/kubeskoop/pkg/exporter/cmd"
 	"github.com/alibaba/kubeskoop/pkg/exporter/loki"
 	"io"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -35,6 +37,8 @@ type ControllerService interface {
 	QueryPrometheus(ctx context.Context, query string, ts time.Time) (model.Value, promv1.Warnings, error)
 	GetPodNodeInfoFromMetrics(ctx context.Context, ts time.Time) (model.Vector, model.Vector, error)
 	PingMesh(ctx context.Context, pingmesh *PingMeshArgs) (*PingMeshResult, error)
+	GetExporterConfig(ctx context.Context) (*exporter.InspServerConfig, error)
+	UpdateExporterConfig(ctx context.Context, cfg *exporter.InspServerConfig) error
 }
 
 func NewControllerService() (ControllerService, error) {
@@ -78,15 +82,29 @@ func NewControllerService() (ControllerService, error) {
 		ctrl.lokiClient = lokiClient
 	}
 
+	if configMap, ok := os.LookupEnv("KUBESKOOP_CONFIGMAP"); ok {
+		c := strings.Split(configMap, "/")
+		if len(c) != 2 {
+			return nil, fmt.Errorf("invalid configmap format %s", configMap)
+		}
+		ctrl.ConfigMapNamespace = c[0]
+		ctrl.ConfigMapName = c[1]
+	} else {
+		ctrl.ConfigMapNamespace = "kubeskoop"
+		ctrl.ConfigMapName = "kubeskoop-config"
+	}
+
 	return ctrl, nil
 }
 
 type controller struct {
 	rpc.UnimplementedControllerRegisterServiceServer
-	diagnosor      diagnose.DiagnoseController
-	k8sClient      *kubernetes.Clientset
-	taskWatcher    sync.Map
-	resultWatchers sync.Map
-	promClient     api.Client
-	lokiClient     *lokiwrapper.Client
+	diagnosor          diagnose.DiagnoseController
+	k8sClient          *kubernetes.Clientset
+	taskWatcher        sync.Map
+	resultWatchers     sync.Map
+	promClient         api.Client
+	lokiClient         *lokiwrapper.Client
+	ConfigMapNamespace string
+	ConfigMapName      string
 }

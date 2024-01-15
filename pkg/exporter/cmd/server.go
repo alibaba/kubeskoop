@@ -223,36 +223,36 @@ func init() {
 	serverCmd.PersistentFlags().StringVarP(&configPath, "config", "c", "/etc/config/config.yaml", "config file path")
 }
 
-type inspServerConfig struct {
-	DebugMode        bool          `yaml:"debugmode" mapstructure:"debugmode"`
-	Port             uint16        `yaml:"port" mapstructure:"port"`
-	EnableController bool          `yaml:"enable_controller" mapstructure:"enable_controller"`
-	MetricsConfig    MetricsConfig `yaml:"metrics" mapstructure:"metrics"`
-	EventConfig      EventConfig   `yaml:"event" mapstructure:"event"`
+type InspServerConfig struct {
+	DebugMode        bool          `yaml:"debugmode" mapstructure:"debugmode" json:"debugmode"`
+	Port             uint16        `yaml:"port" mapstructure:"port" json:"port"`
+	EnableController bool          `yaml:"enable_controller" mapstructure:"enable_controller" json:"enable_controller"`
+	MetricsConfig    MetricsConfig `yaml:"metrics" mapstructure:"metrics" json:"metrics"`
+	EventConfig      EventConfig   `yaml:"event" mapstructure:"event" json:"event"`
 }
 
 type MetricsConfig struct {
-	Probes []ProbeConfig `yaml:"probes" mapstructure:"probes"`
+	Probes []ProbeConfig `yaml:"probes" mapstructure:"probes" json:"probes"`
 }
 
 type EventConfig struct {
-	EventSinks []EventSinkConfig `yaml:"sinks" mapstructure:"sinks"`
-	Probes     []ProbeConfig     `yaml:"probes" mapstructure:"probes"`
+	EventSinks []EventSinkConfig `yaml:"sinks" mapstructure:"sinks" json:"sinks"`
+	Probes     []ProbeConfig     `yaml:"probes" mapstructure:"probes" json:"probes"`
 }
 
 type EventSinkConfig struct {
-	Name string      `yaml:"name" mapstructure:"name"`
-	Args interface{} `yaml:"args" mapstructure:"args"`
+	Name string      `yaml:"name" mapstructure:"name" json:"name"`
+	Args interface{} `yaml:"args" mapstructure:"args" json:"args"`
 }
 
 type ProbeConfig struct {
-	Name string                 `yaml:"name" mapstructure:"name"`
-	Args map[string]interface{} `yaml:"args" mapstructure:"args"`
+	Name string                 `yaml:"name" mapstructure:"name" json:"name"`
+	Args map[string]interface{} `yaml:"args" mapstructure:"args" json:"args"`
 }
 
 type inspServer struct {
 	v             viper.Viper
-	config        inspServerConfig
+	config        InspServerConfig
 	ctx           context.Context
 	metricsServer *MetricsServer
 	eventServer   *EventServer
@@ -268,7 +268,7 @@ func (i *inspServer) MergeConfig() error {
 		return fmt.Errorf("config file err: %w", err)
 	}
 
-	cfg := &inspServerConfig{}
+	cfg := &InspServerConfig{}
 	err = i.v.Unmarshal(cfg)
 	if err != nil {
 		return fmt.Errorf("config file err: %w", err)
@@ -280,7 +280,7 @@ func (i *inspServer) MergeConfig() error {
 }
 
 func (i *inspServer) reload() error {
-	cfg := inspServerConfig{}
+	cfg := InspServerConfig{}
 	err := i.v.Unmarshal(&cfg)
 	if err != nil {
 		return err

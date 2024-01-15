@@ -5,6 +5,7 @@ import (
 	"github.com/alibaba/kubeskoop/pkg/controller/graph"
 	"github.com/alibaba/kubeskoop/pkg/controller/rpc"
 	"github.com/alibaba/kubeskoop/pkg/controller/service"
+	exporter "github.com/alibaba/kubeskoop/pkg/exporter/cmd"
 	skoopContext "github.com/alibaba/kubeskoop/pkg/skoop/context"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/common/model"
@@ -90,6 +91,8 @@ func (s *Server) RunHTTPServer(port int, done <-chan struct{}) {
 	r.GET("/namespaces", s.ListNamespaces)
 	r.GET("/flow", s.GetFlowGraph)
 	r.GET("/events", s.GetEvent)
+	r.GET("/config", s.GetExporterConfig)
+	r.PUT("/config", s.UpdateExporterConfig)
 
 	go func() {
 		err := r.Run(fmt.Sprintf("0.0.0.0:%d", port))
@@ -329,4 +332,29 @@ func (s *Server) GetEvent(ctx *gin.Context) {
 	})
 
 	ctx.AsciiJSON(http.StatusOK, evts)
+}
+
+func (s *Server) GetExporterConfig(ctx *gin.Context) {
+	cfg, err := s.controller.GetExporterConfig(ctx)
+	if err != nil {
+		ctx.AsciiJSON(http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("error get exporter config: %v", err)})
+		return
+	}
+	ctx.AsciiJSON(http.StatusOK, cfg)
+}
+
+func (s *Server) UpdateExporterConfig(ctx *gin.Context) {
+	var cfg *exporter.InspServerConfig
+	err := ctx.BindJSON(&cfg)
+	if err != nil {
+		ctx.AsciiJSON(http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("error unmarshal config: %v", err)})
+		return
+	}
+
+	err = s.controller.UpdateExporterConfig(ctx, cfg)
+	if err != nil {
+		ctx.AsciiJSON(http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("error update exporter config: %v", err)})
+		return
+	}
+	ctx.Status(http.StatusOK)
 }

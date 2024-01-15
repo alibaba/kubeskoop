@@ -405,8 +405,7 @@ metadata:
       prometheus.io/scrape: 'true'
       prometheus.io/port:   '3000'
 spec:
-  selector:
-    app: grafana
+  selector: app: grafana
   type: NodePort
   ports:
     - port: 80
@@ -536,7 +535,31 @@ subjects:
 - kind: ServiceAccount
   name: default
   namespace: kubeskoop
-
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: controller
+  namespace: kubeskoop
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  resourceNames: ["kubeskoop-config"]
+  verbs: ["get", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: controller
+  namespace: kubeskoop
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: controller
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: kubeskoop
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -558,6 +581,17 @@ spec:
       - name: controller
         image: registry.aliyuncs.com/wangbs/kubeskoop:latest
         command: ["/bin/controller"]
+        env:
+          - name: PROMETHEUS_ENDPOINT
+            value: http://prometheus-service
+          - name: LOKI_ENDPOINT
+            value: http://loki-service:3100
+        volumeMounts:
+          - name:  db
+            mountPath: /var/lib/kubeskoop
+      volumes:
+      - name: db
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

@@ -32,7 +32,7 @@ func (c *controller) QueryRangeEvent(ctx context.Context, start, end time.Time, 
 	if c.lokiClient == nil {
 		return nil, fmt.Errorf("loki client is not initialized")
 	}
-	query := "{job=\"kubeskoop\"} | json"
+	query := "{job=\"kubeskoop\"} | json | json pod=\"labels[0].value\", namespace=\"labels[1].value\""
 	if len(labelFilter) != 0 {
 		filter := buildFilterQueries(labelFilter)
 		query = fmt.Sprintf("%s | %s", query, filter)

@@ -15,7 +15,7 @@ export interface EventData {
 };
 
 export default {
-  async getRangeEvent(start?: number, end?: number, types: string[], nodes?: string[], namespaces?: string[], pods?: string[], limit?: number): Promise<EventData[]> {
+  async getRangeEvent(start?: number, end?: number, types?: string[], nodes?: string[], namespaces?: string[], pods?: string[], limit?: number, signal?: AbortSignal): Promise<EventData[]> {
     return request.get('/controller/events', {
       params: {
         start,
@@ -26,6 +26,7 @@ export default {
         pods: pods?.join(','),
         limit,
       },
+      signal: signal,
     });
   }
 };
