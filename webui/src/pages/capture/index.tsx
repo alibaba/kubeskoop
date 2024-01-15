@@ -1,10 +1,11 @@
-import {Card, Button, Table, Message} from "@alifd/next"
+import { Card, Button, Table, Message } from "@alifd/next"
 import PageHeader from "@/components/PageHeader"
 import CaptureForm from "@/pages/capture/components/captureForm";
 import CaptureResult from "@/pages/capture/components/captureResult";
-import {CaptureTask} from "@/services/capture";
+import { CaptureTask } from "@/services/capture";
 import captureService from "@/services/capture"
-import {useEffect, useState} from "react";
+import { useEffect, useState } from "react";
+import { getErrorMessage } from "@/utils";
 
 const submitCapture = (props, callback) => {
   const task: CaptureTask = {
@@ -20,44 +21,58 @@ const submitCapture = (props, callback) => {
       callback()
     })
     .catch(err => {
-      Message.error(`Error when submitting diagnosis: ${err.response.data.error}`)
+      Message.error(`Error when submitting diagnosis: ${getErrorMessage(err)}`)
     })
 }
 
 export default function Capture() {
   const [captureList, setCaptureList] = useState([])
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
+  const [refreshCount, setRefreshCount] = useState(0);
   const refreshCaptureList = () => {
-    captureService.listCaptures()
+    if (abortController) {
+      abortController.abort()
+    }
+    const c = new AbortController();
+    const { signal } = c;
+    setAbortController(c);
+    captureService.listCaptures(signal)
       .then(res => {
-        if(res == null) {
+        if (res == null) {
           res = []
         }
         setCaptureList(Object.values(res))
-        if (Object.values(res).filter(i => i != null).reduce(
-          (prev, i) => prev && i.reduce((prev, item)=>{return prev || item.status==="running"}, true)
-          ,true)) {setTimeout(refreshCaptureList, 3000)}
       })
       .catch(err => {
-        Message.error(`Error when fetching diagnosis: ${err.response.data.error}`)
+        Message.error(`Error when fetching diagnosis: ${getErrorMessage(err)}`)
       })
+      .finally(() => setRefreshCount(refreshCount + 1))
   }
   useEffect(refreshCaptureList, [])
-    return (
-        <div>
-          <PageHeader
-          title='网络抓包'
-          breadcrumbs={[{name: 'Console'}, {name: '抓包'}, {name: '分布式抓包'}]}
-          />
-          <Card id="card-capture" title="抓包" contentHeight="auto">
-              <Card.Content>
-                  <CaptureForm onSubmit={(props) => submitCapture(props, refreshCaptureList)} />
-              </Card.Content>
-          </Card>
-          <Card id="card-capture-tasks" title="抓包任务" contentHeight="auto">
-            <Card.Content>
-              <CaptureResult captureResult={captureList}/>
-            </Card.Content>
-          </Card>
-        </div>
-    )
+  useEffect(() => {
+    if (captureList.flat().find(i => i.status === 'running')) {
+      const id = setTimeout(refreshCaptureList, 3000)
+      return () => clearTimeout(id)
+    }
+    return () => {}
+  }, [refreshCount]);
+
+  return (
+    <div>
+      <PageHeader
+        title='网络抓包'
+        breadcrumbs={[{ name: 'Console' }, { name: '抓包' }, { name: '分布式抓包' }]}
+      />
+      <Card id="card-capture" title="抓包" contentHeight="auto">
+        <Card.Content>
+          <CaptureForm onSubmit={(props) => submitCapture(props, refreshCaptureList)} />
+        </Card.Content>
+      </Card>
+      <Card id="card-capture-tasks" title="抓包任务" contentHeight="auto">
+        <Card.Content>
+          <CaptureResult captureResult={captureList} />
+        </Card.Content>
+      </Card>
+    </div>
+  )
 }

@@ -21,10 +21,13 @@ export interface FlowData {
 };
 
 export default {
-    async getFlowData() {
+    async getFlowData(time: number) {
         return await request({
             url: '/controller/flow',
             method: 'GET',
+            params: {
+                time,
+            }
         });
     },
 }

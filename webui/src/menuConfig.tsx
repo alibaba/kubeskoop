@@ -13,8 +13,12 @@ const asideMenuConfig = [
       {
         name: "事件",
         path: "/monitoring/events"
+      },
+      {
+        name: "链路图",
+        path: "/flow"
       }
-      ]
+    ]
   },
   {
     name: '诊断',

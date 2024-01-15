@@ -22,10 +22,11 @@ export default {
             data: task,
         });
     },
-    async listCaptures(): Promise<string> {
+    async listCaptures(signal?: AbortSignal): Promise<string> {
         return await request({
             url: '/controller/captures',
             method: 'GET',
+            signal: signal,
         });
     }
 };

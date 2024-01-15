@@ -26,13 +26,14 @@ const makeAction = (d: DiagnosisResult, showMessageDialog: (message: string) => 
 const toTableData = (data: DiagnosisResult[], showMessageDialog: (message: string) => void) => {
   if (!data) return [];
   return data.map(d => {
+    const task_config = JSON.parse(d.task_config) as DiagnosisTask;
     return {
       id: d.task_id,
       time: d.start_time,
-      src: d.task_config.source,
-      dst: d.task_config.destination.address,
-      port: d.task_config.destination.port,
-      protocol: d.task_config.protocol,
+      src: task_config.source,
+      dst: task_config.destination.address,
+      port: task_config.destination.port,
+      protocol: task_config.protocol,
       status: d.status === 'running' ? <span><Icon size="xs" type="loading" />{d.status}</span> : d.status,
       action: makeAction(d, showMessageDialog)
     }
@@ -43,16 +44,18 @@ export default function Diagnosis() {
   const [data, setData] = useState<DiagnosisResult[]>([]);;
   const [message, setMessage] = useState('');
   const [dialogVisible, setDialogVisible] = useState(false);
+  const [refreshCount, setRefreshCount] = useState(0);
 
   const refreshDiagnosisList = () => {
     diagnosisService.listDiagnosis()
       .then(res => {
         res = res || []
         setData(res)
-        if (res.find(i => i.status == 'running')) setTimeout(refreshDiagnosisList, 3000)
       })
       .catch(err => {
         Message.error(`获取诊断信息失败： ${getErrorMessage(err)}`)
+      }).finally(() => {
+        setRefreshCount(refreshCount + 1)
       })
   };
 
@@ -81,6 +84,13 @@ export default function Diagnosis() {
   }
 
   useEffect(refreshDiagnosisList, [])
+  useEffect(() => {
+    if (data.find(i => i.status == 'running')) {
+      const id = setTimeout(refreshDiagnosisList, 3000);
+      return () => clearTimeout(id);
+    }
+    return () => {}
+  }, [refreshCount]);
 
   return (
     <div>

@@ -219,7 +219,17 @@ func (s *Server) PingMesh(ctx *gin.Context) {
 }
 
 func (s *Server) GetFlowGraph(ctx *gin.Context) {
-	ts := time.Now()
+	var ts time.Time
+	t := ctx.Query("time")
+	if t != "" {
+		ti, err := strconv.Atoi(t)
+		if err != nil {
+			ctx.AsciiJSON(http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("cannot convert timestamp: %v", err)})
+		}
+		ts = time.Unix(int64(ti), 0)
+	} else {
+		ts = time.Now()
+	}
 	result, _, err := s.controller.QueryPrometheus(ctx, "kubeskoop_flow_bytes", ts)
 	if err != nil {
 		ctx.AsciiJSON(http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("error query flow metrics: %v", err)})

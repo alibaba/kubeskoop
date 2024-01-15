@@ -13,7 +13,7 @@ export interface DiagnosisTask {
 
 export interface DiagnosisResult {
     task_id: string
-    task_config: DiagnosisTask
+    task_config: string
     start_time: string
     finish_time: string
     status: string
