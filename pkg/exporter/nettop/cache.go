@@ -382,7 +382,9 @@ func cacheNetTopology(ctx context.Context) error {
 		var pids []int
 		if podCgroupPath != "" {
 			pids = tasksInsidePodCgroup(podCgroupPath)
-			log.Debugf("found %d pids under cgroup %s", len(pids), podCgroupPath)
+			if len(pids) == 0 {
+				log.Warnf("sandbox %s/%s: found 0 pids under cgroup %s", namespace, name, podCgroupPath)
+			}
 		}
 
 		status := sandboxStatus.Status
