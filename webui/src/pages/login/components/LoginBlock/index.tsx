@@ -74,7 +74,7 @@ const LoginBlock: FunctionComponent<LoginProps> = (
     try {
       const result = await login(values);
       if (result) {
-        Message.success('登录成功！');
+        Message.success('Login succeed！');
         setAuth({
           login: true,
         });
@@ -85,7 +85,7 @@ const LoginBlock: FunctionComponent<LoginProps> = (
       }
       setLoginResult(result);
     } catch (error) {
-      Message.error(`登录失败：${getErrorMessage(error)}`);
+      Message.error(`Login failed：${getErrorMessage(error)}`);
     }
   };
 
@@ -98,11 +98,11 @@ const LoginBlock: FunctionComponent<LoginProps> = (
         />
         <Form value={postData} onChange={formChange} size="large">
           <>
-            <Item required requiredMessage="必填">
-              <Input name="username" maxLength={20} placeholder="用户名" />
+            <Item required requiredMessage="Required">
+              <Input name="username" maxLength={20} placeholder="Username" />
             </Item>
-            <Item required requiredMessage="必填" style={{ marginBottom: 0 }}>
-              <Input.Password name="password" htmlType="password" placeholder="密码" />
+            <Item required requiredMessage="Required" style={{ marginBottom: 0 }}>
+              <Input.Password name="password" htmlType="password" placeholder="Password" />
             </Item>
           </>
           <Item style={{ marginBottom: 10, marginTop: 20 }}>
@@ -113,7 +113,7 @@ const LoginBlock: FunctionComponent<LoginProps> = (
               className={styles.submitBtn}
               validate
             >
-              登录
+              Login
             </Form.Submit>
           </Item>
         </Form>

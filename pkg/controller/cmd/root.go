@@ -1,9 +1,10 @@
 package cmd
 
 import (
+	"os"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"os"
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -40,5 +41,5 @@ func Execute() {
 func init() {
 	rootCmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "Enable debug log information")
 	rootCmd.PersistentFlags().IntVarP(&agentPort, "agent-port", "a", defaultAgentPort, "Controller Port For Agent Registration")
-	rootCmd.PersistentFlags().IntVarP(&httpPort, "http-port", "p", defaultHttpPort, "Controller Port For Agent Registration")
+	rootCmd.PersistentFlags().IntVarP(&httpPort, "http-port", "p", defaultHTTPPort, "Controller Port For Agent Registration")
 }

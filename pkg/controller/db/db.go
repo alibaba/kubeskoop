@@ -3,13 +3,16 @@ package db
 import (
 	"bytes"
 	"database/sql"
-	_ "database/sql"
+
+	// import for go:embed
 	_ "embed"
 	"fmt"
-	"github.com/jmoiron/sqlx"
-	_ "github.com/mattn/go-sqlite3"
 	"text/template"
 	"time"
+
+	"github.com/jmoiron/sqlx"
+	// import for sqlite
+	_ "github.com/mattn/go-sqlite3"
 )
 
 //go:embed db_schema_v1.sql.tpl

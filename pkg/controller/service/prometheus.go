@@ -3,9 +3,10 @@ package service
 import (
 	"context"
 	"errors"
+	"time"
+
 	promv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
-	"time"
 )
 
 func (c *controller) QueryPrometheus(ctx context.Context, query string, ts time.Time) (model.Value, promv1.Warnings, error) {

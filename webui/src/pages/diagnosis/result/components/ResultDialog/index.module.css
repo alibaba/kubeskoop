@@ -1,23 +1,23 @@
 .attributeItem {
-    font-size: 13px;
-    color: black;
+  font-size: 13px;
+  color: black;
 }
 
 .attributeTitle {
-    font-size: 13px;
-    color: rgb(102, 102, 102)
+  font-size: 13px;
+  color: rgb(102, 102, 102);
 }
 
 .attributeSuspicionItem {
-    font-size: 14px;
-    color: black;
+  font-size: 14px;
+  color: black;
 }
 
 .suspicionIcon {
-    padding: 2px 4px;
-    margin-right: 5px;
-    user-select: none;
-    color: white;
-    border-radius: 5px;
-    text-align: center;
+  padding: 2px 4px;
+  margin-right: 5px;
+  user-select: none;
+  color: white;
+  border-radius: 5px;
+  text-align: center;
 }

@@ -22,31 +22,31 @@ const columns = [
     width: 80
   },
   {
-    title: "时间",
+    title: "Time",
     dataIndex: "time",
   },
   {
-    title: "源IP",
+    title: "Source Address",
     dataIndex: "src",
   },
   {
-    title: "目的IP",
+    title: "Destination Address",
     dataIndex: "dst",
   },
   {
-    title: "端口",
+    title: "Port",
     dataIndex: "port",
   },
   {
-    title: "协议",
+    title: "Protocol",
     dataIndex: "protocol",
   },
   {
-    title: "状态",
+    title: "Status",
     dataIndex: "status",
   },
   {
-    title: "操作",
+    title: "Actions",
     dataIndex: "action"
   }
 ];

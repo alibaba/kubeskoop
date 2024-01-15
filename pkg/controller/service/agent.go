@@ -3,10 +3,11 @@ package service
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
+
 	"github.com/alibaba/kubeskoop/pkg/controller/rpc"
 	"github.com/samber/lo"
 	log "k8s.io/klog/v2"
-	"sync/atomic"
 )
 
 type taskWatcher struct {
@@ -14,11 +15,11 @@ type taskWatcher struct {
 	filter   *rpc.TaskFilter
 }
 
-func (c *controller) RegisterAgent(ctx context.Context, info *rpc.AgentInfo) (*rpc.ControllerInfo, error) {
+func (c *controller) RegisterAgent(_ context.Context, _ *rpc.AgentInfo) (*rpc.ControllerInfo, error) {
 	return nil, nil
 }
 
-func (c *controller) ReportEvents(server rpc.ControllerRegisterService_ReportEventsServer) error {
+func (c *controller) ReportEvents(_ rpc.ControllerRegisterService_ReportEventsServer) error {
 	return nil
 }
 
@@ -71,7 +72,7 @@ func (c *controller) GetAgentList() []*rpc.AgentInfo {
 }
 
 var (
-	taskIdx int64 = 0
+	taskIdx int64
 )
 
 func getTaskIdx() int64 {
@@ -97,9 +98,9 @@ func (c *controller) commitTask(node string, task *rpc.Task) ([]string, error) {
 	})
 	if len(commitedNode) > 0 {
 		return commitedNode, nil
-	} else {
-		return nil, fmt.Errorf("there is no client to process task: %v", task)
 	}
+
+	return nil, fmt.Errorf("there is no client to process task: %v", task)
 }
 
 func (c *controller) waitTaskResult(ctx context.Context, id string) (*rpc.TaskResult, error) {

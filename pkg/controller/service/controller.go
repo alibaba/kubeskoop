@@ -3,13 +3,14 @@ package service
 import (
 	"context"
 	"fmt"
-	exporter "github.com/alibaba/kubeskoop/pkg/exporter/cmd"
-	"github.com/alibaba/kubeskoop/pkg/exporter/loki"
 	"io"
 	"os"
 	"strings"
 	"sync"
 	"time"
+
+	exporter "github.com/alibaba/kubeskoop/pkg/exporter/cmd"
+	lokiwrapper "github.com/alibaba/kubeskoop/pkg/exporter/loki"
 
 	"github.com/alibaba/kubeskoop/pkg/controller/diagnose"
 	"github.com/alibaba/kubeskoop/pkg/controller/rpc"
@@ -99,7 +100,7 @@ func NewControllerService() (ControllerService, error) {
 
 type controller struct {
 	rpc.UnimplementedControllerRegisterServiceServer
-	diagnosor          diagnose.DiagnoseController
+	diagnosor          diagnose.Controller
 	k8sClient          *kubernetes.Clientset
 	taskWatcher        sync.Map
 	resultWatchers     sync.Map

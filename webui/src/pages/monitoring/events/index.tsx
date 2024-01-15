@@ -40,7 +40,7 @@ export default function Events() {
       setEventData(res || [])
       if (setLoading) setIsLoading(false);
     }).catch((res) => {
-      Message.error(`获取事件信息失败：${getErrorMessage(res)}`)
+      Message.error(`Error fetching events: ${getErrorMessage(res)}`)
     });
   };
 
@@ -48,19 +48,19 @@ export default function Events() {
     k8sService.listNodes().then((res) => {
       setNodes(res)
     }).catch((res) => {
-      Message.error(`获取节点信息失败：${getErrorMessage(res)}`)
+      Message.error(`Error fetching node info: ${getErrorMessage(res)}`)
     }
     );
     k8sService.listNamespace().then((res) => {
       setNamespaces(res)
     }).catch((res) => {
-      Message.error(`获取命名空间信息失败：${getErrorMessage(res)}`)
+      Message.error(`Error fetching namespace info: ${getErrorMessage(res)}`)
     }
     );
     k8sService.listPods().then((res) => {
       setPods(res)
     }).catch((res) => {
-      Message.error(`获取Pod信息失败：${getErrorMessage(res)}`)
+      Message.error(`Error fetching pod info: ${getErrorMessage(res)}`)
     }
     );
   }
@@ -100,23 +100,23 @@ export default function Events() {
   return (
     <div>
       <PageHeader
-        title='事件'
-        breadcrumbs={[{ name: 'Console' }, { name: '监控' }, { name: '事件' }]}
+        title='Events'
+        breadcrumbs={[{ name: 'Console' }, { name: 'Monitoring' }, { name: 'Events' }]}
       />
-      <Card title="事件" contentHeight="auto">
+      <Card contentHeight="auto">
         <Card.Content>
           <Box direction="row" className={styles.box}>
-            <span className={styles.title}>时间范围</span>
+            <span className={styles.title}>Time Range</span>
             <DatePicker2.RangePicker showTime disabled={isLive} onChange={v => setTimeRange(v)} />
           </Box>
           <Box direction="row" className={styles.box}>
-            <span className={styles.title}>事件类型</span>
+            <span className={styles.title}>Event Type</span>
             <Select className={styles.select} mode="tag" dataSource={eventTypes} onChange={v => setFilteredTypes(v)} disabled={isLive} />
-            <span className={styles.title}>节点</span>
+            <span className={styles.title}>Nodes</span>
             <Select className={styles.select} mode="tag" dataSource={nodeNames} onChange={v => setFilteredNodes(v)} disabled={isLive} />
-            <span className={styles.title}>命名空间</span>
+            <span className={styles.title}>Namespaces</span>
             <Select className={styles.select} mode="tag" dataSource={namespaces} onChange={v => setFilteredNamespaces(v)} disabled={isLive} />
-            <span className={styles.title}>Pod名称</span>
+            <span className={styles.title}>Pods</span>
             <Select className={styles.select} mode="tag" dataSource={podNames} onChange={v => setFilteredPods(v)} disabled={isLive} />
             <div style={{ marginLeft: "auto" }}>
               <Button
@@ -128,17 +128,17 @@ export default function Events() {
                 onClick={() => refreshEventList(true)}
               >
                 <Icon type="refresh" />
-                刷新
+                Refresh
               </Button>
               {
                 isLive ?
-                  <Button className={styles.btn} type="secondary" size="medium" style={{ marginLeft: 'auto', padding: "0 13px" }} onClick={() => setIsLive(false)}><Icon type="loading" />暂停</Button> :
-                  <Button className={styles.btn} type="secondary" size="medium" onClick={() => setIsLive(true)}>实时</Button>
+                  <Button className={styles.btn} type="secondary" size="medium" style={{ marginLeft: 'auto', padding: "0 13px" }} onClick={() => setIsLive(false)}><Icon type="loading" />Pause</Button> :
+                  <Button className={styles.btn} type="secondary" size="medium" onClick={() => setIsLive(true)}>Live</Button>
               }
             </div>
           </Box>
         </Card.Content>
-        <Card.Header title="事件列表" />
+        <Card.Header title="Event List" />
         <Card.Divider />
         <Card.Content>
           <Loading visible={isLoading} style={{ display: 'block' }}>

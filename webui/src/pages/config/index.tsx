@@ -33,7 +33,7 @@ export default function Config() {
           style={{ color: 'red' }}
           onClick={() => deleteItem(type, index)}
         >
-          删除
+          Delete
         </Button>
       </div>
     )
@@ -66,13 +66,16 @@ export default function Config() {
   const showAddItemDialog = (type: string) => {
     switch (type) {
       case METRIC_PROBE:
-        setSelectableItems(probeTypes.metric_probe);
+        const enabledMetricProbes = extractMetricProbes(exporterConfig)?.map(p => p.name);
+        setSelectableItems(probeTypes.metric_probe.filter(i => !enabledMetricProbes.includes(i.name)));
         break;
       case EVENT_PROBE:
-        setSelectableItems(probeTypes.event_probe);
+        const enabledEventProbes = extractEventProbes(exporterConfig)?.map(p => p.name);
+        setSelectableItems(probeTypes.event_probe.filter(i => !enabledEventProbes.includes(i.name)));
         break;
       case EVENT_SINK:
-        setSelectableItems(probeTypes.event_sink);
+        const enabledEventSinks = extractEventSinks(exporterConfig)?.map(p => p.name);
+        setSelectableItems(probeTypes.event_sink.filter(i => !enabledEventSinks.includes(i.name)));
         break;
     }
     setDialogType(type);
@@ -88,7 +91,7 @@ export default function Config() {
           newConfig.metrics.probes = [];
         }
         if (newConfig.metrics?.probes.find(p => p.name === selection.name)) {
-          Message.error(`指标探针 ${selection} 已存在!`)
+          Message.error(`Metric probe \"${selection.name}\" has already existed!`)
           return
         }
         newConfig.metrics?.probes?.push({ ...selection });
@@ -98,7 +101,7 @@ export default function Config() {
           newConfig.event.probes = [];
         }
         if (newConfig.event?.probes.find(p => p.name === selection.name)) {
-          Message.error(`事件探针 ${selection} 已存在!`)
+          Message.error(`Event probe \"${selection.name}\" has already existed!`)
           return
         }
         newConfig.event?.probes?.push({ ...selection });
@@ -108,7 +111,7 @@ export default function Config() {
           newConfig.event.sinks = [];
         }
         if (newConfig.event?.sinks.find(p => p.name === selection.name)) {
-          Message.error(`事件投递 ${selection.name} 已存在!`)
+          Message.error(`Event sink \"${selection.name}\" has already existed!`)
           return
         }
         newConfig.event?.sinks?.push({ ...selection });
@@ -125,53 +128,53 @@ export default function Config() {
   const saveConfig = () => {
     console.log(exporterConfig)
     configService.updateExporterConfig(exporterConfig!).then(() => {
-      Message.success('配置保存成功')
+      Message.success('Configuration saved.')
       setConfigChanged(false);
     }).catch(e => {
-      Message.error(`配置保存失败: ${getErrorMessage(e)}`)
+      Message.error(`Error when saving configuration: ${getErrorMessage(e)}`)
     })
   }
 
   return (
     <div>
       <PageHeader
-        title='节点配置'
-        breadcrumbs={[{ name: 'Console' }, { name: '配置' }, { name: '节点配置' }]}
+        title='Node Configuration'
+        breadcrumbs={[{ name: 'Console' }, { name: 'Configuration' }, { name: 'Node Configuration' }]}
       />
-      <Card title="指标探针" contentHeight="auto">
+      <Card title="Metric Probes" contentHeight="auto">
         <div style={{ display: 'flex' }}>
-          <Button type='primary' style={{ marginBottom: 10 }} onClick={() => showAddItemDialog(METRIC_PROBE)}>添加</Button>
+          <Button type='primary' style={{ marginBottom: 10 }} onClick={() => showAddItemDialog(METRIC_PROBE)}>Add</Button>
         </div>
         <Table.StickyLock dataSource={extractMetricProbes(exporterConfig)}>
-          <Table.Column title="名称" dataIndex="name" />
-          <Table.Column title="参数" dataIndex="args" cell={v => _.isEmpty(v) ? '-' : JSON.stringify(v)} />
-          <Table.Column title="操作" cell={(_, i) => generateActions('metric_probe', i)} />
+          <Table.Column title="Name" dataIndex="name" />
+          <Table.Column title="Args" dataIndex="args" cell={v => _.isEmpty(v) ? '-' : JSON.stringify(v)} />
+          <Table.Column title="Actions" cell={(_, i) => generateActions(METRIC_PROBE, i)} />
         </Table.StickyLock>
       </Card>
-      <Card title="事件探针" contentHeight="auto">
+      <Card title="Event Probes" contentHeight="auto">
         <div style={{ display: 'flex' }}>
-          <Button type='primary' style={{ marginBottom: 10 }} onClick={() => showAddItemDialog(EVENT_PROBE)}>添加</Button>
+          <Button type='primary' style={{ marginBottom: 10 }} onClick={() => showAddItemDialog(EVENT_PROBE)}>Add</Button>
         </div>
         <Table.StickyLock dataSource={extractEventProbes(exporterConfig)}>
-          <Table.Column title="名称" dataIndex="name" />
-          <Table.Column title="参数" dataIndex="args" cell={v => _.isEmpty(v) ? '-' : JSON.stringify(v)} />
-          <Table.Column title="操作" cell={(_, i) => generateActions('event_probe', i)} />
+          <Table.Column title="Name" dataIndex="name" />
+          <Table.Column title="Args" dataIndex="args" cell={v => _.isEmpty(v) ? '-' : JSON.stringify(v)} />
+          <Table.Column title="Actions" cell={(_, i) => generateActions(EVENT_PROBE, i)} />
         </Table.StickyLock>
       </Card>
-      <Card title="事件投递" contentHeight="auto">
+      <Card title="Event Sinks" contentHeight="auto">
         <div style={{ display: 'flex' }}>
-          <Button type='primary' style={{ marginBottom: 10 }} onClick={() => showAddItemDialog(EVENT_SINK)}>添加</Button>
+          <Button type='primary' style={{ marginBottom: 10 }} onClick={() => showAddItemDialog(EVENT_SINK)}>Add</Button>
         </div>
         <Table.StickyLock dataSource={extractEventSinks(exporterConfig)}>
-          <Table.Column title="名称" dataIndex="name" />
-          <Table.Column title="参数" dataIndex="args" cell={v => _.isEmpty(v) ? '-' : JSON.stringify(v)} />
-          <Table.Column title="操作" cell={(_, i) => generateActions('event_sink', i)} />
+          <Table.Column title="Name" dataIndex="name" />
+          <Table.Column title="Args" dataIndex="args" cell={v => _.isEmpty(v) ? '-' : JSON.stringify(v)} />
+          <Table.Column title="Actions" cell={(_, i) => generateActions(EVENT_SINK, i)} />
         </Table.StickyLock>
       </Card>
       <Card contentHeight="auto">
         <Affix offsetBottom={20}>
           <div style={{ display: 'flex' }}>
-            <Button disabled={!configChanged} onClick={saveConfig} type="primary" style={{ marginLeft: 'auto' }}>保存配置</Button>
+            <Button disabled={!configChanged} onClick={saveConfig} type="primary" style={{ marginLeft: 'auto' }}>Save Configuration</Button>
           </div>
         </Affix>
       </Card>

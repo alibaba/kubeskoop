@@ -3,11 +3,12 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"time"
+
 	"github.com/alibaba/kubeskoop/pkg/controller/db"
 	skoopContext "github.com/alibaba/kubeskoop/pkg/skoop/context"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/exp/slices"
-	"time"
 )
 
 // todo reflect to generic task definition
@@ -16,12 +17,12 @@ type DiagnoseTaskResult struct {
 	TaskConfig string `json:"task_config" db:"config"`
 	StartTime  string `json:"start_time" db:"start_time"`
 	FinishTime string `json:"finish_time" db:"finish_time"`
-	Status     string `json:"status" db:"status""`
+	Status     string `json:"status" db:"status"`
 	Result     string `json:"result" db:"result"`
 	Message    string `json:"message" db:"message"`
 }
 
-func (c *controller) Diagnose(ctx context.Context, args *skoopContext.TaskConfig) (int64, error) {
+func (c *controller) Diagnose(_ context.Context, args *skoopContext.TaskConfig) (int64, error) {
 	startTime := time.Now().Format("2006-01-02 15:04:05")
 	data, _ := json.Marshal(args)
 	task := DiagnoseTaskResult{TaskConfig: string(data), StartTime: startTime, Status: "running"}
@@ -48,7 +49,7 @@ func (c *controller) Diagnose(ctx context.Context, args *skoopContext.TaskConfig
 	return task.TaskID, nil
 }
 
-func (c *controller) DiagnoseList(ctx context.Context) ([]DiagnoseTaskResult, error) {
+func (c *controller) DiagnoseList(_ context.Context) ([]DiagnoseTaskResult, error) {
 	//TODO paging, do not list all at once
 	taskSlice, err := listTasks()
 	if err != nil {
@@ -82,7 +83,10 @@ func listTasks() ([]DiagnoseTaskResult, error) {
 	var ret []DiagnoseTaskResult
 	for rows.Next() {
 		result := DiagnoseTaskResult{}
-		rows.StructScan(&result)
+		err = rows.StructScan(&result)
+		if err != nil {
+			return nil, err
+		}
 		ret = append(ret, result)
 	}
 	return ret, nil

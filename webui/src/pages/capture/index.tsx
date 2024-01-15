@@ -17,11 +17,11 @@ const submitCapture = (props, callback) => {
 
   captureService.createCapture(task)
     .then(res => {
-      Message.success('诊断提交成功')
+      Message.success('Capture task submitted.')
       callback()
     })
     .catch(err => {
-      Message.error(`Error when submitting diagnosis: ${getErrorMessage(err)}`)
+      Message.error(`Error when submitting capture task: ${getErrorMessage(err)}`)
     })
 }
 
@@ -60,15 +60,15 @@ export default function Capture() {
   return (
     <div>
       <PageHeader
-        title='网络抓包'
-        breadcrumbs={[{ name: 'Console' }, { name: '抓包' }, { name: '分布式抓包' }]}
+        title='Packet Capturing'
+        breadcrumbs={[{ name: 'Console' }, { name: 'Diagnosis' }, { name: 'Packet Capturing' }]}
       />
-      <Card id="card-capture" title="抓包" contentHeight="auto">
+      <Card id="card-capture" title="Capture" contentHeight="auto">
         <Card.Content>
           <CaptureForm onSubmit={(props) => submitCapture(props, refreshCaptureList)} />
         </Card.Content>
       </Card>
-      <Card id="card-capture-tasks" title="抓包任务" contentHeight="auto">
+      <Card id="card-capture-tasks" title="History" contentHeight="auto">
         <Card.Content>
           <CaptureResult captureResult={captureList} />
         </Card.Content>

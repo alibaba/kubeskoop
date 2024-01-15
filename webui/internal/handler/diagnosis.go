@@ -1,11 +1,12 @@
 package handler
 
 import (
+	"net/http"
+	"strconv"
+
 	jwt "github.com/appleboy/gin-jwt/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/kubeskoop/webconsole/internal/service/controller"
-	"net/http"
-	"strconv"
 )
 
 func RegisterDiagnosisHandler(g *gin.RouterGroup, auth *jwt.GinJWTMiddleware) {

@@ -14,10 +14,10 @@ const makeAction = (d: DiagnosisResult, showMessageDialog: (message: string) => 
     case "success":
       return (<span>
         <Button text type="primary" style={{marginRight: '5px'}}><Link className="next-btn-helper" style={{color: 'inherit'}} to={`/diagnosis/result/${d.task_id}`}>查看结果</Link></Button>
-        {d.message ? <Button text type="primary" onClick={(() => showMessageDialog(d.message))}>查看日志</Button> : null }
+        {d.message ? <Button text type="primary" onClick={(() => showMessageDialog(d.message))}>Log</Button> : null }
       </span>)
     case "failed":
-      return d.message ? <Button text onClick={() => showMessageDialog(d.message)}>查看日志</Button> : null
+      return d.message ? <Button text onClick={() => showMessageDialog(d.message)}>Log</Button> : null
     default:
       return null;
   }
@@ -53,7 +53,7 @@ export default function Diagnosis() {
         setData(res)
       })
       .catch(err => {
-        Message.error(`获取诊断信息失败： ${getErrorMessage(err)}`)
+        Message.error(`Error fetching diagnosis results: ${getErrorMessage(err)}`)
       }).finally(() => {
         setRefreshCount(refreshCount + 1)
       })
@@ -70,11 +70,11 @@ export default function Diagnosis() {
     };
     diagnosisService.createDiagnosis(task)
       .then(res => {
-        Message.success('诊断提交成功')
+        Message.success('Diagnosis task submitted')
         refreshDiagnosisList()
       })
       .catch(err => {
-        Message.error(`诊断提交失败：${getErrorMessage(err)}`)
+        Message.error(`Error when submitting diagnosis task：${getErrorMessage(err)}`)
       })
   };
 
@@ -95,15 +95,15 @@ export default function Diagnosis() {
   return (
     <div>
       <PageHeader
-        title='连通性诊断'
-        breadcrumbs={[{ name: 'Console' }, { name: '诊断' }, { name: '连通性诊断' }]}
+        title='Connectivity Diagnosis'
+        breadcrumbs={[{ name: 'Console' }, { name: 'Diagnosis' }, { name: 'Connectivity Diagnosis' }]}
       />
-      <Card id="card-diagnosis" title="诊断" contentHeight="auto">
+      <Card id="card-diagnosis" title="Diagnose" contentHeight="auto">
         <Card.Content>
           <DiagnosisForm onSubmit={submitDiagnosis} />
         </Card.Content>
       </Card>
-      <Card id="card-history" title="诊断历史" contentHeight="auto">
+      <Card id="card-history" title="History" contentHeight="auto">
         <Card.Content>
           <DiagnosisHistory data={toTableData(data, showMessageDialog)} />
         </Card.Content>

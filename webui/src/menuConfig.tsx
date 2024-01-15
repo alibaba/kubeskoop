@@ -1,51 +1,50 @@
 const asideMenuConfig = [
   {
-    name: "主页",
+    name: "Network Graph",
     path: "/",
   },
   {
-    name: '监控',
+    name: 'Monitoring',
     children: [
       {
-        name: "大盘",
+        name: "Dashboard",
         path: "/monitoring/dashboard"
       },
       {
-        name: "事件",
+        name: "Events",
         path: "/monitoring/events"
       },
       {
-        name: "链路图",
-        path: "/flow"
+        name: "Network Graph",
+        path: "/monitoring/flow"
       }
     ]
   },
   {
-    name: '诊断',
+    name: 'Diagnosis',
     children: [
       {
-        name: "连通性诊断",
+        name: "Connectivity Diagnosis",
         path: "/diagnosis",
       },
       {
-        name: "抓包",
+        name: "Packet Capturing",
         path: "/capture"
       },
       {
-        name: "延迟探测(PingMesh)",
+        name: "Latency Detection",
         path: "/pingmesh"
       }
     ]
   },
   {
-    name: '配置',
+    name: 'Configuration',
     children: [
       {
-        name: '节点配置',
+        name: 'Node Configuration',
         path: '/config',
       }
     ],
   },
 ];
-
 export { asideMenuConfig };

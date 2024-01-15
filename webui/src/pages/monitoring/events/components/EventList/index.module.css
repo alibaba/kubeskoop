@@ -1,32 +1,32 @@
 .eventItem {
-    background-color: rgb(235, 245, 255);
-    font-size: 15px;
-    display: flex;
-    align-items: center;
-    height: 4em;
-    margin-bottom: 10px;
+  background-color: rgb(235, 245, 255);
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  height: 4em;
+  margin-bottom: 10px;
 }
 
 .eventInfo {
-    margin-right: 20px;
+  margin-right: 20px;
 }
 
 .eventMessage {
 }
 
 .eventType {
-    color: orangered;
+  color: orangered;
 }
 
 .tag {
-    margin-right: 10px;
+  margin-right: 10px;
 }
 
 .bar {
-    height: 100%;
-    width: 3px;
-    margin-right: 10px;
-    background-color: #0070cc;
+  height: 100%;
+  width: 3px;
+  margin-right: 10px;
+  background-color: #0070cc;
 }
 
 

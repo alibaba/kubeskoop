@@ -45,10 +45,10 @@ export default function Result() {
     return (
         <div>
             <PageHeader
-                title="诊断结果"
-                breadcrumbs={[{ name: 'Console' }, { name: '诊断' }, { name: '连通性诊断',  path: '#/diagnosis'}, { name: '诊断结果' }]}
+                title="Diagnosis Result"
+                breadcrumbs={[{ name: 'Console' }, { name: 'Diagnosis' }, { name: 'Connectivity Diagnosis',  path: '#/diagnosis'}, { name: 'Diagnosis Result' }]}
             />
-            <Card title="链路图" contentHeight="auto">
+            <Card title="Network Link Graph" contentHeight="auto">
                 <Card.Content>
                     <DiagnosisGraph data={data} onClick={showResultDialog}/>
                 </Card.Content>

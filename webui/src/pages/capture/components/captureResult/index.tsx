@@ -1,8 +1,5 @@
-import {Button, Table, Icon, Message} from '@alifd/next';
-import {useEffect, useState} from "react";
-import moment from 'moment';
+import {Table} from '@alifd/next';
 import {CaptureResult} from "@/services/capture";
-import captureService from "@/services/capture";
 import {requestConfig} from "@/app";
 
 

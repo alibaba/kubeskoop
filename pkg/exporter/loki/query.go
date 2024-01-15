@@ -13,7 +13,6 @@ import (
 const (
 	queryPath      = "/loki/api/v1/query"
 	queryRangePath = "/loki/api/v1/query_range"
-	tailPath       = "/loki/api/v1/tail"
 )
 
 type Client struct {
@@ -99,7 +98,7 @@ func (i *Client) doQuery(ctx context.Context, path string, values url.Values) (*
 		return nil, err
 	}
 
-	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return nil, err
 	}

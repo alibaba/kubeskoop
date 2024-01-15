@@ -20,16 +20,16 @@ const DiagnosisForm: React.FunctionComponent<DiagnosisFormProps> = (props: Diagn
   };
   return (
     <Form inline labelAlign='left'>
-      <Form.Item label="源地址" required patternMessage="请输入正确的IP地址" pattern={ipRegex}>
-        <Input name="src" placeholder="请输入源IP地址" />
+      <Form.Item label="Source Address" required patternMessage='Please enter a valid IP address.' pattern={ipRegex}>
+        <Input name="src" placeholder="The source IP"/>
       </Form.Item>
-      <Form.Item label="目的地址" required patternMessage='请输入正确的IP地址' pattern={ipRegex}>
-        <Input name="dst" placeholder="请输入目的IP地址" />
+      <Form.Item label="Destination Address" required patternMessage='Please enter a valid IP address.' pattern={ipRegex}>
+        <Input name="dst" placeholder="The destination IP" />
       </Form.Item>
-      <Form.Item label="端口" required>
+      <Form.Item label="Port" required>
         <NumberPicker name="port" min={1} max={65535} hasTrigger={false}/>
       </Form.Item>
-      <Form.Item label="协议" required>
+      <Form.Item label="Protocol" required>
         <Select name="protocol">
           <Select.Option value="tcp">TCP</Select.Option>
           <Select.Option value="udp">UDP</Select.Option>
@@ -37,7 +37,7 @@ const DiagnosisForm: React.FunctionComponent<DiagnosisFormProps> = (props: Diagn
       </Form.Item>
       <Form.Item>
         <Form.Submit type="primary" validate onClick={handleSubmit}>
-          发起诊断
+          Diagnose
         </Form.Submit>
       </Form.Item>
     </Form>

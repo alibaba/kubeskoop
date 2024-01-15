@@ -37,7 +37,7 @@ const LokiArgs: React.FC<LokiArgsProps> = (props: LokiArgsProps): JSX.Element =>
   return (
     <div>
       <Box direction="row" className={styles.box}>
-        <span>地址</span>
+        <span>Address</span>
         <Input onChange={onChange} placeholder="loki-service" style={{ width: 300 }} />
       </Box>
     </div>
@@ -50,11 +50,11 @@ const AddDialog: React.FC<AddDialogProps> = (props: AddDialogProps): JSX.Element
   const [args, setArgs] = useState<any>(undefined);
   const verifyInput = (): boolean => {
     if (selection === '') {
-      Message.error('请输入名称');
+      Message.error('Please enter name.');
       return false;
     }
     if (props.type === 'event_sink' && selection === 'loki' && _.isEmpty(args?.addr)) {
-      Message.error('请输入地址');
+      Message.error('Please enter address.');
       return false;
     }
     return true;
@@ -72,14 +72,14 @@ const AddDialog: React.FC<AddDialogProps> = (props: AddDialogProps): JSX.Element
 
   return <Dialog
     v2
-    title="添加"
+    title="Add"
     visible={props.visible}
     onOk={onOk}
     onCancel={() => props.onCancel()}
     onClose={() => props.onCancel()}
   >
     <Box direction="row" className={styles.box}>
-      <span>名称</span>
+      <span>Name</span>
       {
         props.autoComplete ?
           <Select.AutoComplete

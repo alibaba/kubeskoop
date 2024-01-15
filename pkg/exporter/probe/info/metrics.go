@@ -2,6 +2,7 @@ package info
 
 import (
 	"context"
+
 	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
 	"github.com/prometheus/client_golang/prometheus"
@@ -63,11 +64,11 @@ func (m *metricsProbe) collectOnce(emit probe.Emit) error {
 	return nil
 }
 
-func (m *metricsProbe) Start(ctx context.Context) error {
+func (m *metricsProbe) Start(_ context.Context) error {
 	return nil
 }
 
-func (m *metricsProbe) Stop(ctx context.Context) error {
+func (m *metricsProbe) Stop(_ context.Context) error {
 	return nil
 }
 

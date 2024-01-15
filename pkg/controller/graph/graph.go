@@ -2,10 +2,11 @@ package graph
 
 import (
 	"fmt"
+	"strconv"
+
 	jsoniter "github.com/json-iterator/go"
 	"github.com/prometheus/common/model"
 	"github.com/samber/lo"
-	"strconv"
 )
 
 type Node struct {

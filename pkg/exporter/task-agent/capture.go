@@ -1,18 +1,19 @@
-package task_agent
+package taskagent
 
 import (
 	"context"
 	"fmt"
-	"github.com/alibaba/kubeskoop/pkg/controller/rpc"
-	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
-	"github.com/samber/lo"
-	log "github.com/sirupsen/logrus"
-	"golang.org/x/sync/errgroup"
 	"os"
 	"os/exec"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/alibaba/kubeskoop/pkg/controller/rpc"
+	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
+	"github.com/samber/lo"
+	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -21,7 +22,6 @@ const (
 )
 
 type capture struct {
-	netns          string
 	captureCommand string
 	captureFile    string
 	timeout        time.Duration
@@ -48,16 +48,17 @@ func (a *Agent) generateCaptures(id string, task *rpc.CaptureInfo) ([]capture, e
 			},
 		}
 		return files, nil
-	} else {
-		file := fmt.Sprintf("/tmp/%s_%s_host.pcap", id, task.Node.Name)
-		return []capture{
-			{
-				captureCommand: fmt.Sprintf(dumpCommand, "", file, task.GetFilter()),
-				captureFile:    file,
-				timeout:        time.Duration(task.CaptureDurationSeconds) * time.Second,
-			},
-		}, nil
 	}
+
+	file := fmt.Sprintf("/tmp/%s_%s_host.pcap", id, task.Node.Name)
+	return []capture{
+		{
+			captureCommand: fmt.Sprintf(dumpCommand, "", file, task.GetFilter()),
+			captureFile:    file,
+			timeout:        time.Duration(task.CaptureDurationSeconds) * time.Second,
+		},
+	}, nil
+
 }
 
 func (a *Agent) execute(captures []capture) (string, []byte, error) {
@@ -75,7 +76,7 @@ func (a *Agent) execute(captures []capture) (string, []byte, error) {
 				output, err = cmd.CombinedOutput()
 			}()
 			time.Sleep(task.timeout)
-			cmd.Process.Signal(syscall.SIGTERM)
+			_ = cmd.Process.Signal(syscall.SIGTERM)
 			time.Sleep(1 * time.Second)
 			if err != nil {
 				if strings.Contains(err.Error(), "no child processes") {

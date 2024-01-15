@@ -1,12 +1,13 @@
 package handler
 
 import (
-	jwt "github.com/appleboy/gin-jwt/v2"
-	"github.com/gin-gonic/gin"
-	"github.com/kubeskoop/webconsole/internal/config"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+
+	jwt "github.com/appleboy/gin-jwt/v2"
+	"github.com/gin-gonic/gin"
+	"github.com/kubeskoop/webconsole/internal/config"
 )
 
 func RegisterGrafanaProxyHandler(g *gin.RouterGroup, auth *jwt.GinJWTMiddleware) {

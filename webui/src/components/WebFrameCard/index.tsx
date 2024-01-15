@@ -12,11 +12,6 @@ const WebFrameCard: React.FC<WebFrameProps> = (props: WebFrameProps): JSX.Elemen
             <Card.Content className={styles.cardContent}>
                 <iframe className={styles.webFrame} src={props.src}></iframe>
             </Card.Content>
-            <Card.Actions className={styles.cardAction}>
-                <Button text onClick={props.onSetting}>
-                    <Icon type="set" />设置
-                </Button>
-            </Card.Actions>
         </Card>
     )
 }

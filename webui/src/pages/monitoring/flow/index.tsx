@@ -22,7 +22,7 @@ const filterFlowData = (data: FlowData, namespaces: string[], nodes: string[], s
     return !namespaces || node.type != 'pod' || namespaces.includes(node.namespace)
   })
     .filter((node: any) => {
-      return !nodes || node.type == 'external' || nodes.includes(node.nodeName)
+      return !node.length || node.type == 'external' || nodes.includes(node.nodeName)
     })
     .filter((node: any) => {
       return showExternal || node.type !== 'external'
@@ -64,7 +64,7 @@ export default function FlowDashboard() {
       setData(res);
       setLoading(false);
     }).catch(err => {
-      Message.error(`数据获取失败：${getErrorMessage(err)}`)
+      Message.error(`Error fetching data: ${getErrorMessage(err)}`)
     });
   };
   useEffect(() => getFlowData(true), []);
@@ -88,24 +88,24 @@ export default function FlowDashboard() {
   }
 
   const filtered = useMemo(
-    () => filterFlowData(data, selectedNamespaces, null, showExternal),
+    () => filterFlowData(data, selectedNamespaces, [], showExternal),
     [data, selectedNamespaces, showExternal]
   )
 
   return (
     <div>
       <PageHeader
-        title='链路图'
-        breadcrumbs={[{ name: 'Console' }, { name: '监控' }]}
+        title='Network Graph'
+        breadcrumbs={[{ name: 'Console' }, { name: 'Monitoring' }]}
       />
       <Card contentHeight="auto">
         <Card.Content style={{ paddingLeft: 0 }}>
           <Box direction="row" className={styles.contentBox}>
-            <span className={styles.optionLabel}>时间范围</span>
+            <span className={styles.optionLabel}>Time</span>
             <DatePicker2 showTime onChange={v => setTime(v)} />
           </Box>
           <Box className={styles.contentBox} direction='row'>
-            <span className={styles.optionLabel}>命名空间</span>
+            <span className={styles.optionLabel}>Namespaces</span>
             <Select
               name="namespace"
               dataSource={namespaces}
@@ -120,9 +120,9 @@ export default function FlowDashboard() {
             />
           </Box>
           <Box direction='row'>
-            <span className={styles.optionLabel}>显示集群外端点</span>
+            <span className={styles.optionLabel}>Show External Endpoints</span>
             <Switch id='showExternal' style={{ marginRight: '10px' }} onChange={onShowExternalChange} />
-            <span className={styles.optionLabel}>浏览模式</span>
+            <span className={styles.optionLabel}>ViewMode</span>
             <Radio.Group shape='button' defaultValue='graph' style={{ marginRight: '10px' }} onChange={onViewModeChange}>
               <Radio id='graph' value='graph'>Graph</Radio>
               <Radio id='table' value='table'>Table</Radio>
@@ -134,7 +134,7 @@ export default function FlowDashboard() {
               onClick={() => getFlowData(false)}
             >
               <Icon type="refresh" />
-              <span>刷新</span>
+              <span>Refresh</span>
             </Button>
           </Box>
         </Card.Content>

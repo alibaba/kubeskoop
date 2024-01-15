@@ -2,11 +2,10 @@ import PageHeader from '@/components/PageHeader';
 import WebFrameCard from '@/components/WebFrameCard';
 import { useEffect, useState } from 'react';
 import Exception from '@/components/Exception';
-import { Button, Loading, Message } from '@alifd/next';
+import { Loading, Message } from '@alifd/next';
 import store from '@/store'
 
 export default function Dashboard() {
-  const [visible, setVisible] = useState(false);
   const [loading, setLoading] = useState(true)
 
   const [dashboardConfig, dashboardConfigDispatcher] = store.useModel('dashboard');
@@ -36,16 +35,16 @@ export default function Dashboard() {
   return (
     <div>
       <PageHeader
-        title='监控'
-        breadcrumbs={[{ name: 'Console' }, { name: '监控' }, {name: 'Dashboard'}]}
+        title='Monitoring'
+        breadcrumbs={[{ name: 'Console' }, { name: 'Monitoring' }, {name: 'Dashboard'}]}
       />
       {dashboardConfig.metrics_url ? (
         <div className='web-frame'>
-          <WebFrameCard src={dashboardConfig.metrics_url} onSetting={() => setVisible(true)} />
+          <WebFrameCard src={dashboardConfig.metrics_url} />
         </div>
       ) : (
         <Loading visible={loading} style={{ display: 'block' }}>
-        <Exception title="未配置大盘链接" description="请配置大盘链接后使用" extra={<Button type="primary" onClick={() => setVisible(true)}>配置</Button>}/>
+        <Exception title="Dashboard not configured." description="Please configure dashboard url to show this page." />
         </Loading>
       )}
     </div>

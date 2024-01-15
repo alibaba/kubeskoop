@@ -141,14 +141,14 @@ const SelectorDialog: React.FunctionComponent<SelectorProps> = (props: SelectorP
   return (
     <Dialog
       v2
-      title="详情"
+      title="Add Target"
       footerActions={['ok']}
       visible={props.visible}
       onClose={props.onClose}
       onOk={()=>props.submitSelector(selectedResult())}
     >
     <Form inline labelAlign='left'>
-      <Form.Item label="抓包对象类型">
+      <Form.Item label="Type">
         <Radio.Group
           shape="button"
           value={formCaptureType}
@@ -159,20 +159,20 @@ const SelectorDialog: React.FunctionComponent<SelectorProps> = (props: SelectorP
         </Radio.Group>
       </Form.Item>
       <br/>
-      <Form.Item label="如何选择对象">
+      <Form.Item label="Select Target By">
         <Radio.Group
           shape="button"
           value={captureSelectorType}
           onChange={(value) => {setcaptureSelectorType(value); setformNamespace(""); setformName(""); filterCaptureObject(formCaptureType)}}
         >
-          <Radio value="Name">指定对象</Radio>
-          <Radio value="Selector">LabelSelector</Radio>
+          <Radio value="Name">Namespace & Name</Radio>
+          <Radio value="Selector">Label Selector</Radio>
         </Radio.Group>
       </Form.Item>
 
       {formCaptureType == "Pod" &&
         <Form.Item label="Namespace" required >
-          <Select name="namespace" placeholder="请选择Namespace" dataSource={namespaces} useDetailValue showSearch
+          <Select name="namespace" placeholder="Please select target namespace" dataSource={namespaces} useDetailValue showSearch
                   onChange={function (value) {setformNamespace(value.name); setformName(""); filterCaptureObject(formCaptureType, value.name);}}
                   itemRender={(item) => `${item.name}`} valueRender={(item) => `${item.name}`} />
         </Form.Item>
@@ -187,7 +187,7 @@ const SelectorDialog: React.FunctionComponent<SelectorProps> = (props: SelectorP
       }
       {captureSelectorType == "Name" &&
       <Form.Item label="Name" required>
-        <Select name="name" placeholder="选择抓包的对象" useDetailValue showSearch
+        <Select name="name" placeholder="Please select target name." useDetailValue showSearch
                 value = {formName}
                 dataSource={nameList}
                 itemRender={(item) => `${item.name}`} valueRender={(item) => `${item.name}`}
@@ -196,7 +196,7 @@ const SelectorDialog: React.FunctionComponent<SelectorProps> = (props: SelectorP
       </Form.Item>
       }
       {formCaptureType == "Pod" &&
-        <Form.Item label="同时抓取Node空间" >
+        <Form.Item label="Capture node simultaneously" >
           <Checkbox checked={capturePodsNodes} onChange={(value) => {setcapturePodsNodes(!capturePodsNodes); }} />
         </Form.Item>
       }

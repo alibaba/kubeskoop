@@ -12,11 +12,9 @@ export interface ILogoProps {
 
 export default function Logo({ image, text, url, imageStyle, textStyle }: ILogoProps) {
   return (
-    <div>
-      <Link to={url || '/'} className={styles.logo}>
+    <div className={styles.logo}>
         {image && <img src={image} alt="logo" style={imageStyle} />}
         <span style={textStyle}>{text}</span>
-      </Link>
     </div>
   );
 }

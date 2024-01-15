@@ -3,11 +3,12 @@ package service
 import (
 	"context"
 	"fmt"
-	"github.com/alibaba/kubeskoop/pkg/exporter/loki"
-	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
-	jsoniter "github.com/json-iterator/go"
 	"strings"
 	"time"
+
+	lokiwrapper "github.com/alibaba/kubeskoop/pkg/exporter/loki"
+	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
+	jsoniter "github.com/json-iterator/go"
 )
 
 type Event struct {

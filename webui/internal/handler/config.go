@@ -1,11 +1,12 @@
 package handler
 
 import (
+	"net/http"
+	"strings"
+
 	jwt "github.com/appleboy/gin-jwt/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/kubeskoop/webconsole/internal/service/config"
-	"net/http"
-	"strings"
 )
 
 func RegisterConfigHandler(g *gin.RouterGroup, auth *jwt.GinJWTMiddleware) {

@@ -2,8 +2,9 @@ package config
 
 import (
 	"fmt"
-	"github.com/kubeskoop/webconsole/internal/config"
 	"net/url"
+
+	"github.com/kubeskoop/webconsole/internal/config"
 )
 
 const (

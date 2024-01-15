@@ -1,9 +1,10 @@
 package config
 
 import (
-	"github.com/samber/lo"
 	"log"
 	"os"
+
+	"github.com/samber/lo"
 )
 
 var (

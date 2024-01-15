@@ -1,10 +1,11 @@
 package handler
 
 import (
+	"time"
+
 	jwt "github.com/appleboy/gin-jwt/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/kubeskoop/webconsole/internal/config"
-	"time"
 )
 
 type loginParams struct {

@@ -3,12 +3,13 @@ package lokiwrapper
 import (
 	"bytes"
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"io"
 	"net"
 	"net/http"
 	"sync"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	inspproto "github.com/alibaba/kubeskoop/pkg/exporter/probe"
 
@@ -178,36 +179,36 @@ func (i *Ingester) send(entries []*logproto.Entry) {
 
 	buf = snappy.Encode(nil, buf)
 
-	resp, body, err := i.client.sendJSONReq("POST", i.PushURL, "application/x-protobuf", buf)
+	status, body, err := i.client.sendJSONReq("POST", i.PushURL, "application/x-protobuf", buf)
 	if err != nil {
 		log.Warn("loki ingester request error", "err", err)
 		return
 	}
 
-	if resp.StatusCode != 204 {
-		log.Warn("loki ingester response error", "status", resp.StatusCode, "body", body)
+	if status != 204 {
+		log.Warn("loki ingester response error", "status", status, "body", body)
 		return
 	}
 }
 
-func (client *httpClient) sendJSONReq(method, url string, ctype string, reqBody []byte) (resp *http.Response, resBody []byte, err error) {
+func (client *httpClient) sendJSONReq(method, url string, ctype string, reqBody []byte) (int, []byte, error) {
 	req, err := http.NewRequest(method, url, bytes.NewBuffer(reqBody))
 	if err != nil {
-		return nil, nil, err
+		return 0, nil, err
 	}
 
 	req.Header.Set("Content-Type", ctype)
 
-	resp, err = client.parent.Do(req)
+	resp, err := client.parent.Do(req)
 	if err != nil {
-		return nil, nil, err
+		return 0, nil, err
 	}
 	defer resp.Body.Close()
 
-	resBody, err = io.ReadAll(resp.Body)
+	resBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, nil, err
+		return 0, nil, err
 	}
 
-	return resp, resBody, nil
+	return resp.StatusCode, resBody, nil
 }

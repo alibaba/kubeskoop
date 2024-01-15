@@ -3,17 +3,26 @@ package service
 import (
 	"context"
 	"fmt"
-	"github.com/alibaba/kubeskoop/pkg/controller/rpc"
-	"github.com/samber/lo"
 	"io"
-	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	log "k8s.io/klog/v2"
 	"os"
 	"os/exec"
 	"path"
 	"strconv"
 	"sync"
+
+	"github.com/alibaba/kubeskoop/pkg/controller/rpc"
+	"github.com/samber/lo"
+	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	log "k8s.io/klog/v2"
+)
+
+const (
+	typePod  = "Pod"
+	typeNode = "Node"
+
+	statusSuccess = "success"
+	statusFailed  = "failed"
 )
 
 type CaptureArgs struct {
@@ -106,18 +115,18 @@ func (c *controller) Capture(ctx context.Context, capture *CaptureArgs) (int, er
 			Filter:                 capture.Filter,
 		}
 		switch captureItem.Type {
-		case "Pod":
+		case typePod:
 			var err error
 			task.Pod, task.Node, _, err = c.getPodInfo(ctx, captureItem.Namespace, captureItem.Name)
 			if err != nil {
 				return 0, err
 			}
-			task.CaptureType = "Pod"
-		case "Node":
+			task.CaptureType = typePod
+		case typeNode:
 			task.Node = &rpc.NodeInfo{
 				Name: captureItem.Name,
 			}
-			task.CaptureType = "Node"
+			task.CaptureType = typeNode
 		default:
 			return 0, fmt.Errorf("invalid capture type: %v", captureItem.Type)
 		}
@@ -137,7 +146,7 @@ func (c *controller) Capture(ctx context.Context, capture *CaptureArgs) (int, er
 			return 0, err
 		}
 		var spec *TaskSpec
-		if captureInfo.GetCaptureType() == "Pod" {
+		if captureInfo.GetCaptureType() == typePod {
 			spec = &TaskSpec{
 				TaskType:  captureInfo.CaptureType,
 				Name:      captureInfo.GetPod().Name,
@@ -163,7 +172,7 @@ func (c *controller) Capture(ctx context.Context, capture *CaptureArgs) (int, er
 	return taskID, nil
 }
 
-func (c *controller) CaptureList(ctx context.Context) (map[int][]*CaptureTaskResult, error) {
+func (c *controller) CaptureList(_ context.Context) (map[int][]*CaptureTaskResult, error) {
 	results := map[int][]*CaptureTaskResult{}
 	captureTasks.Range(func(key, value interface{}) bool {
 		id := key.(int)
@@ -174,14 +183,14 @@ func (c *controller) CaptureList(ctx context.Context) (map[int][]*CaptureTaskRes
 	return results, nil
 }
 
-func (c *controller) storeCaptureFile(ctx context.Context, spec *TaskSpec, id int, result *rpc.CaptureResult) (string, error) {
+func (c *controller) storeCaptureFile(_ context.Context, spec *TaskSpec, id int, result *rpc.CaptureResult) (string, error) {
 	taskPath := fmt.Sprintf("/tmp/task_%d/", id)
 	err := os.MkdirAll(taskPath, 0755)
 	if err != nil {
 		return "", err
 	}
 	captureFileName := ""
-	if spec.TaskType == "Pod" {
+	if spec.TaskType == typePod {
 		captureFileName = fmt.Sprintf("capture_task_%d_%s_%s", id, spec.Namespace, spec.Name)
 	} else {
 		captureFileName = fmt.Sprintf("capture_task_%d_%s_%s", id, "node", spec.Name)
@@ -196,7 +205,7 @@ func (c *controller) storeCaptureFile(ctx context.Context, spec *TaskSpec, id in
 
 func (c *controller) DownloadCaptureFile(ctx context.Context, id int) (string, int64, io.ReadCloser, error) {
 	filename := fmt.Sprintf("/tmp/capture_task_%d.tar.gz", id)
-	compressResults := exec.Command("tar", "-czf", filename, fmt.Sprintf("/tmp/task_%d/", id))
+	compressResults := exec.CommandContext(ctx, "tar", "-czf", filename, fmt.Sprintf("/tmp/task_%d/", id))
 	output, err := compressResults.CombinedOutput()
 	if err != nil {
 		return "", 0, nil, fmt.Errorf("error compress capture file: %v, output: %s", err, string(output))
@@ -224,14 +233,14 @@ func (c *controller) storeCaptureResult(ctx context.Context, result *rpc.TaskRes
 				(result.GetTask().GetPod() == nil && result.GetTask().GetNode().GetName() == captureResult.Spec.Name) {
 				captureResult.Message = result.GetMessage()
 				if result.GetSuccess() {
-					captureResult.Status = "success"
+					captureResult.Status = statusSuccess
 					captureFile, err := c.storeCaptureFile(ctx, captureResult.Spec, id, result.GetCapture())
 					if err != nil {
 						return nil, fmt.Errorf("store capture file failed: %v", err)
 					}
 					captureResult.Result = captureFile
 				} else {
-					captureResult.Status = "failed"
+					captureResult.Status = statusFailed
 				}
 			}
 		}

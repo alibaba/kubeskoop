@@ -1,4 +1,4 @@
-package task_agent
+package taskagent
 
 import "testing"
 

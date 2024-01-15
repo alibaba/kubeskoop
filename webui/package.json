@@ -1,7 +1,8 @@
 {
   "name": "@ice/fusion-pro-scaffold",
-  "version": "1.2.0",
-  "description": "ice.js 3 Pro 模板（基于 Fusion Design）",
+  "version": "1.0.0",
+  "license": "Apache-2.0",
+  "description": "KubeSkoop Web Console",
   "dependencies": {
     "@alifd/next": "^1.26.8",
     "@alifd/theme-design-pro": "^0.8.0",
@@ -9,6 +10,7 @@
     "@antv/g6-react-node": "^1.4.5",
     "@ice/runtime": "^1.2.7",
     "bizcharts": "^3.5.10",
+    "build-plugin-ice-i18n": "^0.2.2",
     "d3": "^7.8.5",
     "moment": "^2.28.0",
     "react": "^18.2.0",
@@ -41,6 +43,5 @@
   },
   "publishConfig": {
     "access": "public"
-  },
-  "repository": "git@github.com:ice-lab/react-materials.git"
+  }
 }

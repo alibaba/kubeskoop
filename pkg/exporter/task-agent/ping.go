@@ -1,14 +1,15 @@
-package task_agent
+package taskagent
 
 import (
 	"context"
 	"fmt"
-	"github.com/alibaba/kubeskoop/pkg/controller/rpc"
-	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
-	log "github.com/sirupsen/logrus"
 	"os/exec"
 	"regexp"
 	"strconv"
+
+	"github.com/alibaba/kubeskoop/pkg/controller/rpc"
+	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
+	log "github.com/sirupsen/logrus"
 )
 
 var (

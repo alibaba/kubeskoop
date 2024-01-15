@@ -21,7 +21,7 @@ const Login: React.FC = () => {
 
 export const pageConfig = definePageConfig(() => {
   return {
-    title: '登录',
+    title: 'Login',
   };
 });
 

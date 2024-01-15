@@ -8,33 +8,33 @@ interface FlowTableProps {
 
 const columns = [
   {
-    title: '源',
+    title: 'Source',
     dataIndex: 'srcName',
   },
   {
-    title: '源地址',
+    title: 'Source Address',
     dataIndex: 'srcAddr',
   },
   {
-    title: '目的',
+    title: 'Destination',
     dataIndex: 'dstName',
   },
   {
-    title: '目的地址',
+    title: 'Destination Address',
     dataIndex: 'dstAddr',
   },
     {
-    title: '协议',
+    title: 'Protocol',
     dataIndex: 'protocol',
   },
   {
-    title: '字节数',
+    title: 'Bytes',
     dataIndex: 'bytes',
     sortable: true,
     sortDirections: ["desc", "asc"],
   },
   {
-    title: '数据包数',
+    title: 'Packets',
     dataIndex: 'packets',
     sortable: true,
     sortDirections: ["desc", "asc"],
@@ -119,7 +119,7 @@ const FlowTable: React.FC<FlowTableProps> = (props: FlowTableProps): JSX.Element
         current={currentPage}
         pageSize={pageSize}
         total={data.length}
-        totalRender={total => `总数：${total}`}
+        totalRender={total => `Total：${total}`}
         style={{ marginTop: 16, textAlign: 'right' }}
         onChange={onPageChange}
       />

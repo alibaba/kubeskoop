@@ -1,14 +1,17 @@
-package task_agent
+package taskagent
 
 import (
 	"context"
 	"fmt"
+	"os"
+	"time"
+
+	"google.golang.org/grpc/credentials/insecure"
+
 	"github.com/alibaba/kubeskoop/pkg/controller/rpc"
 	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
-	"os"
-	"time"
 )
 
 var (
@@ -29,7 +32,8 @@ type Agent struct {
 func (a *Agent) Run() error {
 	var opts []grpc.CallOption
 	opts = append(opts, grpc.MaxCallSendMsgSize(102*1024*1024))
-	conn, err := grpc.Dial(controllerAddr, grpc.WithDefaultCallOptions(opts...), grpc.WithInsecure())
+	conn, err := grpc.Dial(controllerAddr, grpc.WithDefaultCallOptions(opts...),
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return fmt.Errorf("failed to connect: %v", err)
 	}
@@ -43,7 +47,8 @@ func (a *Agent) Run() error {
 	}
 	reconn := func() {
 		time.Sleep(1 * time.Second)
-		conn, err = grpc.Dial(controllerAddr, grpc.WithDefaultCallOptions(opts...), grpc.WithInsecure())
+		conn, err = grpc.Dial(controllerAddr, grpc.WithDefaultCallOptions(opts...),
+			grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
 			log.Errorf("failed to connect: %v", err)
 			return
@@ -73,7 +78,11 @@ func (a *Agent) Run() error {
 					reconn()
 					continue
 				}
-				a.ProcessTasks(task)
+				err = a.ProcessTasks(task)
+				if err != nil {
+					log.Errorf("failed to process task: %v", err)
+					continue
+				}
 			}
 		}
 	}()
@@ -84,10 +93,20 @@ func (a *Agent) ProcessTasks(task *rpc.ServerTask) error {
 	log.Infof("process task: %v", task)
 	switch task.GetTask().GetType() {
 	case rpc.TaskType_Capture:
-		go a.ProcessCapture(task)
+		go func() {
+			err := a.ProcessCapture(task)
+			if err != nil {
+				log.Errorf("failed to process capture: %v", err)
+			}
+		}()
 		return nil
 	case rpc.TaskType_Ping:
-		go a.ProcessPing(task)
+		go func() {
+			err := a.ProcessPing(task)
+			if err != nil {
+				log.Errorf("failed to process ping: %v", err)
+			}
+		}()
 		return nil
 	}
 	return nil

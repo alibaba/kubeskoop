@@ -2,13 +2,10 @@ import { useState } from 'react';
 import { Outlet, useLocation } from 'ice';
 import { Shell, ConfigProvider } from '@alifd/next';
 import store from '@/store';
-import logo from '@/assets/logo.png';
-import Footer from '@/components/Footer';
 import PageNav from '@/components/PageNav';
 import HeaderAvatar from '@/components/HeaderAvatar';
-import Notice from '@/components/Notice';
-import GlobalSearch from '@/components/GlobalSearch';
 import Logo from '@/components/Logo';
+import enUS from '@alifd/next/lib/locale/en-us';
 
 
 interface IGetDevice {
@@ -48,7 +45,7 @@ export default function Layout() {
   }
 
   return (
-    <ConfigProvider device={device}>
+    <ConfigProvider device={device} locale={enUS}>
       <Shell
         style={{
           minHeight: '100vh',

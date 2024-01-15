@@ -2,9 +2,10 @@ package nettop
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/vishvananda/netlink"
 	"golang.org/x/exp/slices"
-	"os"
 )
 
 var (

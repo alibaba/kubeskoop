@@ -3,11 +3,12 @@ package service
 import (
 	"context"
 	"fmt"
-	"github.com/alibaba/kubeskoop/pkg/controller/rpc"
-	log "github.com/sirupsen/logrus"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/alibaba/kubeskoop/pkg/controller/rpc"
+	log "github.com/sirupsen/logrus"
 )
 
 type NodeInfo struct {
@@ -36,7 +37,7 @@ type PingMeshResult struct {
 }
 
 func (c *controller) dispatchPingTask(ctx context.Context, src, dst NodeInfo, taskGroup *sync.WaitGroup, latencyResult chan<- *Latency) error {
-	taskId := strconv.Itoa(int(getTaskIdx()))
+	taskID := strconv.Itoa(int(getTaskIdx()))
 	pingInfo := &rpc.PingInfo{}
 	var err error
 	switch src.Type {
@@ -67,7 +68,7 @@ func (c *controller) dispatchPingTask(ctx context.Context, src, dst NodeInfo, ta
 
 	_, err = c.commitTask(src.Nodename, &rpc.Task{
 		Type: rpc.TaskType_Ping,
-		Id:   taskId,
+		Id:   taskID,
 		TaskInfo: &rpc.Task_Ping{
 			Ping: pingInfo,
 		},
@@ -78,8 +79,8 @@ func (c *controller) dispatchPingTask(ctx context.Context, src, dst NodeInfo, ta
 	taskGroup.Add(1)
 	go func() {
 		defer taskGroup.Done()
-		result, err := c.waitTaskResult(ctx, taskId)
-		if err != nil || result.Success == false {
+		result, err := c.waitTaskResult(ctx, taskID)
+		if err != nil || !result.Success {
 			if err != nil {
 				log.Errorf("wait task result error: %v", err)
 			} else {

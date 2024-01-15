@@ -2,14 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/alibaba/kubeskoop/pkg/controller/graph"
-	"github.com/alibaba/kubeskoop/pkg/controller/rpc"
-	"github.com/alibaba/kubeskoop/pkg/controller/service"
-	exporter "github.com/alibaba/kubeskoop/pkg/exporter/cmd"
-	skoopContext "github.com/alibaba/kubeskoop/pkg/skoop/context"
-	"github.com/gin-gonic/gin"
-	"github.com/prometheus/common/model"
-	"google.golang.org/grpc"
 	"io"
 	"log"
 	"net"
@@ -21,11 +13,20 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/alibaba/kubeskoop/pkg/controller/graph"
+	"github.com/alibaba/kubeskoop/pkg/controller/rpc"
+	"github.com/alibaba/kubeskoop/pkg/controller/service"
+	exporter "github.com/alibaba/kubeskoop/pkg/exporter/cmd"
+	skoopContext "github.com/alibaba/kubeskoop/pkg/skoop/context"
+	"github.com/gin-gonic/gin"
+	"github.com/prometheus/common/model"
+	"google.golang.org/grpc"
 )
 
 const (
 	defaultAgentPort = 10263
-	defaultHttpPort  = 10264
+	defaultHTTPPort  = 10264
 )
 
 type Server struct {
@@ -75,7 +76,7 @@ func (s *Server) RunAgentServer(port int, done <-chan struct{}) {
 
 func (s *Server) RunHTTPServer(port int, done <-chan struct{}) {
 	if port == 0 {
-		port = defaultHttpPort
+		port = defaultHTTPPort
 	}
 	r := gin.New()
 	r.Use(gin.Logger())

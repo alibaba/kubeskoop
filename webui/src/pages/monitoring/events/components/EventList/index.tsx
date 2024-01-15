@@ -6,11 +6,11 @@ interface EventListProps {
   data: EventData[]
 };
 
-const renderListItem = (ev: EventData): JSX.Element => {
+const renderListItem = (ev: EventData, i: number): JSX.Element => {
   // convert nanosecond timestamp to date
   const date = new Date(ev.timestamp / 1000000);
   return (
-    <div className={styles.eventItem}>
+    <div className={styles.eventItem} key={i.toString()}>
       <div className={styles.bar} />
       <div className={styles.eventInfo}>
         <div>{date.toISOString()}</div>
@@ -18,7 +18,7 @@ const renderListItem = (ev: EventData): JSX.Element => {
       </div>
       <div>
         <div>
-          {ev.labels.map(i => <Tag className={styles.tag} size="small" color="blue">{`${i.name}: ${i.value}`}</Tag>)}
+          {ev.labels.map(i => <Tag key={i.name} className={styles.tag} size="small" color="blue">{`${i.name}: ${i.value}`}</Tag>)}
         </div>
         <div className={styles.eventMessage}>{ev.msg}</div>
       </div>

@@ -3,17 +3,18 @@ package diagnose
 import (
 	"context"
 	"fmt"
-	skoopContext "github.com/alibaba/kubeskoop/pkg/skoop/context"
 	"os"
 	"os/exec"
 	"strconv"
+
+	skoopContext "github.com/alibaba/kubeskoop/pkg/skoop/context"
 )
 
-type DiagnoseController interface {
+type Controller interface {
 	Diagnose(ctx context.Context, taskConfig *skoopContext.TaskConfig) (string, error)
 }
 
-func NewDiagnoseController() DiagnoseController {
+func NewDiagnoseController() Controller {
 	// 1. build skoop global context
 	return &diagnoser{}
 }
@@ -29,7 +30,7 @@ func (d *diagnoser) Diagnose(ctx context.Context, taskConfig *skoopContext.TaskC
 	defer os.RemoveAll(tempDir)
 
 	resultStorage := fmt.Sprintf("%v/result.json", tempDir)
-	cmd := exec.Command("skoop", "--output", resultStorage, "--format", "json",
+	cmd := exec.CommandContext(ctx, "skoop", "--output", resultStorage, "--format", "json",
 		"-s", taskConfig.Source,
 		"-d", taskConfig.Destination.Address,
 		"--dport", strconv.FormatUint(uint64(taskConfig.Destination.Port), 10))

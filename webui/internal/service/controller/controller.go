@@ -2,9 +2,10 @@ package controller
 
 import (
 	"fmt"
+	"net/http"
+
 	"github.com/imroc/req/v3"
 	"github.com/kubeskoop/webconsole/internal/config"
-	"net/http"
 )
 
 const (

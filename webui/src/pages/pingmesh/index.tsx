@@ -1,6 +1,6 @@
-import {Card, Button, Table, Message} from "@alifd/next"
+import {Card, Message} from "@alifd/next"
 import PageHeader from "@/components/PageHeader"
-import {useEffect, useState} from "react";
+import {useState} from "react";
 import PingForm from "@/pages/pingmesh/pingForm";
 import PingGraph from "@/pages/pingmesh/pingGraph";
 import pingMeshService from "@/services/pingmesh";
@@ -12,10 +12,10 @@ export default function Capture() {
     return (
         <div>
           <PageHeader
-          title='网络延迟探测'
-          breadcrumbs={[{name: 'Console'}, {name: '延迟探测'}]}
+          title='Latency Detection(PingMesh)'
+          breadcrumbs={[{name: 'Console'}, {name: 'Latency Detection'}]}
           />
-          <Card id="card-capture" title="延迟探测(PingMesh)" contentHeight="auto">
+          <Card id="card-capture" title="Detect" contentHeight="auto">
               <Card.Content>
               <PingForm onSubmit={(values) => {
                   pingMeshService.pingMeshLatency(values).then(res => {
@@ -26,7 +26,7 @@ export default function Capture() {
               }}/>
               </Card.Content>
           </Card>
-          <Card id="card-capture-tasks" title="探测结果" contentHeight="auto">
+          <Card id="card-capture-tasks" title="History" contentHeight="auto">
             <Card.Content>
               {latency && <PingGraph data={latency}/>}
             </Card.Content>

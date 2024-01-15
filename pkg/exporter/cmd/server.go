@@ -7,13 +7,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	task_agent "github.com/alibaba/kubeskoop/pkg/exporter/task-agent"
 	"net/http"
 	"os"
 	"os/signal"
 	"reflect"
 	"sync"
 	"syscall"
+
+	task_agent "github.com/alibaba/kubeskoop/pkg/exporter/task-agent"
 
 	"github.com/alibaba/kubeskoop/pkg/exporter/sink"
 
