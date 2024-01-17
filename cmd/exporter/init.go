@@ -2,6 +2,7 @@ package main
 
 import (
 	_ "github.com/alibaba/kubeskoop/pkg/exporter/probe/flow"
+	_ "github.com/alibaba/kubeskoop/pkg/exporter/probe/info"
 	_ "github.com/alibaba/kubeskoop/pkg/exporter/probe/nlconntrack"
 	_ "github.com/alibaba/kubeskoop/pkg/exporter/probe/nlqdisc"
 	_ "github.com/alibaba/kubeskoop/pkg/exporter/probe/procfd"

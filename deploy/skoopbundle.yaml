@@ -31,7 +31,7 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       initContainers:
         - name: inspector-prepare
-          image: "kubeskoop/kubeskoop:latest"
+          image: kubeskoop/kubeskoop:v1.0.0
           volumeMounts:
             - name: btf-rawdata
               mountPath: /etc/net-exporter/btf
@@ -39,7 +39,7 @@ spec:
               name: boot
           command: [btfhack, discover, -p, /etc/net-exporter/btf/]
       containers:
-      - image: "kubeskoop/kubeskoop:latest"
+      - image: kubeskoop/kubeskoop:v1.0.0
         name: inspector
         env:
         - name: INSPECTOR_NODENAME
@@ -363,6 +363,12 @@ spec:
         env:
           - name: GF_SECURITY_ADMIN_PASSWORD
             value: "kubeskoop"
+          - name: GF_SECURITY_ALLOW_EMBEDDING
+            value: "true"
+          - name: GF_SERVER_SERVE_FROM_SUB_PATH
+            value: "true"
+          - name: GF_SERVER_ROOT_URL
+            value: "/grafana"
         resources:
           limits:
             memory: "1Gi"
@@ -377,7 +383,7 @@ spec:
             name: grafana-datasources
             readOnly: false
       - name: register-dashboard
-        image: kubeskoop/kubeskoop:latest
+        image: kubeskoop/kubeskoop:v1.0.0
         env:
           - name: GRAFANA_PASSWORD
             value: "kubeskoop"
@@ -399,8 +405,7 @@ metadata:
       prometheus.io/scrape: 'true'
       prometheus.io/port:   '3000'
 spec:
-  selector:
-    app: grafana
+  selector: app: grafana
   type: NodePort
   ports:
     - port: 80
@@ -486,3 +491,173 @@ data:
 
     analytics:
       reporting_enabled: false
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: controller
+rules:
+- apiGroups: [""]
+  resources:
+  - pods
+  verbs: ["get", "list", "watch", "delete", "create"]
+- apiGroups: [""]
+  resources:
+  - nodes
+  - nodes/proxy
+  - services
+  - endpoints
+  - configmaps
+  - namespaces
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["daemonsets"]
+  verbs: ["get", "list"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["networkpolicies"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["pods/exec", "pods/attach", "pods/portforward"]
+  verbs: ["create", "get", "list", "update", "delete"]
+- nonResourceURLs: ["/metrics"]
+  verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: controller
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: kubeskoop
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: controller
+  namespace: kubeskoop
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  resourceNames: ["kubeskoop-config"]
+  verbs: ["get", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: controller
+  namespace: kubeskoop
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: controller
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: kubeskoop
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controller
+  namespace: kubeskoop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: controller
+  template:
+    metadata:
+      name: controller
+      labels:
+        app: controller
+    spec:
+      containers:
+      - name: controller
+        image: kubeskoop/kubeskoop:v1.0.0
+        command: ["/bin/controller"]
+        env:
+          - name: PROMETHEUS_ENDPOINT
+            value: http://prometheus-service
+          - name: LOKI_ENDPOINT
+            value: http://loki-service:3100
+        volumeMounts:
+          - name:  db
+            mountPath: /var/lib/kubeskoop
+      volumes:
+      - name: db
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: controller
+  namespace: kubeskoop
+spec:
+  selector:
+    app: controller
+  ports:
+    - name: grpc
+      port: 10263
+      targetPort: 10263
+    - name: http
+      port: 10264
+      targetPort: 10264
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webconsole
+  namespace: kubeskoop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: webconsole
+  template:
+    metadata:
+      name: webconsole
+      labels:
+        app: webconsole
+    spec:
+      containers:
+      - name: controller
+        image: kubeskoop/kubeskoop:v1.0.0
+        command: ["/bin/webconsole"]
+        env:
+          - name: CONTROLLER_ENDPOINT
+            value: "http://controller:10264"
+          - name: GRAFANA_PROXY
+            value: "true"
+          - name: GRAFANA_ENDPOINT
+            value: "http://grafana/grafana"
+          - name: GRAFANA_USERNAME
+            value: "admin"
+          - name: GRAFANA_PASSWORD
+            value: "kubeskoop"
+          - name: AUTH_USERNAME
+            value: "admin"
+          - name: AUTH_PASSWORD
+            value: "kubeskoop"
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: webconsole
+  namespace: kubeskoop
+spec:
+  selector:
+    app: webconsole
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080

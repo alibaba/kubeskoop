@@ -1,0 +1,22 @@
+.title:first-child {
+  margin-left: 0;
+}
+
+.title {
+  margin-right: 10px;
+  margin-left: 20px;
+}
+
+.box {
+  display: flex;
+  align-items: center;
+  margin: 20px 0;
+}
+
+.btn {
+  margin: 0 5px;
+}
+
+.select {
+  min-width: 200px;
+}

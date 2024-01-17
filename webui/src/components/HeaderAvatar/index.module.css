@@ -1,0 +1,51 @@
+.headerAvatar {
+  height: 100%;
+  padding: 10px;
+  cursor: pointer;
+}
+
+.menu {
+  line-height: 40px;
+  border: 0;
+}
+
+.menu :global .next-menu-item {
+  color: var(--color-text1-3, #666);
+}
+
+.menu :global .next-menu-item-inner {
+  height: 40px;
+}
+
+.menu :global .next-icon {
+  margin-right: 8px;
+}
+
+.profile {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: flex-start;
+  min-width: 250px;
+  padding: 8px 16px 4px;
+  font-size: 0;
+}
+
+.avatar {
+  margin-right: 12px;
+}
+
+.content {
+  flex: 1 0 auto;
+}
+
+.content h4 {
+  margin: 0;
+  font-weight: bold;
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.content span {
+  color: var(--color-text1-3, #666);
+  font-size: 12px;
+}

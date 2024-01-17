@@ -1,0 +1,104 @@
+{
+    "metric_probe": [
+        {
+            "name": "virtcmdLatency"
+        },
+        {
+            "name": "flow"
+        },
+        {
+            "name": "tcp"
+        },
+        {
+            "name": "socketlatency"
+        },
+        {
+            "name": "sock"
+        },
+        {
+            "name": "tcpsummary"
+        },
+        {
+            "name": "kernellatency"
+        },
+        {
+            "name": "netiftxlat"
+        },
+        {
+            "name": "conntrack"
+        },
+        {
+            "name": "ipvs"
+        },
+        {
+            "name": "ip"
+        },
+        {
+            "name": "io"
+        },
+        {
+            "name": "tcpext"
+        },
+        {
+            "name": "udp"
+        },
+        {
+            "name": "info"
+        },
+        {
+            "name": "qdisc"
+        },
+        {
+            "name": "fd"
+        },
+        {
+            "name": "packetloss"
+        },
+        {
+            "name": "netdev"
+        },
+        {
+            "name": "softnet"
+        },
+        {
+            "name": "netsoftirq"
+        }
+    ],
+    "event_probe": [
+        {
+            "name": "conntrack"
+        },
+        {
+            "name": "biolatency"
+        },
+        {
+            "name": "kernellatency"
+        },
+        {
+            "name": "packetloss"
+        },
+        {
+            "name": "socketlatency"
+        },
+        {
+            "name": "netiftxlat"
+        },
+        {
+            "name": "netsoftirq"
+        },
+        {
+            "name": "tcpreset"
+        },
+        {
+            "name": "virtcmdLatency"
+        }
+    ],
+    "event_sink": [
+        {
+            "name": "stderr"
+        },
+        {
+            "name": "loki"
+        }
+    ]
+}

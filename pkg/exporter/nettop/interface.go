@@ -3,10 +3,14 @@ package nettop
 import (
 	"fmt"
 	"os"
+
+	"github.com/vishvananda/netlink"
+	"golang.org/x/exp/slices"
 )
 
 var (
-	InitNetns = 0
+	InitNetns             = 0
+	defaultInterfaceNames = []string{"eth0", "eno0"}
 )
 
 // GetEntityByNetns get entity by netns, if netns was deleted asynchrously, return nil; otherwise return error
@@ -60,4 +64,26 @@ func GetNodeName() string {
 	}
 
 	return node
+}
+
+func GetNodeIPs() ([]string, error) {
+	links, err := netlink.LinkList()
+	if err != nil {
+		return nil, err
+	}
+
+	var ret []string
+	for _, l := range links {
+		if slices.Contains(defaultInterfaceNames, l.Attrs().Name) {
+			addrs, err := netlink.AddrList(l, netlink.FAMILY_V4)
+			if err != nil {
+				return nil, err
+			}
+			for _, addr := range addrs {
+				ret = append(ret, addr.IP.String())
+			}
+			break
+		}
+	}
+	return ret, nil
 }

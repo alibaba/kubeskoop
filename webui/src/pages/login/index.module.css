@@ -1,0 +1,12 @@
+.container {
+  display: flex;
+  align-items: center;
+  height: 100vh;
+  background-image: url('https://img.alicdn.com/tfs/TB1L.owp1H2gK0jSZJnXXaT1FXa-2880-1770.png');
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.content {
+  width: 100%;
+}
