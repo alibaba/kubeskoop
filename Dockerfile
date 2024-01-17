@@ -12,7 +12,7 @@ WORKDIR /go/src/github.com/alibaba/kubeskoop/
 ADD . /go/src/github.com/alibaba/kubeskoop/
 RUN mkdir -p bin && make all
 
-FROM docker.io/library/node:20.9.0-alpine as build-ui
+FROM --platform=linux/amd64 docker.io/library/node:20.9.0-alpine as build-ui
 WORKDIR /webconsole
 ADD ./webui /webconsole
 RUN yarn install && yarn build
