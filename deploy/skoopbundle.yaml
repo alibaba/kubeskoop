@@ -120,6 +120,7 @@ data:
     port: 9102
     metrics:
       probes:
+      - name: info
       - name: netdev
       - name: io
       - name: socketlatency
@@ -130,6 +131,7 @@ data:
       - name: tcpext
       - name: udp
       - name: packetloss
+      - name: flow
     event:
       probes:
       - name: packetloss
@@ -405,7 +407,8 @@ metadata:
       prometheus.io/scrape: 'true'
       prometheus.io/port:   '3000'
 spec:
-  selector: app: grafana
+  selector:
+    app: grafana
   type: NodePort
   ports:
     - port: 80
