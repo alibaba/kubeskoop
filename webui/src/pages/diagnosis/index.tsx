@@ -13,7 +13,7 @@ const makeAction = (d: DiagnosisResult, showMessageDialog: (message: string) => 
   switch (d.status) {
     case "success":
       return (<span>
-        <Button text type="primary" style={{marginRight: '5px'}}><Link className="next-btn-helper" style={{color: 'inherit'}} to={`/diagnosis/result/${d.task_id}`}>查看结果</Link></Button>
+        <Button text type="primary" style={{marginRight: '5px'}}><Link className="next-btn-helper" style={{color: 'inherit'}} to={`/diagnosis/result/${d.task_id}`}>Result</Link></Button>
         {d.message ? <Button text type="primary" onClick={(() => showMessageDialog(d.message))}>Log</Button> : null }
       </span>)
     case "failed":

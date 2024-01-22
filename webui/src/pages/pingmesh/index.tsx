@@ -26,7 +26,7 @@ export default function Capture() {
               }}/>
               </Card.Content>
           </Card>
-          <Card id="card-capture-tasks" title="History" contentHeight="auto">
+          <Card id="card-capture-tasks" title="Result" contentHeight="auto">
             <Card.Content>
               {latency && <PingGraph data={latency}/>}
             </Card.Content>

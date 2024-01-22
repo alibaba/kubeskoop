@@ -10,8 +10,6 @@ import (
 const (
 	dashboardUID        = "PtAs82D4k"
 	metricsDashboardURL = "/d/%s/skoop-exporter?orgId=1&kiosk=tv&theme=light&from=now-15m&to=now&refresh=10s"
-	eventDashboardURL   = ""
-	flowDashboardURL    = ""
 )
 
 type DashboardConfig struct {

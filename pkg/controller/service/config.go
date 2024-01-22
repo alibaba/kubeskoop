@@ -8,7 +8,7 @@ import (
 )
 
 func (c *controller) GetExporterConfig(ctx context.Context) (*exporter.InspServerConfig, error) {
-	cm, err := c.getConfigMap(ctx, c.ConfigMapNamespace, c.ConfigMapName)
+	cm, err := c.getConfigMap(ctx, c.Namespace, c.ConfigMapName)
 	if err != nil {
 		return nil, err
 	}
@@ -22,7 +22,7 @@ func (c *controller) GetExporterConfig(ctx context.Context) (*exporter.InspServe
 }
 
 func (c *controller) UpdateExporterConfig(ctx context.Context, cfg *exporter.InspServerConfig) error {
-	cm, err := c.getConfigMap(ctx, c.ConfigMapNamespace, c.ConfigMapName)
+	cm, err := c.getConfigMap(ctx, c.Namespace, c.ConfigMapName)
 	if err != nil {
 		return err
 	}
@@ -31,5 +31,5 @@ func (c *controller) UpdateExporterConfig(ctx context.Context, cfg *exporter.Ins
 		return err
 	}
 	cm.Data["config.yaml"] = string(data)
-	return c.updateConfigMap(ctx, c.ConfigMapNamespace, c.ConfigMapName, cm)
+	return c.updateConfigMap(ctx, c.Namespace, c.ConfigMapName, cm)
 }
