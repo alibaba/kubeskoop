@@ -1,8 +1,6 @@
 # KubeSkoop
 
-![kubeskoop](https://img.shields.io/github/v/tag/alibaba/kubeskoop)
-![license](https://img.shields.io/badge/license-Apache-blue)
-[![Go Report Card](https://goreportcard.com/badge/github.com/alibaba/kubeskoop)](https://goreportcard.com/report/github.com/alibaba/kubeskoop)
+![logo](docs/images/kubeskoop_logo.svg)
 
 [English](./README.md) | 简体中文
 
@@ -37,80 +35,82 @@ KubeSkoop是一个Kubernetes网络诊断工具。针对不同的网络插件和I
 #### 网络异常事件识别
 
 - 数十种网络异常场景的自动分析识别
+- 通过Web Console或Grafana Loki展示网络异常事件
 
-- 通过Grafana Loki展示网络异常事件
+#### 用户友好的Web控制台
+
+- 集成KubeSkoop所有能力，提供网络诊断、异常事件监控、抓包、延迟探测等功能。
 
 ## 快速开始
 
 完整的文档可以直接访问[KubeSkoop.io](https://kubeskoop.io/) 。
 
-### 诊断网络不通问题
+### 安装
 
-#### 诊断命令安装
+你可以通过[skoopbundle.yaml](deploy/skoopbundle.yaml)文件快速部署KubeSkoop、Prometheus、Grafana和Loki至你的集群。
 
-通过`go install`来安装KubeSkoop的诊断客户端：
-
-```shell
-go install github.com/alibaba/kubeskoop/cmd/skoop@main
+```bash
+kubectl apply -f https://github.com/alibaba/kubeskoop/deploy/skoopbundle.yaml
 ```
 
-也可以使用`docker run` 执行`skoop`命令
+***备注: skoopbundle.yaml以最小副本和默认配置启动，不适用于生产环境***
 
-```shell
-docker run -v ~/.kube:/root/.kube --rm kubeskoop/kubeskoop:latest skoop
+在安装完成并启动后，你可以通过`webconsole`服务来访问KubeSkoop Web控制台。
+
+```bash
+kubectl get svc -n kubeskoop webconsole
 ```
 
-#### 一键诊断
+你可能需要使用`NodePort` 或`LoadBalancer`类型的服务从集群外访问。
 
-```shell
-$ skoop -s 172.18.0.4 -d 10.96.0.10 -p 53 --http # 执行诊断命令，通过src,dst指定源地址和目的地址，使用--http通过本地web服务展示诊断结果
-I0118 11:43:23.383446    6280 web.go:97] http server listening on http://127.0.0.1:8080 # 在诊断完成后，将会显示用于查看诊断结果的链接
-```
+控制台的默认用户为`admin`，密码为`kubeskoop`。
 
-或者通过`docker run`命令执行
+![Web Console](docs/images/web_console.png)
 
-```shell
-$ docker run -p 8080:8080 -v ~/.kube:/root/.kube kubeskoop/kubeskoop:latest skoop -s 172.18.0.4 -d 10.96.0.10 -p 53 --http --http-address 0.0.0.0:8080 # 执行诊断命令，通过src,dst指定源地址和目的地址，使用--http通过本地web服务展示诊断结果, 地址设置为0.0.0.0:8080
-I0118 11:43:23.383446    6280 web.go:97] http server listening on http://0.0.0.0:8080 # 在诊断完成后，将会显示用于查看诊断结果的链接
-```
+### 诊断网络问题
 
-通过浏览器打开`http://127.0.0.1:8080`后可以看到诊断结果：  
-![diagnose_web](/docs/images/intro_diagnose_web.jpg)
+#### 网络连通性诊断
 
-### 诊断网络抖动和网络性能问题
+可以通过Web控制台对集群内网络发起连通性诊断。
 
-#### 安装网络监控组件
+![Diagnose](docs/images/diagnose.png)
 
-通过以下步骤，可以在Kubernetes集群中快速部署Skoop exporter及其与Prometheus，Grafana和Loki构成的可观测性组合：
+在Diagnosis - Connectivity Diagnosis下输入诊断的源地址、目的地址、端口和协议，点击`Diagnose` 发起诊断。诊断完成后，可以在列表中看到诊断结果。
 
-```shell
-kubectl apply -f https://raw.githubusercontent.com/alibaba/kubeskoop/main/deploy/skoopbundle.yaml
-```
+![Diagnosis Result](docs/images/diagnosis_result.png)
 
-通过以下步骤，确认安装完成以及获取访问入口：
+#### 抓包
 
-```shell
-# 查看KubeSkoop exporter状态
-kubectl get pod -n kubeskoop -l app=kubeskoop-exporter -o wide
-# 查看探针状态
-kubectl get --raw /api/v1/namespaces/kubeskoop/pods/kubeskoop-exporter-t4d9m:9102/proxy/status |jq .
-# 获得Prometheus服务的访问入口，服务默认为NodePort类型
-kubectl get service -n kubeskoop prometheus-service -o wide
-# 获得Grafana控制台服务的访问入口，服务默认为NodePort类型
-kubectl get service -n kubeskoop grafana -o wide
-```
+你可以在Diagnosis - Packet Capturing中进行集群内Node/Pod的抓包操作。
 
-***备注: skoopbundle.yaml以最小副本方式启动，不适用于生产环境***
+![Packet Capturing](docs/images/packet_capturing.png)
 
-#### 查看网络抖动和性能分析
+#### 延迟探测
 
-打开Grafana的Service访问入口，打开网络监控的页面，查看对应性能问题时间点的各深度指标的水位情况。例如：
-![grafana_performance](/docs/images/monitoring.png)
+在Diagnosis - Latency Detection中，对集群内多个Node/Pod之间的网络延迟进行探测。
 
-#### 网络抖动事件
+![Latency Detection](docs/images/ping_mesh.png)
 
-打开Grafana的Service访问入口，打开Loki的页面，查看对应网络抖动时间点对应的事件，以及网络监控页面对应的水位情况。
-![grafana_performance](/docs/images/loki_tracing.png)
+### 监控集群网络
+
+#### 查看网络抖动和性能大盘
+
+在Monitoring - Dashboard中，可以查看当前集群内网络大盘，从大盘中可查询对应性能问题时间点的各深度指标的水位情况。
+![grafana_performance](docs/images/monitoring.png)
+
+#### 查看网络抖动事件
+
+在Monitoring - Event下，可以看到当前时间点集群内产生的异常事件。你也可以手动选择需要的时间范围，或者根据事件类型、节点、事件产生的Pod命名空间/名称等信息进行筛选。
+
+点击右上角的`Live`，可以实时根据当前筛选条件，实时监控集群内事件。
+
+![Events](docs/images/events.png)
+
+#### 网络链路图
+
+在主页或Monitoring - Network Graph中，可以看到当前集群内的网络实际链路图，并通过时间、命名空间进行筛选。你也可以将模式改为`Table`按条查看连接信息。
+
+![Network Graph Table](docs/images/network_graph_table.png)
 
 ## 贡献说明
 

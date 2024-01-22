@@ -1,5 +1,7 @@
 # KubeSkoop
 
+![logo](docs/images/kubeskoop_logo.svg)
+
 ![kubeskoop](https://img.shields.io/github/v/tag/alibaba/kubeskoop)
 ![license](https://img.shields.io/badge/license-Apache-blue)
 [![Go Report Card](https://goreportcard.com/badge/github.com/alibaba/kubeskoop)](https://goreportcard.com/report/github.com/alibaba/kubeskoop)
@@ -24,7 +26,7 @@ monitoring and analysis of the kernel's critical path by eBPF, to resolve most o
 
 - Diagnose in-cluster traffic between Pod,Service,Node and Ingress/Egress Traffic.
 - Cover whole linux network stack: Socket,Bridge,Veth,Netfilter,sysctls…
-- Support IAAS network probe for cloud providers.
+- Support IaaS network probe for cloud providers.
 
 #### In-Depth Kernel Monitor
 
@@ -35,82 +37,81 @@ monitoring and analysis of the kernel's critical path by eBPF, to resolve most o
 #### Network Anomaly Event
 
 - support dozens of anomy scenes recognition
-- export anomy event to Grafana Loki
+- export anomy event to Grafana Loki or Web Console
+
+#### User-friendly Web Console
+
+- Integrating all capabilities of KubeSkoop, provides network diagnosis, event monitoring, packet capturing, latency detection, etc.
 
 ## Quick Start
 
 You can view the full documentation from the [KubeSkoop.io](https://kubeskoop.io/).
 
-### One-Shot diagnose persistent network failure
+### Installation
 
-#### Install KubeSkoop command
+You can quickly deploy KubeSkoop, Prometheus, Grafana and Loki to your cluster via [skoopbundle.yaml](deploy/skoopbundle.yaml).
 
-Through `go install` to install KubeSkoop cli：
-
-```shell
-go install github.com/alibaba/kubeskoop/cmd/skoop@main
+```bash
+kubectl apply -f https://github.com/alibaba/kubeskoop/deploy/skoopbundle.yaml
 ```
 
-You can also run `skoop` command via `docker run`:
+***Note: skoopbundle.yaml starts with the minimum number of replicas and default configurations, which is not suitable for production environments.***
 
-```shell
-docker run -v ~/.kube:/root/.kube --rm kubeskoop/kubeskoop:latest skoop
+When installation is done, you can acess the KubeSkoop Web Console by service `webconsole`.
+
+```bash
+kubectl get svc -n kubeskoop webconsole
 ```
 
-#### One-Shot Diagnose
+You may need a `Nodeport` or `LoadBalancer` to acess from outside of the cluster.
 
-```shell
-$ skoop -s 172.18.0.4 -d 10.96.0.10 -p 53 --http # Execute the diagnostic command, specify the src,dst, and use --http to provide the diagnostic result through the local web service
-I0118 11:43:23.383446    6280 web.go:97] http server listening on http://127.0.0.1:8080 # After the diagnosis is completed, a link to the diagnosis result will be output
-```
+Default username is `admin`, and password is `kubeskoop`.
 
-or via `docker run`:
+![Web Console](docs/images/web_console.png)
 
-```shell
-$ docker run -p 8080:8080 -v ~/.kube:/root/.kube kubeskoop/kubeskoop:latest skoop -s 172.18.0.4 -d 10.96.0.10 -p 53 --http --http-address=0.0.0.0:8080 # Execute the diagnostic command, specify the src,dst, and use --http to provide the diagnostic result through the local web service with address 0.0.0.0:8080
-I0118 11:43:23.383446    6280 web.go:97] http server listening on http://0.0.0.0:8080 # After the diagnosis is completed, a link to the diagnosis result will be output
-```
+### Network diagnosis
 
-Open the diagnosis result `http://127.0.0.1:8080` through browser：  
-![diagnose_web](/docs/images/intro_diagnose_web.jpg)
+#### Connectivity Diagnosis
+
+Connectivity diagnosis can be submitted through the web console.
+
+![Diagnose](docs/images/diagnose.png)
+
+Under **Diagnosis - Connectivity Diagnosis**, you can enter the source address, destination address, port, and protocol for diagnosis, and click `Diagnose` to submit the diagnosis. After the diagnosis is complete, you can see the result in the history list.
+
+![Diagnosis Result](docs/images/diagnosis_result.png)
+
+#### Packet Capturing
+
+Under **Diagnosis - Packet Capturing**，you can perform packet capturing for node/pod in the cluster.
+
+![Packet Capturing](docs/images/packet_capturing.png)
+
+#### Latency Detection
+
+Under **Diagnosis - Latency Detection**，you can detect latencies between multiple nodes and pods.
+
+![Latency Detection](docs/images/ping_mesh.png)
 
 ### Monitor network jitter and bottlenecks
 
-#### Install monitor components
+#### Network Performance Dashboard
 
-The KubeSkoop exporter bundles with Prometheus, Grafana, and Loki
-can be quickly deployed in a Kubernetes cluster by following these steps:
+View the network permance dashboard from **Monitoring - Dashboard**. In the dashboard, you can check the water level of each monitor item corresponding to the time point of the performance problem.  
+![grafana_performance](docs/images/monitoring.png)
 
-```shell
-kubectl apply -f https://raw.githubusercontent.com/alibaba/kubeskoop/main/deploy/skoopbundle.yaml
-```
+#### Network Jitter & Anomy Event Analysis
 
-Confirm that the installation is complete and obtain access through the following steps：
+Under **Monitoring - Event**, you can view the anomaly events occurring within the cluster at the current time point. You can also manually select the desired time range, or filter based on event type, node, and information such as the namespace/name of the Pod where the event occurred.
 
-```shell
-# View the status of KubeSkoop exporter
-kubectl get pod -n kubeskoop -l app=kubeskoop-exporter -o wide
-# View the status of Probe collection probes
-kubectl get --raw /api/v1/namespaces/kubeskoop/pods/kubeskoop-exporter-t4d9m:9102/proxy/status |jq .
-# Obtain the entrance of Prometheus service, which is exposed by NodePort by default
-kubectl get service -n kubeskoop prometheus-service -o wide
-# Obtain the access entry of the Grafana console, which is exposed by NodePort by default
-kubectl get service -n kubeskoop grafana -o wide
-```
+Click `Live` on the right top to view the live event stream according to the current filters.
+![Events](docs/images/events.png)
 
-***Note: skoopbundle.yaml starts with a minimal copy, not suitable for production environments***
+#### Network Link Graph
 
-#### network performance analysis
+Under the homepage or **Monitoring - Network Graph**, you can see the actual network link graph in the cluster, with time and namespaces. You can also switch view mode to `Table` to view each connection.
 
-Open the NodePort Service of grafana on web browser, open the network monitoring page,
-and check the water level of each monitor item corresponding to the time point of the performance problem. For example：  
-![grafana_performance](/docs/images/monitoring.png)
-
-#### network jitter & anomy event analysis
-
-Open the NodePort Service of grafana on web browser, open the Loki page,
-check the events corresponding to the time point of network jitter and the water level corresponding to the network monitoring page.
-![grafana_performance](/docs/images/loki_tracing.png)
+![Network Graph Table](docs/images/network_graph_table.png)
 
 ## Contributing
 
