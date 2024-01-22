@@ -14,15 +14,18 @@ type Controller interface {
 	Diagnose(ctx context.Context, taskConfig *skoopContext.TaskConfig) (string, error)
 }
 
-func NewDiagnoseController() Controller {
+func NewDiagnoseController(namespace string) Controller {
 	// 1. build skoop global context
-	return &diagnoser{}
+	return &Diagnostor{
+		namespace: namespace,
+	}
 }
 
-type diagnoser struct {
+type Diagnostor struct {
+	namespace string
 }
 
-func (d *diagnoser) Diagnose(ctx context.Context, taskConfig *skoopContext.TaskConfig) (string, error) {
+func (d *Diagnostor) Diagnose(ctx context.Context, taskConfig *skoopContext.TaskConfig) (string, error) {
 	tempDir, err := os.MkdirTemp("/tmp", "skoop")
 	if err != nil {
 		return "", fmt.Errorf("failed create temp dir: %v", err)
@@ -33,7 +36,10 @@ func (d *diagnoser) Diagnose(ctx context.Context, taskConfig *skoopContext.TaskC
 	cmd := exec.CommandContext(ctx, "skoop", "--output", resultStorage, "--format", "json",
 		"-s", taskConfig.Source,
 		"-d", taskConfig.Destination.Address,
-		"--dport", strconv.FormatUint(uint64(taskConfig.Destination.Port), 10))
+		"--dport", strconv.FormatUint(uint64(taskConfig.Destination.Port), 10),
+		"--protocol", taskConfig.Protocol,
+		"--collector-namespace", d.namespace,
+	)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("failed to diagnose: %v, output: %v", err, string(output))

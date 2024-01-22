@@ -118,6 +118,7 @@ data:
   config.yaml: |-
     debugmode: true
     port: 9102
+    enable_controller: true
     metrics:
       probes:
       - name: info
@@ -503,10 +504,6 @@ metadata:
 rules:
 - apiGroups: [""]
   resources:
-  - pods
-  verbs: ["get", "list", "watch", "delete", "create"]
-- apiGroups: [""]
-  resources:
   - nodes
   - nodes/proxy
   - services
@@ -520,9 +517,6 @@ rules:
 - apiGroups: ["networking.k8s.io"]
   resources: ["networkpolicies"]
   verbs: ["get", "list"]
-- apiGroups: [""]
-  resources: ["pods/exec", "pods/attach", "pods/portforward"]
-  verbs: ["create", "get", "list", "update", "delete"]
 - nonResourceURLs: ["/metrics"]
   verbs: ["get"]
 ---
@@ -549,6 +543,13 @@ rules:
   resources: ["configmaps"]
   resourceNames: ["kubeskoop-config"]
   verbs: ["get", "update"]
+- apiGroups: [""]
+  resources:
+  - pods
+  verbs: ["get", "list", "watch", "delete", "create"]
+- apiGroups: [""]
+  resources: ["pods/exec", "pods/attach", "pods/portforward"]
+  verbs: ["create", "get", "list", "update", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

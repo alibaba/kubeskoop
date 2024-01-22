@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -44,7 +43,6 @@ type ControllerService interface {
 
 func NewControllerService() (ControllerService, error) {
 	ctrl := &controller{
-		diagnosor:      diagnose.NewDiagnoseController(),
 		taskWatcher:    sync.Map{},
 		resultWatchers: sync.Map{},
 	}
@@ -83,29 +81,31 @@ func NewControllerService() (ControllerService, error) {
 		ctrl.lokiClient = lokiClient
 	}
 
-	if configMap, ok := os.LookupEnv("KUBESKOOP_CONFIGMAP"); ok {
-		c := strings.Split(configMap, "/")
-		if len(c) != 2 {
-			return nil, fmt.Errorf("invalid configmap format %s", configMap)
-		}
-		ctrl.ConfigMapNamespace = c[0]
-		ctrl.ConfigMapName = c[1]
+	if namespace, ok := os.LookupEnv("NAMESPACE"); ok {
+		ctrl.Namespace = namespace
 	} else {
-		ctrl.ConfigMapNamespace = "kubeskoop"
+		ctrl.Namespace = "kubeskoop"
+	}
+
+	if configMap, ok := os.LookupEnv("KUBESKOOP_CONFIGMAP"); ok {
+		ctrl.ConfigMapName = configMap
+	} else {
 		ctrl.ConfigMapName = "kubeskoop-config"
 	}
+
+	ctrl.diagnostor = diagnose.NewDiagnoseController(ctrl.Namespace)
 
 	return ctrl, nil
 }
 
 type controller struct {
 	rpc.UnimplementedControllerRegisterServiceServer
-	diagnosor          diagnose.Controller
-	k8sClient          *kubernetes.Clientset
-	taskWatcher        sync.Map
-	resultWatchers     sync.Map
-	promClient         api.Client
-	lokiClient         *lokiwrapper.Client
-	ConfigMapNamespace string
-	ConfigMapName      string
+	diagnostor     diagnose.Controller
+	k8sClient      *kubernetes.Clientset
+	taskWatcher    sync.Map
+	resultWatchers sync.Map
+	promClient     api.Client
+	lokiClient     *lokiwrapper.Client
+	Namespace      string
+	ConfigMapName  string
 }

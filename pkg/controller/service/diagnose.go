@@ -13,13 +13,13 @@ import (
 
 // todo reflect to generic task definition
 type DiagnoseTaskResult struct {
-	TaskID     int64  `json:"task_id" db:"id"`
-	TaskConfig string `json:"task_config" db:"config"`
-	StartTime  string `json:"start_time" db:"start_time"`
-	FinishTime string `json:"finish_time" db:"finish_time"`
-	Status     string `json:"status" db:"status"`
-	Result     string `json:"result" db:"result"`
-	Message    string `json:"message" db:"message"`
+	TaskID     int64   `json:"task_id" db:"id"`
+	TaskConfig string  `json:"task_config" db:"config"`
+	StartTime  string  `json:"start_time" db:"start_time"`
+	FinishTime *string `json:"finish_time" db:"finish_time"`
+	Status     string  `json:"status" db:"status"`
+	Result     *string `json:"result" db:"result"`
+	Message    *string `json:"message" db:"message"`
 }
 
 func (c *controller) Diagnose(_ context.Context, args *skoopContext.TaskConfig) (int64, error) {
@@ -33,15 +33,17 @@ func (c *controller) Diagnose(_ context.Context, args *skoopContext.TaskConfig) 
 	task.TaskID = id
 
 	go func() {
-		result, err := c.diagnosor.Diagnose(context.TODO(), args)
+		result, err := c.diagnostor.Diagnose(context.TODO(), args)
 
-		task.FinishTime = time.Now().Format("2006-01-02 15:04:05")
+		finishTime := time.Now().Format("2006-01-02 15:04:05")
+		task.FinishTime = &finishTime
 		if err != nil {
 			task.Status = "failed"
-			task.Message = err.Error()
+			message := err.Error()
+			task.Message = &message
 		} else {
 			task.Status = "success"
-			task.Message = result
+			task.Result = &result
 		}
 
 		updateTask(&task)

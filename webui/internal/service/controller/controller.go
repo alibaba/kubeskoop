@@ -25,13 +25,13 @@ type DiagnosisTask struct {
 }
 
 type DiagnosisTaskResult struct {
-	TaskID     int    `json:"task_id"`
-	TaskConfig string `json:"task_config"`
-	StartTime  string `json:"start_time"`
-	FinishTime string `json:"finish_time"`
-	Status     string `json:"status"`
-	Result     string `json:"result"`
-	Message    string `json:"message"`
+	TaskID     int     `json:"task_id"`
+	TaskConfig string  `json:"task_config"`
+	StartTime  string  `json:"start_time"`
+	FinishTime *string `json:"finish_time"`
+	Status     string  `json:"status"`
+	Result     *string `json:"result"`
+	Message    *string `json:"message"`
 }
 
 type responseError struct {
