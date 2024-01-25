@@ -27,7 +27,7 @@ import (
 
 // nolint
 const (
-	ModuleName = "insp_socketlatency" // nolint
+	ModuleName = "socketlatency" // nolint
 
 	SOCKETLAT_READSLOW = "SOCKETLAT_READSLOW"
 	SOCKETLAT_SENDSLOW = "SOCKETLAT_SENDSLOW"
