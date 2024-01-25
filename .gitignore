@@ -7,6 +7,7 @@ pkg/exporter/proto/github.com/alibaba/kubeskoop/proto/inspector_grpc.pb.go
 
 # dependencies
 webui/node_modules
+vendor
 
 # testing
 webui/coverage
@@ -27,6 +28,7 @@ pnpm-debug.log*
 
 # local env files
 .env*.local
+bin
 
 # tmp
 .ice
