@@ -15,14 +15,20 @@ type Controller interface {
 }
 
 func NewDiagnoseController(namespace string) Controller {
+	diagnoseArgs := ""
+	if diagnoseArgsFromEnv, ok := os.LookupEnv("KUBESKOOP_DIAGNOSE_ARGS"); ok {
+		diagnoseArgs = diagnoseArgsFromEnv
+	}
 	// 1. build skoop global context
 	return &Diagnostor{
-		namespace: namespace,
+		namespace:    namespace,
+		diagnoseArgs: diagnoseArgs,
 	}
 }
 
 type Diagnostor struct {
-	namespace string
+	namespace    string
+	diagnoseArgs string
 }
 
 func (d *Diagnostor) Diagnose(ctx context.Context, taskConfig *skoopContext.TaskConfig) (string, error) {
@@ -39,6 +45,7 @@ func (d *Diagnostor) Diagnose(ctx context.Context, taskConfig *skoopContext.Task
 		"--dport", strconv.FormatUint(uint64(taskConfig.Destination.Port), 10),
 		"--protocol", taskConfig.Protocol,
 		"--collector-namespace", d.namespace,
+		d.diagnoseArgs,
 	)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
