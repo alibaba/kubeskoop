@@ -32,11 +32,11 @@ const (
 	SOCKETLAT_READSLOW = "SOCKETLAT_READSLOW"
 	SOCKETLAT_SENDSLOW = "SOCKETLAT_SENDSLOW"
 
-	READ100MS  = "socketlatencyread100ms"
-	READ300MS  = "socketlatencyread300ms"
-	READ1MS    = "socketlatencyread1ms"
-	WRITE100MS = "socketlatencywrite100ms"
-	WRITE1MS   = "socketlatencywrite1ms"
+	READ100MS  = "read100ms"
+	READ300MS  = "read300ms"
+	READ1MS    = "read1ms"
+	WRITE100MS = "write100ms"
+	WRITE1MS   = "write1ms"
 
 	/*
 		#define ACTION_READ	    1

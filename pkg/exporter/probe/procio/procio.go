@@ -14,10 +14,10 @@ import (
 )
 
 const (
-	IOReadSyscall  = "ioreadsyscall"
-	IOWriteSyscall = "iowritesyscall"
-	IOReadBytes    = "ioreadbytes"
-	IOWriteBytes   = "iowritebytes"
+	IOReadSyscall  = "readsyscall"
+	IOWriteSyscall = "writesyscall"
+	IOReadBytes    = "readbytes"
+	IOWriteBytes   = "writebytes"
 
 	probeName = "io" // nolint
 )

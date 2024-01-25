@@ -24,16 +24,18 @@ import (
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -cflags $BPF_CFLAGS -type insp_softirq_event_t bpf ../../../../bpf/net_softirq.c -- -I../../../../bpf/headers -D__TARGET_ARCH_x86
 const (
-	NETSOFTIRQ_SCHED_SLOW   = "net_softirq_schedslow"       //nolint
-	NETSOFTIRQ_SCHED_100MS  = "net_softirq_schedslow100ms"  //nolint
-	NETSOFTIRQ_EXCUTE_SLOW  = "net_softirq_excuteslow"      //nolint
-	NETSOFTIRQ_EXCUTE_100MS = "net_softirq_excuteslow100ms" //nolint
+	NETSOFTIRQ_SCHED_SLOW   = "schedslow"       //nolint
+	NETSOFTIRQ_SCHED_100MS  = "schedslow100ms"  //nolint
+	NETSOFTIRQ_EXCUTE_SLOW  = "excuteslow"      //nolint
+	NETSOFTIRQ_EXCUTE_100MS = "excuteslow100ms" //nolint
 )
 
 var (
 	metrics          = []string{NETSOFTIRQ_SCHED_SLOW, NETSOFTIRQ_SCHED_100MS, NETSOFTIRQ_EXCUTE_SLOW, NETSOFTIRQ_EXCUTE_100MS}
 	probeName        = "netsoftirq"
-	_netSoftirqProbe = &netSoftirqProbe{}
+	_netSoftirqProbe = &netSoftirqProbe{
+		metricsMap: make(map[string]map[uint32]uint64),
+	}
 )
 
 func init() {

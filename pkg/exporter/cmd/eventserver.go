@@ -110,6 +110,7 @@ func (m *EventProbeManager) CreateProbe(config ProbeConfig) (probe.EventProbe, e
 }
 
 func (m *EventProbeManager) StartProbe(ctx context.Context, probe probe.EventProbe) error {
+	log.Infof("start event probe %s", probe.Name())
 	return probe.Start(ctx)
 }
 

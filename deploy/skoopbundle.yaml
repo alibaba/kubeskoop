@@ -131,7 +131,6 @@ data:
       - name: tcp
       - name: tcpext
       - name: udp
-      - name: packetloss
       - name: flow
     event:
       probes:
