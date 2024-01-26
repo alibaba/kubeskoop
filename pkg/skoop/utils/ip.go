@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"net"
+	"strings"
 )
 
 func MatchPrefix(ip, cidr string) (bool, error) {
@@ -27,4 +28,8 @@ func IPMatchPrefix(ip net.IP, cidr string) (bool, error) {
 
 func CompareRoute() {
 	panic("xx")
+}
+
+func ConvertNICNameInSysctls(nicName string) string {
+	return strings.Replace(nicName, ".", "/", -1)
 }

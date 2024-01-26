@@ -376,8 +376,8 @@ func (h *calicoHost) basicCheck() error {
 	h.net.AssertNoPolicyRoute()
 	h.net.AssertNetDevice(h.iface, netstack.Interface{MTU: 1500, State: netstack.LinkUP})
 	h.net.AssertSysctls(map[string]string{
-		"net.ipv4.ip_forward":                               "1",
-		fmt.Sprintf("net.ipv4.conf.%s.forwarding", h.iface): "1",
+		"net.ipv4.ip_forward": "1",
+		fmt.Sprintf("net.ipv4.conf.%s.forwarding", utils.ConvertNICNameInSysctls(h.iface)): "1",
 	}, model.SuspicionLevelFatal)
 	return nil
 }
@@ -765,7 +765,7 @@ func (h *calicoHost) assertInterface(ifName string) {
 	}
 	h.net.AssertNetDevice(ifName, netstack.Interface{State: netstack.LinkUP})
 	h.net.AssertSysctls(map[string]string{
-		fmt.Sprintf("net.ipv4.conf.%s.forwarding", ifName): "1",
+		fmt.Sprintf("net.ipv4.conf.%s.forwarding", utils.ConvertNICNameInSysctls(ifName)): "1",
 	}, model.SuspicionLevelWarning)
 }
 
