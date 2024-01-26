@@ -1,9 +1,15 @@
 import { EventData } from "@/services/event";
-import { List, Tag } from "@alifd/next";
+import { Button, List, Tag } from "@alifd/next";
 import styles from './index.module.css'
 
 interface EventListProps {
   data: EventData[]
+};
+
+const EventMessage = ({msg}): JSX.Element => {
+  return <div>
+      <span className={styles.eventMessage}>{msg}</span>
+    </div>;
 };
 
 const renderListItem = (ev: EventData, i: number): JSX.Element => {
@@ -18,9 +24,9 @@ const renderListItem = (ev: EventData, i: number): JSX.Element => {
       </div>
       <div>
         <div>
-          {ev.labels.map(i => <Tag key={i.name} className={styles.tag} size="small" color="blue">{`${i.name}: ${i.value}`}</Tag>)}
+          {ev.labels.filter(i => i.value !== '').map(i => <Tag key={i.name} className={styles.tag} size="small" color="blue">{`${i.name}: ${i.value}`}</Tag>)}
         </div>
-        <div className={styles.eventMessage}>{ev.msg}</div>
+        <EventMessage msg={ev.msg}/>
       </div>
     </div>
   )

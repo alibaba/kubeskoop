@@ -89,7 +89,7 @@ export default function Events() {
     return filteredNamespaces?.length ?
       pods.filter((i) => {
         return filteredNamespaces.includes(i.namespace)
-      }).map(i => i.name) : pods.map(i => i.name) ;
+      }).map(i => i.name) : pods.map(i => i.name);
   }, [pods, filteredNamespaces])
 
   const nodeNames = useMemo(() => nodes.map(i => i.name), [nodes])
@@ -112,13 +112,15 @@ export default function Events() {
           <Box direction="row" className={styles.box}>
             <span className={styles.title}>Event Type</span>
             <Select className={styles.select} mode="tag" dataSource={eventTypes} onChange={v => setFilteredTypes(v)} disabled={isLive} />
-            <span className={styles.title}>Nodes</span>
+            <span className={styles.title} style={{width: 50, minWidth: 50}}>Nodes</span>
             <Select className={styles.select} mode="tag" dataSource={nodeNames} onChange={v => setFilteredNodes(v)} disabled={isLive} />
+            </Box>
+            <Box direction="row" className={styles.box}>
             <span className={styles.title}>Namespaces</span>
             <Select className={styles.select} mode="tag" dataSource={namespaces} onChange={v => setFilteredNamespaces(v)} disabled={isLive} />
-            <span className={styles.title}>Pods</span>
+            <span className={styles.title} style={{width: 50, minWidth: 50}}>Pods</span>
             <Select className={styles.select} mode="tag" dataSource={podNames} onChange={v => setFilteredPods(v)} disabled={isLive} />
-            <div style={{ marginLeft: "auto" }}>
+            <div style={{ marginLeft: "auto", paddingLeft: 10, display: 'flex' }}>
               <Button
                 disabled={isLive}
                 className={styles.btn}

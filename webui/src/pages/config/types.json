@@ -1,7 +1,7 @@
 {
     "metric_probe": [
         {
-            "name": "virtcmdLatency"
+            "name": "virtcmdlatency"
         },
         {
             "name": "flow"

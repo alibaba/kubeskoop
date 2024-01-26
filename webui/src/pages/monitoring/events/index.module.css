@@ -5,6 +5,8 @@
 .title {
   margin-right: 10px;
   margin-left: 20px;
+  width: 80px;
+  min-width: 80px;
 }
 
 .box {

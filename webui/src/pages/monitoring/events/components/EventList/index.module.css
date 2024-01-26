@@ -2,16 +2,26 @@
   background-color: rgb(235, 245, 255);
   font-size: 15px;
   display: flex;
-  align-items: center;
-  height: 4em;
+  /* align-items: center; */
+  min-height: 4em;
   margin-bottom: 10px;
+  padding: 5px 0;
 }
 
 .eventInfo {
   margin-right: 20px;
+  height: 4em;
 }
 
 .eventMessage {
+  display: inline-block;
+  white-space: pre-wrap;
+  /* height: 1em; */
+  overflow: hidden;
+}
+
+.expandBtn {
+  display: inline-block;
 }
 
 .eventType {
