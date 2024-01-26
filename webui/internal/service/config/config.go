@@ -9,7 +9,7 @@ import (
 
 const (
 	dashboardUID        = "PtAs82D4k"
-	metricsDashboardURL = "/d/%s/skoop-exporter?orgId=1&kiosk=tv&theme=light&from=now-15m&to=now&refresh=10s"
+	metricsDashboardURL = "/d/%s/skoop-exporter?orgId=1&theme=light&from=now-15m&to=now&refresh=10s"
 )
 
 type DashboardConfig struct {

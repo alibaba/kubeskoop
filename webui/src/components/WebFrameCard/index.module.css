@@ -3,6 +3,7 @@
   width: 100%;
   height: 80vh;
   min-height: 860px;
+  margin-top: -40px; /* grafana header is 40px height https://github.com/grafana/grafana/blob/ae2e1aeee4c02fd213f3b25254c9fd8c237392df/public/app/core/components/AppChrome/types.ts#L2-L3 */
 }
 
 .cardAction {
