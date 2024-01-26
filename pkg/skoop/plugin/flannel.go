@@ -263,7 +263,7 @@ func (r *flannelRoute) AssertBackend(pkt *model.Packet) error {
 		})
 		r.localNetAssertion.AssertSysctls(map[string]string{
 			fmt.Sprintf("net.ipv4.conf.%s.forwarding",
-				strings.Replace(hostInfo.Dev.Name, ".", "/", -1)): "1",
+				utils.ConvertNICNameInSysctls(hostInfo.Dev.Name)): "1",
 		}, model.SuspicionLevelFatal)
 		if hostInfo.BackendType == "vxlan" {
 			err = r.localNetAssertion.AssertVxlanVtep(hostInfo.Vtep, hostInfo.NodeIP, flannelVxlanInterface)
@@ -902,10 +902,10 @@ func (h *flannelHost) basicCheck() error {
 	})
 	h.net.AssertHostBridge(h.bridge)
 	h.net.AssertSysctls(map[string]string{
-		"net.bridge.bridge-nf-call-iptables":                 "1",
-		"net.ipv4.ip_forward":                                "1",
-		fmt.Sprintf("net.ipv4.conf.%s.forwarding", h.bridge): "1",
-		fmt.Sprintf("net.ipv4.conf.%s.forwarding", h.iface):  "1",
+		"net.bridge.bridge-nf-call-iptables": "1",
+		"net.ipv4.ip_forward":                "1",
+		fmt.Sprintf("net.ipv4.conf.%s.forwarding", utils.ConvertNICNameInSysctls(h.bridge)): "1",
+		fmt.Sprintf("net.ipv4.conf.%s.forwarding", utils.ConvertNICNameInSysctls(h.iface)):  "1",
 	}, model.SuspicionLevelFatal)
 
 	return nil
