@@ -3,6 +3,7 @@
 
 body {
   -webkit-font-smoothing: antialiased;
+  min-width: 1100px;
 }
 
 .next-loading {
