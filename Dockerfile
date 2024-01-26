@@ -23,6 +23,7 @@ RUN apk add --no-cache \
     iproute2 \
     ipset \
     iptables \
+    iptables-legacy \
     ipvsadm \
     jq \
     strace \
