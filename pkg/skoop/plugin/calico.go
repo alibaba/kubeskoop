@@ -29,6 +29,7 @@ import (
 )
 
 type CalicoConfig struct {
+	HostMTU    int
 	PodMTU     int
 	IPIPPodMTU int
 	Interface  string
@@ -37,6 +38,8 @@ type CalicoConfig struct {
 func (c *CalicoConfig) BindFlags(fs *pflag.FlagSet) {
 	fs.StringVarP(&c.Interface, "calico-host-interface", "", "",
 		"Host interface for calico plugin.")
+	fs.IntVarP(&c.HostMTU, "calico-host-mtu", "", 1500,
+		"Host MTU for calico plugin. Host interface MTU in BGP mode.")
 	fs.IntVarP(&c.PodMTU, "calico-pod-mtu", "", 1500,
 		"Pod MTU for calico plugin. Pod interface MTU in BGP mode.")
 	fs.IntVarP(&c.IPIPPodMTU, "calico-ipip-pod-mtu", "", 1480,
@@ -65,6 +68,7 @@ const (
 
 type CalicoPluginOptions struct {
 	InfraShim        network.InfraShim
+	HostMTU          int
 	PodMTU           int
 	IPIPPodMTU       int
 	ServiceProcessor service.Processor
@@ -266,6 +270,7 @@ func NewCalicoPluginWithOptions(ctx *ctx.Context, options *CalicoPluginOptions) 
 		hostOptions: &calicoHostOptions{
 			Interface: options.Interface,
 			IPPools:   ippools.Items,
+			MTU:       options.HostMTU,
 		},
 	}, nil
 }
@@ -274,6 +279,7 @@ func NewCalicoPlugin(ctx *ctx.Context, serviceProcessor service.Processor, infra
 	options := &CalicoPluginOptions{
 		InfraShim:        infraShim,
 		PodMTU:           Calico.PodMTU,
+		HostMTU:          Calico.HostMTU,
 		IPIPPodMTU:       Calico.IPIPPodMTU,
 		ServiceProcessor: serviceProcessor,
 		Interface:        Calico.Interface,
@@ -284,6 +290,7 @@ func NewCalicoPlugin(ctx *ctx.Context, serviceProcessor service.Processor, infra
 
 type calicoHostOptions struct {
 	Interface string
+	MTU       int
 	Gateway   net.IP
 	IPPools   []calicov3.IPPool
 }
@@ -293,6 +300,7 @@ type calicoHost struct {
 	nodeInfo *k8s.NodeInfo
 
 	iface            string
+	mtu              int
 	ipCache          *k8s.IPCache
 	infraShim        network.InfraShim
 	serviceProcessor service.Processor
@@ -324,6 +332,7 @@ func newCalicoHost(ipCache *k8s.IPCache, nodeInfo *k8s.NodeInfo, infraShim netwo
 		netNode:          netNode,
 		nodeInfo:         nodeInfo,
 		iface:            options.Interface,
+		mtu:              options.MTU,
 		ipCache:          ipCache,
 		serviceProcessor: serviceProcessor,
 		network:          ipNet,
@@ -374,7 +383,7 @@ func (h *calicoHost) initRoute() error {
 func (h *calicoHost) basicCheck() error {
 	h.net.AssertDefaultRule()
 	h.net.AssertNoPolicyRoute()
-	h.net.AssertNetDevice(h.iface, netstack.Interface{MTU: 1500, State: netstack.LinkUP})
+	h.net.AssertNetDevice(h.iface, netstack.Interface{MTU: h.mtu, State: netstack.LinkUP})
 	h.net.AssertSysctls(map[string]string{
 		"net.ipv4.ip_forward": "1",
 		fmt.Sprintf("net.ipv4.conf.%s.forwarding", utils.ConvertNICNameInSysctls(h.iface)): "1",
