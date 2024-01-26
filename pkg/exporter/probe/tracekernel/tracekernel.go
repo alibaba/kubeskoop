@@ -40,10 +40,10 @@ const (
 	HOOK_IPOUTPUT    = "ip_output"
 	HOOK_IPOUTPUTFIN = "ip_finish_output2"
 
-	RXKERNEL_SLOW_METRIC      = "kernellatency_rxslow"
-	TXKERNEL_SLOW_METRIC      = "kernellatency_txslow"
-	RXKERNEL_SLOW100MS_METRIC = "kernellatency_rxslow100ms"
-	TXKERNEL_SLOW100MS_METRIC = "kernellatency_txslow100ms"
+	RXKERNEL_SLOW_METRIC      = "rxslow"
+	TXKERNEL_SLOW_METRIC      = "txslow"
+	RXKERNEL_SLOW100MS_METRIC = "rxslow100ms"
+	TXKERNEL_SLOW100MS_METRIC = "txslow100ms"
 
 	probeTypeEvent   = 0
 	probeTypeMetrics = 1

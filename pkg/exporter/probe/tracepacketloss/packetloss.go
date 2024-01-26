@@ -173,17 +173,17 @@ func (p *packetLossProbe) start(ctx context.Context, probeType probe.Type) (err 
 			_ = p.cleanup()
 			return
 		}
+	}
 
-		if p.refcnt[probe.ProbeTypeEvent] == 1 {
-			p.perfReader, err = perf.NewReader(p.objs.bpfMaps.InspPlEvent, int(unsafe.Sizeof(bpfInspPlEventT{})))
-			if err != nil {
-				log.Errorf("%s error create perf reader, err: %v", probeName, err)
-				_ = p.stop(ctx, probeType)
-				return
-			}
-
-			go p.perfLoop()
+	if p.refcnt[probe.ProbeTypeEvent] == 1 {
+		p.perfReader, err = perf.NewReader(p.objs.bpfMaps.InspPlEvent, int(unsafe.Sizeof(bpfInspPlEventT{})))
+		if err != nil {
+			log.Errorf("%s error create perf reader, err: %v", probeName, err)
+			_ = p.stop(ctx, probeType)
+			return
 		}
+
+		go p.perfLoop()
 	}
 	return nil
 }
@@ -343,9 +343,9 @@ func (p *packetLossProbe) perfLoop() {
 			strs = append(strs, sym.GetExpr())
 		}
 
-		stackStr := strings.Join(strs, " ")
+		stackStr := strings.Join(strs, "\n")
 
-		evt.Message = fmt.Sprintf("%s stacktrace:%s", tuple, stackStr)
+		evt.Message = fmt.Sprintf("%s\nstacktrace:\n%s", tuple, stackStr)
 
 		if p.sink != nil {
 			log.Debugf("%s sink event %s", probeName, util.ToJSONString(evt))

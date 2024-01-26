@@ -24,17 +24,19 @@ import (
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -cflags $BPF_CFLAGS -type insp_virtcmdlat_event_t  bpf ../../../../bpf/virtcmdlatency.c -- -I../../../../bpf/headers -D__TARGET_ARCH_x86
 
 const (
-	VIRTCMD100MS  = "virtcmdlatency100ms"
-	VIRTCMD       = "virtcmdlatency"
+	VIRTCMD100MS  = "latency100ms"
+	VIRTCMD       = "latency"
 	VIRTCMDEXCUTE = "VIRTCMDEXCUTE"
 
 	fn        = "virtnet_send_command"
-	probeName = "virtcmdLatency"
+	probeName = "virtcmdlatency"
 )
 
 var (
 	metrics              = []string{VIRTCMD100MS, VIRTCMD}
-	_virtcmdLatencyProbe = &virtcmdLatencyProbe{}
+	_virtcmdLatencyProbe = &virtcmdLatencyProbe{
+		metricsMap: make(map[string]map[uint32]uint64),
+	}
 )
 
 func init() {

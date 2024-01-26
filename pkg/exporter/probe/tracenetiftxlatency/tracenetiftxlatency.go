@@ -27,8 +27,8 @@ import (
 //
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -cflags $BPF_CFLAGS -type insp_nftxlat_event_t -type insp_nftxlat_metric_t bpf ../../../../bpf/netiftxlatency.c -- -I../../../../bpf/headers -D__TARGET_ARCH_x86
 const (
-	TXLAT_QDISC_SLOW  = "netiftxlat_qdiscslow100ms"
-	TXLAT_NETDEV_SLOW = "netiftxlat_netdevslow100ms"
+	TXLAT_QDISC_SLOW  = "qdiscslow100ms"
+	TXLAT_NETDEV_SLOW = "netdevslow100ms"
 )
 
 var (
