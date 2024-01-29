@@ -8,6 +8,7 @@ import flowService, { FlowData } from '@/services/flow'
 import { getErrorMessage } from '@/utils';
 import { Dayjs } from 'dayjs';
 import * as dayjs from 'dayjs';
+import { definePageConfig } from "ice";
 
 const getNamespaces = (data: any) => {
   return data.nodes.map((node: any) => {
@@ -149,3 +150,10 @@ export default function FlowDashboard() {
     </div>
   );
 }
+
+export const pageConfig = definePageConfig(() => {
+  return {
+    title: 'Network Graph',
+  };
+});
+

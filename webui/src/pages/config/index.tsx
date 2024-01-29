@@ -7,6 +7,7 @@ import AddDialog, { SelectableItem, Selection } from "./components/AddDialog";
 import probeTypes from "./types.json"
 import { getErrorMessage } from "@/utils"
 import _ from "lodash"
+import { definePageConfig } from "ice";
 
 const METRIC_PROBE = "metric_probe"
 const EVENT_PROBE = "event_probe"
@@ -189,3 +190,9 @@ export default function Config() {
     </div>
   );
 }
+
+export const pageConfig = definePageConfig(() => {
+  return {
+    title: 'Node Configuration',
+  };
+});

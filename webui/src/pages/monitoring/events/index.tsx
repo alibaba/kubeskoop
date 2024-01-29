@@ -10,6 +10,7 @@ import { getErrorMessage } from '@/utils';
 import EventList from './components/EventList';
 import styles from './index.module.css'
 import { useRequest } from '@ice/plugin-request/hooks';
+import { definePageConfig } from "ice";
 
 export default function Events() {
   const [eventData, setEventData] = useState<EventData[]>([]);
@@ -151,3 +152,9 @@ export default function Events() {
     </div>
   );
 }
+
+export const pageConfig = definePageConfig(() => {
+  return {
+    title: 'Events',
+  };
+});
