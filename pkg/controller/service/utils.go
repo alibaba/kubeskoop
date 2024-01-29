@@ -18,8 +18,9 @@ func (c *controller) getPodInfo(ctx context.Context, podNamespace, podName strin
 		return nil, nil, "", fmt.Errorf("pod %s/%s is not running", podNamespace, podName)
 	}
 	pi := &rpc.PodInfo{
-		Name:      podName,
-		Namespace: podNamespace,
+		Name:        podName,
+		Namespace:   podNamespace,
+		HostNetwork: p.Spec.HostNetwork,
 	}
 	ni := &rpc.NodeInfo{
 		Name: p.Spec.NodeName,
