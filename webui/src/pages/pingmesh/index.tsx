@@ -4,7 +4,8 @@ import {useState} from "react";
 import PingForm from "@/pages/pingmesh/pingForm";
 import PingGraph from "@/pages/pingmesh/pingGraph";
 import pingMeshService from "@/services/pingmesh";
-import {getErrorMessage} from "@/utils";
+import { getErrorMessage } from "@/utils";
+import { definePageConfig } from "ice";
 
 export default function Capture() {
     const [latency, setLatency] = useState()
@@ -34,3 +35,9 @@ export default function Capture() {
         </div>
     )
 }
+
+export const pageConfig = definePageConfig(() => {
+  return {
+    title: 'Latency Detection',
+  };
+});

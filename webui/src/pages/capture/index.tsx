@@ -6,6 +6,7 @@ import { CaptureTask } from "@/services/capture";
 import captureService from "@/services/capture"
 import { useEffect, useState } from "react";
 import { getErrorMessage } from "@/utils";
+import { definePageConfig } from "ice";
 
 const submitCapture = (props, callback) => {
   const task: CaptureTask = {
@@ -76,3 +77,9 @@ export default function Capture() {
     </div>
   )
 }
+
+export const pageConfig = definePageConfig(() => {
+  return {
+    title: 'Packet Capturing',
+  };
+});

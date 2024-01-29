@@ -7,6 +7,7 @@ import { DiagnosisResult, DiagnosisTask } from "@/services/diagnosis"
 import { Link } from "@ice/runtime"
 import diagnosisService from '@/services/diagnosis'
 import { getErrorMessage } from "@/utils"
+import { definePageConfig } from "ice";
 
 
 const makeAction = (d: DiagnosisResult, showMessageDialog: (message: string) => void): JSX.Element | null => {
@@ -119,3 +120,10 @@ export default function Diagnosis() {
     </div>
   );
 }
+
+export const pageConfig = definePageConfig(() => {
+  return {
+    title: 'Connectivity Diagnosis',
+  };
+});
+

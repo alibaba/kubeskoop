@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Exception from '@/components/Exception';
 import { Loading, Message } from '@alifd/next';
 import store from '@/store'
+import { definePageConfig } from "ice";
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(true)
@@ -50,3 +51,9 @@ export default function Dashboard() {
     </div>
   );
 }
+
+export const pageConfig = definePageConfig(() => {
+  return {
+    title: 'Dashboard',
+  };
+});
