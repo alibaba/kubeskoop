@@ -15,6 +15,7 @@ export default function Dashboard() {
   useEffect(() => {
       dashboardConfigDispatcher.fetchDashboardConfig()
       .then(() => {
+        localStorage.setItem("SearchBar_Hidden", "true")
         if(effectsState.fetchDashboardConfig.error) {
           Message.error(`Error when fetching dashboard config: ${effectsState.fetchDashboardConfig.error.response.data.error}`)
         }
