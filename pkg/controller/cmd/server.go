@@ -47,6 +47,7 @@ func (s *Server) Run(agentPort int, httpPort int) {
 	done := make(chan struct{})
 	go s.RunAgentServer(agentPort, done)
 	go s.RunHTTPServer(httpPort, done)
+	go s.controller.Run(done)
 
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGTERM)

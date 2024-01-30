@@ -24,6 +24,7 @@ import (
 
 type ControllerService interface {
 	rpc.ControllerRegisterServiceServer
+	Run(done <-chan struct{})
 	GetAgentList() []*rpc.AgentInfo
 	Capture(ctx context.Context, capture *CaptureArgs) (int, error)
 	CaptureList(ctx context.Context) (map[int][]*CaptureTaskResult, error)
@@ -63,6 +64,10 @@ func NewControllerService() (ControllerService, error) {
 		return nil, fmt.Errorf("error create k8s client, err: %v", err)
 	}
 
+	if os.Getenv("KUBERNETES_RESOURCE_INFORMER") == "enable" {
+		ctrl.InitInformer()
+	}
+
 	if promEndpoint, ok := os.LookupEnv("PROMETHEUS_ENDPOINT"); ok {
 		promClient, err := api.NewClient(api.Config{
 			Address: promEndpoint,
@@ -100,6 +105,7 @@ func NewControllerService() (ControllerService, error) {
 
 type controller struct {
 	rpc.UnimplementedControllerRegisterServiceServer
+	ControllerInformer
 	diagnostor     diagnose.Controller
 	k8sClient      *kubernetes.Clientset
 	taskWatcher    sync.Map
@@ -108,4 +114,8 @@ type controller struct {
 	lokiClient     *lokiwrapper.Client
 	Namespace      string
 	ConfigMapName  string
+}
+
+func (c *controller) Run(stop <-chan struct{}) {
+	c.RunInformer(stop)
 }
