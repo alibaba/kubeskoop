@@ -1,4 +1,4 @@
-import {Card, Message} from "@alifd/next"
+import {Card, Icon, Message} from "@alifd/next"
 import PageHeader from "@/components/PageHeader"
 import {useState} from "react";
 import PingForm from "@/pages/pingmesh/pingForm";
@@ -9,6 +9,7 @@ import { definePageConfig } from "ice";
 
 export default function Capture() {
     const [latency, setLatency] = useState()
+    const [detecting, setDetecting] = useState(false)
 
     return (
         <div>
@@ -19,7 +20,10 @@ export default function Capture() {
           <Card id="card-capture" title="Detect" contentHeight="auto">
               <Card.Content>
               <PingForm onSubmit={(values) => {
+                setDetecting(true)
+                setLatency(undefined)
                   pingMeshService.pingMeshLatency(values).then(res => {
+                    setDetecting(false)
                     setLatency(res)
                   }).catch(err => {
                     Message.error(`error get ping mesh result：${getErrorMessage(err)}`)
@@ -28,6 +32,9 @@ export default function Capture() {
               </Card.Content>
           </Card>
           <Card id="card-capture-tasks" title="Result" contentHeight="auto">
+            <Card.Content>
+              {detecting && <span style={{color: 'orange', fontSize: 20}}> <Icon size="xs" type="loading" />Latency Detecting</span>}
+            </Card.Content>
             <Card.Content>
               {latency && <PingGraph data={latency}/>}
             </Card.Content>

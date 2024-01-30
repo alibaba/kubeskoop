@@ -49,9 +49,9 @@ const toGraphData = (data: any): GraphData => {
       id: item.id,
       source: nodeID(item.source),
       target: nodeID(item.destination),
-      latency_avg: item.latency_avg.toFixed(3),
-      latency_max: item.latency_max.toFixed(3),
-      latency_min: item.latency_min.toFixed(3),
+      latency_avg: item.latency_avg < 9000? item.latency_avg.toFixed(3) : "failed",
+      latency_max: item.latency_max < 9000? item.latency_max.toFixed(3) : "failed",
+      latency_min: item.latency_min < 9000? item.latency_min.toFixed(3) : "failed",
       curvature: 0.3,
     }
   });
@@ -72,13 +72,14 @@ const PingGraph: React.FC<PingGraphProps> = (props: PingGraphProps): JSX.Element
   }, []);
   return (
     <div style={{
+      position: "relative",
       height: "400px",
-      width: "900px",
+      width: "1000px",
       display: "inline-flex",
     }}>
       <div style={{
         height: "400px",
-        width: "600px",
+        width: "1000px",
       }}>
       <ForceGraph2D ref={ref} graphData={graphData}
                     linkCurveRotation="rotation"
@@ -87,7 +88,7 @@ const PingGraph: React.FC<PingGraphProps> = (props: PingGraphProps): JSX.Element
                     linkDirectionalParticles={2}
                     linkCurvature={0.3}
                     nodeRelSize={6}
-                    width={600}
+                    width={1000}
                     height={400}
                     enableNodeDrag={true}
                     onNodeDragEnd={node => {
@@ -108,6 +109,9 @@ const PingGraph: React.FC<PingGraphProps> = (props: PingGraphProps): JSX.Element
                     linkCanvasObjectMode={() => 'after'}
                     linkLabel={(link) => `${link.source.name}->${link.target.name} max/avg/min ${link.latency_max}/${link.latency_avg}/${link.latency_min} ms`}
                     linkColor={(link) => {
+                      if (link.latency_avg === "failed") {
+                        return 'red'
+                      }
                       return link.latency_avg > 1 ? (link.latency_avg > 100 ? 'red' : 'orange') : 'green'
                     }}
                     linkCanvasObject={(link, ctx) => {
@@ -145,7 +149,7 @@ const PingGraph: React.FC<PingGraphProps> = (props: PingGraphProps): JSX.Element
                       // maintain label vertical orientation for legibility
                       if (textAngle > Math.PI / 2) textAngle = -(Math.PI - textAngle);
                       if (textAngle < -Math.PI / 2) textAngle = -(-Math.PI - textAngle);
-                      const label = `${link.latency_avg}ms`;
+                      const label = link.latency_avg==="failed"? "failed" : `${link.latency_avg}ms`;
                       // estimate fontSize to fit in link length
                       ctx.font = '1px Sans-Serif';
                       const fontSize = Math.min(MAX_FONT_SIZE, maxTextLength / ctx.measureText(label).width);
@@ -167,7 +171,7 @@ const PingGraph: React.FC<PingGraphProps> = (props: PingGraphProps): JSX.Element
                     }}
       />
       </div>
-      <div style={{float: 'right', width: '200px', display: 'inline-block'}}>
+      <div style={{float: 'right', width: '200px', position: 'absolute', top: '0px', right: '0px'}}>
         <div><span style={{color: 'red'}}>---  </span><span>latency &gt; 100ms or failed</span></div>
         <div><span style={{color: 'orange'}}>---  </span><span>1ms &lt; latency &lt; 100ms</span></div>
         <div><span style={{color: 'green'}}>---  </span><span>latency &lt; 1ms</span></div>

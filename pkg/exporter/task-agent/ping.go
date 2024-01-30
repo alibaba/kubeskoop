@@ -39,7 +39,7 @@ func getLatency(pingResult string) (float64, float64, float64, error) {
 
 func (a *Agent) ping(task *rpc.PingInfo) (string, error) {
 	var pingCmd string
-	if task.Pod != nil {
+	if task.Pod != nil && !task.Pod.HostNetwork {
 		var podEntry *nettop.Entity
 		entries := nettop.GetAllEntity()
 		for _, e := range entries {

@@ -59,6 +59,7 @@ message Task {
 message PodInfo {
   string name = 1;
   string namespace = 2;
+  bool hostNetwork = 3;
 }
 
 message NodeInfo {

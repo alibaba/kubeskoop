@@ -28,7 +28,7 @@ type capture struct {
 }
 
 func (a *Agent) generateCaptures(id string, task *rpc.CaptureInfo) ([]capture, error) {
-	if task.Pod != nil {
+	if task.Pod != nil && !task.Pod.HostNetwork {
 		var podEntry *nettop.Entity
 		entries := nettop.GetAllEntity()
 		for _, e := range entries {
