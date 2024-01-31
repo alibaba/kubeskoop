@@ -121,7 +121,7 @@ Skoop-exporter支持的配置项如下:
 | io                                 | Infromation of io syscalls, support metrics                                                                          | `true`                             |
 | socketlatency                      | Latency statistics of socket recv/send syscalls, support metrics  and events                                         | `true`                             |
 | packetloss                         | Infromation of io syscalls, support metrics                                                                          | `true`                             |
-| net_softirq                        | Network softirq sched and excute latency, support metrics and events                                                 | `true`                             |
+| softirq                            | softirq sched and excute latency, support metrics and events                                                         | `true`                             |
 | tcpext                             | Infromation of tcp netstat, support metrics                                                                          | `true`                             |
 | tcpsummary                         | Infromation of tcp detail connection statistic, support metrics                                                      | `true`                             |
 | tcp                                | Infromation of snmp statistics, support metrics                                                                      | `true`                             |

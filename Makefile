@@ -48,6 +48,10 @@ build-btfhack:
 build-webconsole:
 	cd webui && CGO_ENABLED=0 go build -o ../bin/webconsole -ldflags $(ldflags) .
 
+.PHONY: generate-btf
+generate-btf:
+	go generate ./pkg/exporter/probe/...
+
 .PHONY: image
 image: ## build kubeskoop image
 	docker build -t $(SKOOP_REPO):$(TAG) .

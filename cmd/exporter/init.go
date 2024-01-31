@@ -18,9 +18,9 @@ import (
 	_ "github.com/alibaba/kubeskoop/pkg/exporter/probe/tracebiolatency"
 	_ "github.com/alibaba/kubeskoop/pkg/exporter/probe/tracekernel"
 	_ "github.com/alibaba/kubeskoop/pkg/exporter/probe/tracenetiftxlatency"
-	_ "github.com/alibaba/kubeskoop/pkg/exporter/probe/tracenetsoftirq"
 	_ "github.com/alibaba/kubeskoop/pkg/exporter/probe/tracepacketloss"
 	_ "github.com/alibaba/kubeskoop/pkg/exporter/probe/tracesocketlatency"
+	_ "github.com/alibaba/kubeskoop/pkg/exporter/probe/tracesoftirq"
 	_ "github.com/alibaba/kubeskoop/pkg/exporter/probe/tracetcpreset"
 	_ "github.com/alibaba/kubeskoop/pkg/exporter/probe/tracevirtcmdlat"
 )
