@@ -49,6 +49,10 @@ type Node struct {
 }
 
 func (c *controller) PodList(ctx context.Context) ([]*Pod, error) {
+	if c.podInformer != nil {
+		return c.podListWithInformer(ctx)
+	}
+
 	pods, err := c.k8sClient.CoreV1().Pods("").List(ctx, v1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("list pods failed: %v", err)
