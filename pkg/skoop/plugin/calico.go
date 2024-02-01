@@ -4,9 +4,13 @@ import (
 	"context"
 	"crypto/sha1"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net"
 	"strings"
+
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 
 	"k8s.io/klog/v2"
 
@@ -76,7 +80,6 @@ type CalicoPluginOptions struct {
 }
 
 type calicoPlugin struct {
-	calicoClient     *clientset.Clientset
 	serviceProcessor service.Processor
 	podMTU           int
 	ipipPodMTU       int
@@ -112,6 +115,45 @@ func getIPPool(ipPools []calicov3.IPPool, ip net.IP) *calicov3.IPPool {
 	}
 
 	return &matchedPool
+}
+
+func listIPPools(ctx *ctx.Context) ([]calicov3.IPPool, error) {
+	client, err := clientset.NewForConfig(ctx.KubernetesRestClient())
+	if err != nil {
+		return nil, err
+	}
+
+	ippools, err := client.ProjectcalicoV3().IPPools().List(context.TODO(), metav1.ListOptions{})
+	if err == nil {
+		return ippools.Items, nil
+	}
+
+	klog.V(5).Infof("not able to list projectcalico.org/v3 ippools, error %s, fallback to list crd.", err)
+	dynClient, err := dynamic.NewForConfig(ctx.KubernetesRestClient())
+	if err != nil {
+		return nil, err
+	}
+
+	gvr := schema.GroupVersionResource{
+		Group:    "crd.projectcalico.org",
+		Version:  "v1",
+		Resource: "ippools",
+	}
+	list, err := dynClient.Resource(gvr).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	str, err := list.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	var ippoolList calicov3.IPPoolList
+	err = json.Unmarshal(str, &ippoolList)
+	if err != nil {
+		return nil, err
+	}
+
+	return ippools.Items, err
 }
 
 func (c *calicoPlugin) CreatePod(pod *k8s.Pod) (model.NetNodeAction, error) {
@@ -246,22 +288,16 @@ func (r *calicoRoute) Assert(pkt *model.Packet) error {
 }
 
 func NewCalicoPluginWithOptions(ctx *ctx.Context, options *CalicoPluginOptions) (Plugin, error) {
-	client, err := clientset.NewForConfig(ctx.KubernetesRestClient())
-	if err != nil {
-		return nil, err
-	}
-
 	if options.ServiceProcessor == nil {
 		return nil, fmt.Errorf("service processor must be provided")
 	}
 
-	ippools, err := client.ProjectcalicoV3().IPPools().List(context.TODO(), metav1.ListOptions{})
+	ippools, err := listIPPools(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	return &calicoPlugin{
-		calicoClient:     client,
 		infraShim:        options.InfraShim,
 		podMTU:           options.PodMTU,
 		ipipPodMTU:       options.IPIPPodMTU,
@@ -269,7 +305,7 @@ func NewCalicoPluginWithOptions(ctx *ctx.Context, options *CalicoPluginOptions) 
 		serviceProcessor: options.ServiceProcessor,
 		hostOptions: &calicoHostOptions{
 			Interface: options.Interface,
-			IPPools:   ippools.Items,
+			IPPools:   ippools,
 			MTU:       options.HostMTU,
 		},
 	}, nil
@@ -321,13 +357,6 @@ func newCalicoHost(ipCache *k8s.IPCache, nodeInfo *k8s.NodeInfo, infraShim netwo
 	assertion := assertions.NewNetstackAssertion(netNode, &nodeInfo.NetNS)
 	k8sAssertion := assertions.NewKubernetesAssertion(netNode)
 
-	iface, ok := lo.Find(nodeInfo.Interfaces, func(i netstack.Interface) bool { return i.Name == options.Interface })
-	if !ok {
-		return nil, fmt.Errorf("cannot find interface %s", options.Interface)
-	}
-	ip, mask := netstack.GetDefaultIPv4(&iface)
-	ipNet := &net.IPNet{IP: ip, Mask: mask}
-
 	host := &calicoHost{
 		netNode:          netNode,
 		nodeInfo:         nodeInfo,
@@ -335,20 +364,29 @@ func newCalicoHost(ipCache *k8s.IPCache, nodeInfo *k8s.NodeInfo, infraShim netwo
 		mtu:              options.MTU,
 		ipCache:          ipCache,
 		serviceProcessor: serviceProcessor,
-		network:          ipNet,
 		gateway:          options.Gateway,
 		ipPools:          options.IPPools,
 		net:              assertion,
 		k8s:              k8sAssertion,
 		infraShim:        infraShim,
 	}
+
 	if host.iface == "" {
 		host.iface = netstack.LookupDefaultIfaceName(nodeInfo.NetNSInfo.Interfaces)
 		if host.iface == "" {
 			return nil, fmt.Errorf("cannot lookup default host interface, please manually specify it via --calico-host-interface")
 		}
-		klog.V(5).Infof("detected host interface %s on node %s", host.iface, host.nodeInfo.NodeName)
+		klog.V(5).Infof("detected host interface %s on node %s", host.iface, nodeInfo.NodeName)
 	}
+
+	iface, ok := lo.Find(nodeInfo.Interfaces, func(i netstack.Interface) bool { return i.Name == host.iface })
+	if !ok {
+		return nil, fmt.Errorf("cannot find interface %s", options.Interface)
+	}
+
+	ip, mask := netstack.GetDefaultIPv4(&iface)
+	ipNet := &net.IPNet{IP: ip, Mask: mask}
+	host.network = ipNet
 
 	err := host.initRoute()
 	if err != nil {

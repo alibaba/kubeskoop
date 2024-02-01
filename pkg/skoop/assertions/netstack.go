@@ -82,7 +82,7 @@ func (na *NetstackAssertion) AssertNetDevice(s string, expect netstack.Interface
 	}
 
 	na.AddSuspicion(model.SuspicionLevelCritical,
-		fmt.Sprintf("cannot found interface: %s to assert", s),
+		fmt.Sprintf("cannot find interface: %s to assert", s),
 	)
 }
 
