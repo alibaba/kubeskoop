@@ -1,9 +1,10 @@
 package cmd
 
 import (
+	"fmt"
+	log "github.com/sirupsen/logrus"
 	"os"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -13,20 +14,47 @@ var (
 		Use:   "skoop-controller",
 		Short: "skoop centralized controller",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			if debug {
-				log.SetLevel(log.DebugLevel)
-			} else {
-				log.SetLevel(log.InfoLevel)
-			}
 		},
-		Run: func(cmd *cobra.Command, args []string) {
-			NewServer().Run(agentPort, httpPort)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			config := &Config{}
+			var err error
+			if configPath != "" {
+				config, err = loadConfig(configPath)
+				if err != nil {
+					return err
+				}
+			}
+			if debug {
+				config.LogLevel = "debug"
+			}
+			logLevel, err := log.ParseLevel(config.LogLevel)
+			if err != nil {
+				return fmt.Errorf("invalid log level: %s", config.LogLevel)
+			}
+			log.SetLevel(logLevel)
+
+			if config.Server.AgentPort == 0 {
+				config.Server.AgentPort = defaultAgentPort
+			}
+			if agentPort > 0 {
+				config.Server.AgentPort = agentPort
+			}
+			if config.Server.HttpPort == 0 {
+				config.Server.HttpPort = defaultHTTPPort
+			}
+			if httpPort > 0 {
+				config.Server.HttpPort = httpPort
+			}
+
+			NewServer().Run(config.Server.AgentPort, config.Server.HttpPort)
+			return nil
 		},
 	}
 
-	debug     bool
-	agentPort int
-	httpPort  int
+	debug      bool
+	agentPort  int
+	httpPort   int
+	configPath string
 )
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -39,7 +67,8 @@ func Execute() {
 }
 
 func init() {
+	rootCmd.PersistentFlags().StringVarP(&configPath, "config", "c", "/etc/kubeskoop/controller.yaml", "Config file path for kubeskoop controller")
 	rootCmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "Enable debug log information")
-	rootCmd.PersistentFlags().IntVarP(&agentPort, "agent-port", "a", defaultAgentPort, "Controller Port For Agent Registration")
-	rootCmd.PersistentFlags().IntVarP(&httpPort, "http-port", "p", defaultHTTPPort, "Controller Port For Agent Registration")
+	rootCmd.PersistentFlags().IntVarP(&agentPort, "agent-port", "a", -1, "Controller port for agent registration")
+	rootCmd.PersistentFlags().IntVarP(&httpPort, "http-port", "p", -1, "Controller port for http access")
 }
