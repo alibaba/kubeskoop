@@ -4,6 +4,7 @@ import styles from "./index.module.css"
 import moment from 'moment';
 import k8sService from "@/services/k8s";
 import SelectorDialog from "./selectorDialog.tsx"
+import capture from '@/services/capture';
 
 interface CaptureFormProps {
   onSubmit: (data: CaptureFormData) => void;
@@ -19,16 +20,16 @@ const CaptureForm: React.FunctionComponent<CaptureFormProps> = (props: CaptureFo
   const { onSubmit } = props;
   const [showSelectorDialog, setShowSelectorDialog] = useState(false)
 
-  const [capturelist, setCapturelist] = useState([])
+  const [captureList, setCaptureList] = useState([])
   const handleSubmit = (values: CaptureFormData, errors: any) => {
     if (errors) {
       return
     }
-    if (capturelist.length == 0) {
+    if (captureList.length == 0) {
       Message.error("Please select at least one target.")
       return
     }
-    values["capture_list"] = capturelist
+    values["capture_list"] = captureList
     values["duration"] = values["duration"].minutes() * 60 + values["duration"].seconds()
     onSubmit(values);
     console.log(values)
@@ -38,7 +39,7 @@ const CaptureForm: React.FunctionComponent<CaptureFormProps> = (props: CaptureFo
     <Form inline labelAlign='left'>
       <Form.Item label="Targets" >
         <div className={styles.custom}>
-          {capturelist.map((v, i) => {
+          {captureList.map((v, i) => {
             if (v.type == "Node") {
               return <Button className={styles.btn} key={i}>{v.type + ": " + v.name}</Button>;
             } else {
@@ -48,21 +49,29 @@ const CaptureForm: React.FunctionComponent<CaptureFormProps> = (props: CaptureFo
           <Button className={styles.btn} type="primary" onClick={() => { setShowSelectorDialog(!showSelectorDialog) }}>
             Add ＋{" "}
           </Button>
-          <Button className={styles.btn} warning type="primary" onClick={() => { setCapturelist([]) }}>
+          <Button className={styles.btn} warning type="primary" onClick={() => { setCaptureList([]) }}>
             Clear
           </Button>
           <SelectorDialog visible={showSelectorDialog}
             submitSelector={(value) => {
+              console.log(value)
               let toAdd = []
               skip: for (const v of value.values()) {
-                for (const c of capturelist.values()) {
+                if (v.type === 'Pod' && (!v.name || !v.namespace)) {
+                  continue
+                }
+                if (v.type === 'Node' && !v.name) {
+                  continue
+                }
+
+                for (const c of captureList.values()) {
                   if (v.name == c.name) {
                     continue skip
                   }
                 }
                 toAdd = [...toAdd, v]
               }
-              setCapturelist([...capturelist, ...toAdd])
+              setCaptureList([...captureList, ...toAdd])
               setShowSelectorDialog(!showSelectorDialog)
             }}
             onClose={() => { setShowSelectorDialog(!showSelectorDialog) }}></SelectorDialog>
