@@ -33,7 +33,7 @@ const (
 	kubeAPIVersion = "0.1.0"
 )
 
-var runtimeEndpoints = []string{"/var/run/dockershim.sock", "/run/containerd/containerd.sock", "/run/k3s/containerd/containerd.sock"}
+var runtimeEndpoints = []string{"/var/run/dockershim.sock", "/run/containerd/containerd.sock", "/run/k3s/containerd/containerd.sock", "/var/run/cri-dockerd.sock"}
 
 func initCriClient(eps []string) (err error) {
 	if criClient != nil {
