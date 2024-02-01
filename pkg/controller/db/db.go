@@ -1,13 +1,11 @@
 package db
 
 import (
-	"bytes"
 	"database/sql"
 
 	// import for go:embed
 	_ "embed"
 	"fmt"
-	"text/template"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -15,55 +13,68 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-//go:embed db_schema_v1.sql.tpl
-var ddlTemplate string
-
-// rendered ddl
-var ddl string
-
 var (
 	db *sqlx.DB
 )
 
-func InitDB() {
-	//TODO with config file?
+type Driver func(config *Config) (ddl string, db *sqlx.DB, err error)
+
+var drivers = map[string]Driver{
+	"sqlite": newSQLite3,
+	"mysql":  newMySQL,
 }
 
-func prepareDDL(engine string) {
-	tpl := template.Must(template.New("ddl").Parse(ddlTemplate))
-	buf := &bytes.Buffer{}
-	ctx := map[string]interface{}{
-		"engine": engine,
+func InitializeDB(config *Config) error {
+	var (
+		ddl string
+		err error
+	)
+
+	dbType := config.Type
+	if dbType == "" {
+		dbType = "sqlite3"
 	}
 
-	if err := tpl.Execute(buf, ctx); err != nil {
-		panic(fmt.Sprintf("failed render ddl, err: %v", err))
+	driver := drivers[dbType]
+	if driver == nil {
+		return fmt.Errorf("unsupported database type %s", config.Type)
 	}
 
-	ddl = buf.String()
-}
+	ddl, db, err = driver(config)
 
-func init() {
-	engine := "sqlite3"
-	prepareDDL(engine)
-
-	path := "/var/lib/kubeskoop/controller_db.sqlite3"
-
-	var err error
-	db, err = sqlx.Connect("sqlite3", path)
 	if err != nil {
-		panic(fmt.Sprintf("failed open sqlite db, err: %v", err))
+		return err
 	}
 
-	db.DB.SetConnMaxLifetime(10 * time.Second)
-	db.DB.SetMaxIdleConns(10)
-	db.DB.SetMaxOpenConns(100)
-	db.DB.SetConnMaxIdleTime(60 * time.Second)
-
-	//TODO check weather this is a new database
-	if err := CreateTables(); err != nil {
-		panic(fmt.Sprintf("failed init database, err: %v", err))
+	if config.Pool.MaxIdleConns > 0 {
+		db.DB.SetMaxIdleConns(config.Pool.MaxIdleConns)
 	}
+	if config.Pool.MaxOpenConns > 0 {
+		db.DB.SetMaxOpenConns(config.Pool.MaxOpenConns)
+	}
+	db.DB.SetConnMaxIdleTime(time.Duration(config.Pool.ConnMaxIdleTime) * time.Second)
+	db.DB.SetConnMaxLifetime(time.Duration(config.Pool.ConnMaxLifetime) * time.Second)
+
+	if err := CreateTables(ddl); err != nil {
+		return fmt.Errorf("failed create tables, err: %w", err)
+	}
+	return nil
+}
+
+type ConnectionPool struct {
+	MaxIdleConns    int `yaml:"maxIdleConns"`
+	MaxOpenConns    int `yaml:"maxOpenConns"`
+	ConnMaxLifetime int `yaml:"connMaxLifetime"`
+	ConnMaxIdleTime int `yaml:"connMaxIdleTime"`
+}
+
+type Config struct {
+	Type     string         `yaml:"type"`
+	Addr     string         `yaml:"addr"`
+	Username string         `yaml:"username"`
+	Password string         `yaml:"password"`
+	DBName   string         `yaml:"dbName"`
+	Pool     ConnectionPool `yaml:"pool"`
 }
 
 func getDB() *sqlx.DB {
@@ -112,7 +123,7 @@ func Get(dest interface{}, query string, args ...interface{}) error {
 	return getDB().Get(dest, query, args...)
 }
 
-func CreateTables() error {
+func CreateTables(ddl string) error {
 	_, err := db.Exec(ddl)
 	return err
 }
