@@ -16,6 +16,7 @@ require (
 	github.com/docker/docker v20.10.22+incompatible
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/gin-gonic/gin v1.9.1
+	github.com/go-sql-driver/mysql v1.6.0
 	github.com/golang/snappy v0.0.4
 	github.com/google/gops v0.3.26
 	github.com/gorilla/mux v1.8.0

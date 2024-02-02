@@ -567,6 +567,23 @@ subjects:
   name: default
   namespace: kubeskoop
 ---
+apiVersion: v1
+data:
+  controller.yaml: |-
+    logLevel: debug
+    server:
+      httpPort: 10264
+      agentPort: 10263
+    controller:
+      prometheus: http://prometheus-service
+      database:
+        type: sqlite3
+      diagnose: {}
+kind: ConfigMap
+metadata:
+  name: kubeskoop-controller-config
+  namespace: kubeskoop
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -588,16 +605,19 @@ spec:
         image: kubeskoop/kubeskoop:v1.0.0
         command: ["/bin/controller"]
         env:
-          - name: PROMETHEUS_ENDPOINT
-            value: http://prometheus-service
           - name: LOKI_ENDPOINT
             value: http://loki-service:3100
         volumeMounts:
-          - name:  db
+          - name:  lib
             mountPath: /var/lib/kubeskoop
+          - name: config
+            mountPath: /etc/kubeskoop
       volumes:
-      - name: db
+      - name: lib
         emptyDir: {}
+      - name: config
+        configMap:
+          name: kubeskoop-controller-config
 ---
 apiVersion: v1
 kind: Service

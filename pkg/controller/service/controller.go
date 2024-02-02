@@ -8,6 +8,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alibaba/kubeskoop/pkg/controller/db"
+	log "github.com/sirupsen/logrus"
+
 	exporter "github.com/alibaba/kubeskoop/pkg/exporter/cmd"
 	lokiwrapper "github.com/alibaba/kubeskoop/pkg/exporter/loki"
 
@@ -20,6 +23,11 @@ import (
 	"github.com/prometheus/common/model"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+)
+
+const (
+	Namespace         = "kubeskoop"
+	ExporterConfigMap = "kubeskoop-config"
 )
 
 type ControllerService interface {
@@ -42,19 +50,34 @@ type ControllerService interface {
 	UpdateExporterConfig(ctx context.Context, cfg *exporter.InspServerConfig) error
 }
 
-func NewControllerService() (ControllerService, error) {
+type Config struct {
+	KubeConfig string          `yaml:"kubeConfig"`
+	Prometheus string          `yaml:"prometheus"`
+	DB         db.Config       `yaml:"database"`
+	Diagnose   diagnose.Config `yaml:"diagnose"`
+}
+
+func NewControllerService(config *Config) (ControllerService, error) {
 	ctrl := &controller{
 		taskWatcher:    sync.Map{},
 		resultWatchers: sync.Map{},
+		Namespace:      Namespace,
+		ConfigMapName:  ExporterConfigMap,
 	}
 	var (
 		restConfig *rest.Config
 		err        error
 	)
-	if os.Getenv("KUBERNETES_SERVICE_HOST") == "" {
-		restConfig, _, err = utils.NewConfig("~/.kube/config")
-	} else {
+
+	if config.KubeConfig != "" {
+		log.Infof("load kubeconfig from %s", config.KubeConfig)
+		restConfig, _, err = utils.NewConfig(config.KubeConfig)
+	} else if os.Getenv("KUBERNETES_SERVICE_HOST") != "" {
+		log.Infof("load incluster kubeconfig")
 		restConfig, err = rest.InClusterConfig()
+	} else {
+		log.Infof("try load kubeconfig from ~/.kube/config")
+		restConfig, _, err = utils.NewConfig("~/.kube/config")
 	}
 	if err != nil {
 		return nil, fmt.Errorf("error get incluster config, err: %v", err)
@@ -64,13 +87,16 @@ func NewControllerService() (ControllerService, error) {
 		return nil, fmt.Errorf("error create k8s client, err: %v", err)
 	}
 
-	if os.Getenv("KUBERNETES_RESOURCE_INFORMER") == "enable" {
-		ctrl.InitInformer()
+	ctrl.InitInformer()
+
+	//init db
+	if err := db.InitializeDB(&config.DB); err != nil {
+		return nil, err
 	}
 
-	if promEndpoint, ok := os.LookupEnv("PROMETHEUS_ENDPOINT"); ok {
+	if config.Prometheus != "" {
 		promClient, err := api.NewClient(api.Config{
-			Address: promEndpoint,
+			Address: config.Prometheus,
 		})
 		if err != nil {
 			return nil, err
@@ -86,19 +112,11 @@ func NewControllerService() (ControllerService, error) {
 		ctrl.lokiClient = lokiClient
 	}
 
-	if namespace, ok := os.LookupEnv("NAMESPACE"); ok {
-		ctrl.Namespace = namespace
-	} else {
-		ctrl.Namespace = "kubeskoop"
+	//if diagnose kubeconfig is not set, use controller's kubeconfig as default
+	if config.Diagnose.KubeConfig == "" {
+		config.Diagnose.KubeConfig = config.KubeConfig
 	}
-
-	if configMap, ok := os.LookupEnv("KUBESKOOP_CONFIGMAP"); ok {
-		ctrl.ConfigMapName = configMap
-	} else {
-		ctrl.ConfigMapName = "kubeskoop-config"
-	}
-
-	ctrl.diagnostor = diagnose.NewDiagnoseController(ctrl.Namespace)
+	ctrl.diagnostor = diagnose.NewDiagnoseController(ctrl.Namespace, &config.Diagnose)
 
 	return ctrl, nil
 }
