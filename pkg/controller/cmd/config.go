@@ -2,23 +2,22 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/alibaba/kubeskoop/pkg/controller/db"
-	"github.com/alibaba/kubeskoop/pkg/controller/diagnose"
-	"gopkg.in/yaml.v3"
 	"os"
+
+	"github.com/alibaba/kubeskoop/pkg/controller/service"
+	"gopkg.in/yaml.v3"
 )
 
 type ServerConfig struct {
 	AgentPort  int    `yaml:"agentPort"`
-	HttpPort   int    `yaml:"httpPort"`
+	HTTPPort   int    `yaml:"httpPort"`
 	KubeConfig string `yaml:"kubeConfig"`
 }
 
 type Config struct {
-	LogLevel string          `yaml:"logLevel"`
-	Server   ServerConfig    `yaml:"server"`
-	DB       db.Config       `yaml:"database"`
-	Diagnose diagnose.Config `yaml:"diagnose"`
+	LogLevel   string         `yaml:"logLevel"`
+	Server     ServerConfig   `yaml:"server"`
+	Controller service.Config `yaml:"controller"`
 }
 
 func loadConfig(path string) (*Config, error) {

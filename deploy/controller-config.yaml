@@ -1,0 +1,9 @@
+logLevel: debug
+server:
+  httpPort: 10264
+  agentPort: 10263
+controller:
+  database:
+    type: sqlite3
+  diagnose: {}
+

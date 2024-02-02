@@ -20,8 +20,9 @@ var (
 type Driver func(config *Config) (ddl string, db *sqlx.DB, err error)
 
 var drivers = map[string]Driver{
-	"sqlite": newSQLite3,
-	"mysql":  newMySQL,
+	"sqlite":  newSQLite3,
+	"sqlite3": newSQLite3,
+	"mysql":   newMySQL,
 }
 
 func InitializeDB(config *Config) error {

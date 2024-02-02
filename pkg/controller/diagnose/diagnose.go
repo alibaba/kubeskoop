@@ -11,25 +11,29 @@ import (
 	skoopContext "github.com/alibaba/kubeskoop/pkg/skoop/context"
 )
 
+type Config struct {
+	KubeConfig    string `yaml:"kubeConfig"`
+	CloudProvider string `yaml:"cloudProvider"`
+	NetworkPlugin string `yaml:"networkPlugin"`
+	ProxyModel    string `yaml:"proxyModel"`
+	ClusterCidr   string `yaml:"clusterCidr"`
+}
+
 type Controller interface {
 	Diagnose(ctx context.Context, taskConfig *skoopContext.TaskConfig) (string, error)
 }
 
-func NewDiagnoseController(namespace string) Controller {
-	var diagnoseArgs []string
-	if diagnoseArgsFromEnv, ok := os.LookupEnv("KUBESKOOP_DIAGNOSE_ARGS"); ok {
-		diagnoseArgs = strings.Split(diagnoseArgsFromEnv, " ")
-	}
+func NewDiagnoseController(namespace string, config *Config) Controller {
 	// 1. build skoop global context
 	return &Diagnostor{
-		namespace:    namespace,
-		diagnoseArgs: diagnoseArgs,
+		namespace: namespace,
+		config:    config,
 	}
 }
 
 type Diagnostor struct {
-	namespace    string
-	diagnoseArgs []string
+	namespace string
+	config    *Config
 }
 
 func (d *Diagnostor) Diagnose(ctx context.Context, taskConfig *skoopContext.TaskConfig) (string, error) {
@@ -47,8 +51,8 @@ func (d *Diagnostor) Diagnose(ctx context.Context, taskConfig *skoopContext.Task
 		"--protocol", taskConfig.Protocol,
 		"--collector-namespace", d.namespace,
 	}
-	if len(d.diagnoseArgs) != 0 {
-		args = append(args, d.diagnoseArgs...)
+	if d.config != nil {
+		args = append(args, buildArgsFromConfig(d.config))
 	}
 	cmd := exec.CommandContext(ctx, "skoop", args...)
 	output, err := cmd.CombinedOutput()
@@ -60,4 +64,22 @@ func (d *Diagnostor) Diagnose(ctx context.Context, taskConfig *skoopContext.Task
 		return "", fmt.Errorf("failed to read diagnose result: %v", err)
 	}
 	return string(diagnoseResult), nil
+}
+
+func buildArgsFromConfig(config *Config) string {
+	var args []string
+	m := map[string]string{
+		"--cloud-provider": config.CloudProvider,
+		"--network-plugin": config.NetworkPlugin,
+		"--proxy-mode":     config.ProxyModel,
+		"--cluster-cidr":   config.ClusterCidr,
+	}
+
+	for k, v := range m {
+		if v != "" {
+			args = append(args, k, v)
+		}
+	}
+
+	return strings.Join(args, " ")
 }

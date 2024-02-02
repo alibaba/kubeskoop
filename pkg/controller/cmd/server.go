@@ -30,23 +30,25 @@ const (
 )
 
 type Server struct {
+	config     ServerConfig
 	controller service.ControllerService
 }
 
-func NewServer() *Server {
-	ctrlSVC, err := service.NewControllerService()
+func NewServer(config *Config) *Server {
+	ctrlSVC, err := service.NewControllerService(&config.Controller)
 	if err != nil {
 		log.Fatalf("error create controller service: %v", err)
 	}
 	return &Server{
+		config:     config.Server,
 		controller: ctrlSVC,
 	}
 }
 
-func (s *Server) Run(agentPort int, httpPort int) {
+func (s *Server) Run() {
 	done := make(chan struct{})
-	go s.RunAgentServer(agentPort, done)
-	go s.RunHTTPServer(httpPort, done)
+	go s.RunAgentServer(s.config.AgentPort, done)
+	go s.RunHTTPServer(s.config.HTTPPort, done)
 	go s.controller.Run(done)
 
 	signals := make(chan os.Signal, 1)

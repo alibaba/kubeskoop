@@ -2,8 +2,9 @@ package cmd
 
 import (
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"os"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/spf13/cobra"
 )
@@ -39,14 +40,14 @@ var (
 			if agentPort > 0 {
 				config.Server.AgentPort = agentPort
 			}
-			if config.Server.HttpPort == 0 {
-				config.Server.HttpPort = defaultHTTPPort
+			if config.Server.HTTPPort == 0 {
+				config.Server.HTTPPort = defaultHTTPPort
 			}
 			if httpPort > 0 {
-				config.Server.HttpPort = httpPort
+				config.Server.HTTPPort = httpPort
 			}
 
-			NewServer().Run(config.Server.AgentPort, config.Server.HttpPort)
+			NewServer(config).Run()
 			return nil
 		},
 	}
