@@ -3,6 +3,8 @@ FROM docker.io/library/golang:1.20.5-alpine AS build
 ARG GOPROXY
 # --build-arg ALPINE_MIRROR=mirrors.aliyun.com
 ARG ALPINE_MIRROR
+ENV GOPROXY=$GOPROXY
+ENV ALPINE_MIRROR=$ALPINE_MIRROR
 
 RUN if [ ! -z "$ALPINE_MIRROR" ]; then sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories; fi && \
     apk add gcc g++ linux-headers git make bash && \
@@ -18,8 +20,12 @@ ADD ./webui /webconsole
 RUN yarn install && yarn build
 
 FROM docker.io/library/alpine
-
-RUN apk add --no-cache \
+ARG GOPROXY
+ARG ALPINE_MIRROR
+ENV GOPROXY=$GOPROXY
+ENV ALPINE_MIRROR=$ALPINE_MIRROR
+RUN if [ ! -z "$ALPINE_MIRROR" ]; then sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories; fi && \
+    apk add --no-cache \
     iproute2 \
     ipset \
     iptables \

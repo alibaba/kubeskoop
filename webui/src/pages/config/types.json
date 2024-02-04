@@ -61,7 +61,7 @@
             "name": "softnet"
         },
         {
-            "name": "netsoftirq"
+            "name": "softirq"
         }
     ],
     "event_probe": [
@@ -84,7 +84,7 @@
             "name": "netiftxlat"
         },
         {
-            "name": "netsoftirq"
+            "name": "softirq"
         },
         {
             "name": "tcpreset"

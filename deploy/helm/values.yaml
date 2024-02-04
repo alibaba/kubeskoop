@@ -30,7 +30,7 @@ config:
     - name: io
     - name: socketlatency
     - name: packetloss
-    - name: net_softirq
+    - name: softirq
     - name: tcpext
     - name: tcpsummary
     - name: tcp

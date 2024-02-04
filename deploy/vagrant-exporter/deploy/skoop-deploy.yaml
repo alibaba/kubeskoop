@@ -114,7 +114,7 @@ data:
       - tcp
       - tcpext
       - udp
-      - net_softirq
+      - softirq
       - virtcmdlatency
     event_config:
       port: 19102
