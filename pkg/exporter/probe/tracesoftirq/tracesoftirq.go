@@ -35,9 +35,9 @@ const (
 )
 
 var (
-	probeName        = "softirq"
-	softirqTypes     = []string{"hi", "timer", "net_tx", "net_rx", "block", "irq_poll", "tasklet", "sched", "hrtimer", "rcu"}
-	_netSoftirqProbe = &softirqProbe{
+	probeName     = "softirq"
+	softirqTypes  = []string{"hi", "timer", "net_tx", "net_rx", "block", "irq_poll", "tasklet", "sched", "hrtimer", "rcu"}
+	_softirqProbe = &softirqProbe{
 		metricsMap: map[string]map[string]uint64{
 			SOFTIRQ_SCHED_SLOW:   {},
 			SOFTIRQ_SCHED_100MS:  {},
@@ -60,7 +60,7 @@ func metricsProbeCreator(args softirqArgs) (probe.MetricsProbe, error) {
 	if len(args.SoftirqTypes) == 0 {
 		args.SoftirqTypes = []string{"net_rx"}
 	}
-	_netSoftirqProbe.metricsProbeIrqTypes = softirqTypesBits(args.SoftirqTypes)
+	_softirqProbe.metricsProbeIrqTypes = softirqTypesBits(args.SoftirqTypes)
 
 	p := &metricsProbe{}
 	opts := probe.BatchMetricsOpts{
@@ -82,7 +82,7 @@ func eventProbeCreator(sink chan<- *probe.Event, args softirqArgs) (probe.EventP
 	if len(args.SoftirqTypes) == 0 {
 		args.SoftirqTypes = []string{"net_rx"}
 	}
-	_netSoftirqProbe.eventProbeIrqTypes = softirqTypesBits(args.SoftirqTypes)
+	_softirqProbe.eventProbeIrqTypes = softirqTypesBits(args.SoftirqTypes)
 	p := &eventProbe{
 		sink: sink,
 	}
@@ -93,19 +93,19 @@ type metricsProbe struct {
 }
 
 func (p *metricsProbe) Start(_ context.Context) error {
-	return _netSoftirqProbe.start(probe.ProbeTypeMetrics)
+	return _softirqProbe.start(probe.ProbeTypeMetrics)
 }
 
 func (p *metricsProbe) Stop(_ context.Context) error {
-	return _netSoftirqProbe.stop(probe.ProbeTypeMetrics)
+	return _softirqProbe.stop(probe.ProbeTypeMetrics)
 }
 
 func (p *metricsProbe) collectOnce(emit probe.Emit) error {
-	_netSoftirqProbe.metricsLock.RLock()
-	defer _netSoftirqProbe.metricsLock.RUnlock()
+	_softirqProbe.metricsLock.RLock()
+	defer _softirqProbe.metricsLock.RUnlock()
 	nodeName := nettop.GetNodeName()
-	for metricsName, values := range _netSoftirqProbe.metricsMap {
-		for _, irqType := range enabledIrqTypes(_netSoftirqProbe.metricsProbeIrqTypes) {
+	for metricsName, values := range _softirqProbe.metricsMap {
+		for _, irqType := range enabledIrqTypes(_softirqProbe.metricsProbeIrqTypes) {
 			emit(metricsName, []string{nodeName, irqType}, float64(values[irqType]))
 		}
 	}
@@ -117,17 +117,17 @@ type eventProbe struct {
 }
 
 func (e *eventProbe) Start(_ context.Context) error {
-	err := _netSoftirqProbe.start(probe.ProbeTypeEvent)
+	err := _softirqProbe.start(probe.ProbeTypeEvent)
 	if err != nil {
 		return err
 	}
 
-	_netSoftirqProbe.sink = e.sink
+	_softirqProbe.sink = e.sink
 	return nil
 }
 
 func (e *eventProbe) Stop(_ context.Context) error {
-	return _netSoftirqProbe.stop(probe.ProbeTypeEvent)
+	return _softirqProbe.stop(probe.ProbeTypeEvent)
 }
 
 type softirqProbe struct {
