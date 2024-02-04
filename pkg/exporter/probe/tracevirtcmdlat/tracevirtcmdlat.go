@@ -35,7 +35,10 @@ const (
 var (
 	metrics              = []string{VIRTCMD100MS, VIRTCMD}
 	_virtcmdLatencyProbe = &virtcmdLatencyProbe{
-		metricsMap: make(map[string]map[uint32]uint64),
+		metricsMap: map[string]map[uint32]uint64{
+			VIRTCMD:      {0: 0},
+			VIRTCMD100MS: {0: 0},
+		},
 	}
 )
 
