@@ -3,6 +3,8 @@ package netstack
 import (
 	"fmt"
 	"net"
+
+	"golang.org/x/sys/unix"
 )
 
 // Neighbor Cache Entry States.
@@ -71,4 +73,19 @@ func (n *Neighbour) ProbeNeigh(ip net.IP, linkIndex int) (*NeighResult, error) {
 		}
 	}
 	return result, nil
+}
+
+func (n *Neighbour) ProbeRouteNeigh(route *Route, dst net.IP) (*Neigh, error) {
+	for _, ni := range n.interfaces {
+		if ni.Name == route.OifName {
+			for _, neigh := range ni.NeighInfo {
+				if neigh.Family == unix.AF_INET &&
+					(route.Gw == nil && neigh.IP.Equal(dst)) ||
+					(route.Gw != nil && neigh.IP.Equal(route.Gw)) {
+					return &neigh, nil
+				}
+			}
+		}
+	}
+	return nil, nil
 }

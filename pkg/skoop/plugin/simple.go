@@ -67,7 +67,7 @@ func (p *simpleVEthPod) Send(dst model.Endpoint, protocol model.Protocol) ([]mod
 		Protocol: protocol,
 	}
 
-	addr, _, err := p.podInfo.NetNS.Router.RouteSrc(pkt, "", "")
+	addr, dstRoute, err := p.podInfo.NetNS.Router.RouteSrc(pkt, "", "")
 	if err != nil {
 		if err == netstack.ErrNoRouteToHost {
 			p.netNode.AddSuspicion(model.SuspicionLevelFatal, fmt.Sprintf("no route to host: %v", dst))
@@ -76,6 +76,21 @@ func (p *simpleVEthPod) Send(dst model.Endpoint, protocol model.Protocol) ([]mod
 			SrcNode: p.netNode,
 			Err:     fmt.Errorf("no route to host: %v", err)}
 	}
+	neigh, err := p.podInfo.NetNS.Neighbour.ProbeRouteNeigh(dstRoute, pkt.Dst)
+	if err != nil {
+		return nil, &assertions.CannotBuildTransmissionError{
+			SrcNode: p.netNode,
+			Err:     fmt.Errorf("pod neigh system probe failed: %v", err),
+		}
+	}
+	if neigh != nil && (neigh.State == netstack.NudFailed || neigh.State == netstack.NudIncomplete) {
+		if dstRoute.Gw == nil {
+			p.netNode.AddSuspicion(model.SuspicionLevelCritical, fmt.Sprintf("dst: %v ARP resolve failed.", pkt.Dst.String()))
+		} else {
+			p.netNode.AddSuspicion(model.SuspicionLevelCritical, fmt.Sprintf("dst: %v route's gateway: %v ARP resolve failed.", pkt.Dst.String(), dstRoute.Gw.String()))
+		}
+	}
+
 	pkt.Src = net.ParseIP(addr)
 
 	iface, _ := lo.Find(p.podInfo.NetNS.Interfaces, func(i netstack.Interface) bool { return i.Name == "eth0" })
