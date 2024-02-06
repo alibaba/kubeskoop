@@ -59,7 +59,7 @@ func (c *controller) DiagnoseList(_ context.Context) ([]DiagnoseTaskResult, erro
 	}
 
 	slices.SortFunc(taskSlice, func(a, b DiagnoseTaskResult) bool {
-		return a.TaskID < b.TaskID
+		return a.TaskID > b.TaskID
 	})
 	return taskSlice, nil
 }

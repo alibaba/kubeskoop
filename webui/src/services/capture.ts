@@ -14,6 +14,10 @@ export interface CaptureResult {
     message: string
 }
 
+export interface Captures {
+    [key: number]: CaptureResult[]
+}
+
 export default {
     async createCapture(task: CaptureTask): Promise<string> {
         return await request({
@@ -22,7 +26,7 @@ export default {
             data: task,
         });
     },
-    async listCaptures(signal?: AbortSignal): Promise<string> {
+    async listCaptures(signal?: AbortSignal): Promise<Captures> {
         return await request({
             url: '/controller/captures',
             method: 'GET',

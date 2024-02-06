@@ -27,7 +27,7 @@ const submitCapture = (props, callback) => {
 }
 
 export default function Capture() {
-  const [captureList, setCaptureList] = useState([])
+  const [captureList, setCaptureList] = useState<any[]>([])
   const [abortController, setAbortController] = useState<AbortController | null>(null);
   const [refreshCount, setRefreshCount] = useState(0);
   const refreshCaptureList = () => {
@@ -40,9 +40,9 @@ export default function Capture() {
     captureService.listCaptures(signal)
       .then(res => {
         if (res == null) {
-          res = []
+          res = {}
         }
-        setCaptureList(Object.values(res))
+        setCaptureList(Object.values(res).toSorted((a, b) => b[0]?.task_id - a[0]?.task_id))
       })
       .catch(err => {
         Message.error(`Error when fetching diagnosis: ${getErrorMessage(err)}`)
