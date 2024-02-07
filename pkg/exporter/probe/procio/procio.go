@@ -86,7 +86,7 @@ func getAllProcessIO(nslist []*nettop.Entity) (map[uint32][]procfs.ProcIO, error
 		nslogic := nslist[idx]
 		prociolist := []procfs.ProcIO{}
 		for _, indx := range nslogic.GetPids() {
-			iodata, err := getProccessIoStat(indx)
+			iodata, err := getProcessIOStat(indx)
 			if err != nil {
 				continue
 			}
@@ -98,7 +98,7 @@ func getAllProcessIO(nslist []*nettop.Entity) (map[uint32][]procfs.ProcIO, error
 }
 
 // IO creates a new ProcIO instance from a given Proc instance.
-func getProccessIoStat(pid int) (procfs.ProcIO, error) {
+func getProcessIOStat(pid int) (procfs.ProcIO, error) {
 	pio := procfs.ProcIO{}
 
 	data, err := ReadFileNoStat(fmt.Sprintf("/proc/%d/io", pid))
