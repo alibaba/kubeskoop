@@ -128,6 +128,13 @@ func (p *kernelLatencyProbe) stop(_ context.Context, probeType probe.Type) error
 	}
 
 	p.refcnt[probeType]--
+
+	if p.refcnt[probe.ProbeTypeEvent] == 0 {
+		if p.perfReader != nil {
+			p.perfReader.Close()
+		}
+	}
+
 	if p.totalReferenceCountLocked() == 0 {
 		return p.cleanup()
 	}
@@ -164,9 +171,13 @@ func (p *kernelLatencyProbe) totalReferenceCountLocked() int {
 	return c
 }
 
-func (p *kernelLatencyProbe) start(_ context.Context, probeType probe.Type) (err error) {
+func (p *kernelLatencyProbe) start(ctx context.Context, probeType probe.Type) (err error) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
+
+	if p.refcnt[probeType] != 0 {
+		return fmt.Errorf("%s(%s) has already started", probeName, probeType)
+	}
 
 	p.refcnt[probeType]++
 	if p.totalReferenceCountLocked() == 1 {
@@ -175,11 +186,13 @@ func (p *kernelLatencyProbe) start(_ context.Context, probeType probe.Type) (err
 			_ = p.cleanup()
 			return fmt.Errorf("%s failed load bpf: %w", probeName, err)
 		}
+	}
 
+	if p.refcnt[probe.ProbeTypeEvent] == 1 {
 		p.perfReader, err = perf.NewReader(p.objs.bpfMaps.InspKlatencyEvent, int(unsafe.Sizeof(bpfInspKlEventT{})))
 		if err != nil {
 			log.Errorf("%s failed create perf reader, err: %v", probeName, err)
-			_ = p.cleanup()
+			_ = p.stop(ctx, probeType)
 			return fmt.Errorf("%s failed create bpf reader: %w", probeName, err)
 		}
 
