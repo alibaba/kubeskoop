@@ -52,7 +52,7 @@ You can view the full documentation from the [KubeSkoop.io](https://kubeskoop.io
 You can quickly deploy KubeSkoop, Prometheus, Grafana and Loki to your cluster via [skoopbundle.yaml](deploy/skoopbundle.yaml).
 
 ```bash
-kubectl apply -f https://github.com/alibaba/kubeskoop/deploy/skoopbundle.yaml
+kubectl apply -f https://raw.githubusercontent.com/alibaba/kubeskoop/main/deploy/skoopbundle.yaml
 ```
 
 ***Note: skoopbundle.yaml starts with the minimum number of replicas and default configurations, which is not suitable for production environments.***
