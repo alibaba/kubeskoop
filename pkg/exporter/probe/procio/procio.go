@@ -77,7 +77,7 @@ func collectProcessIO(entity *nettop.Entity, emit probe.Emit) {
 		writeBytes   uint64
 	)
 	for _, pid := range entity.GetPids() {
-		iodata, err := getProccessIoStat(pid)
+		iodata, err := getProcessIOStat(pid)
 		if err != nil {
 			log.Warningf("probe %s: failed get process io data: %v", probeName, err)
 			continue
@@ -87,7 +87,6 @@ func collectProcessIO(entity *nettop.Entity, emit probe.Emit) {
 		writeSyscall += iodata.SyscW
 		readBytes += iodata.ReadBytes
 		writeBytes += iodata.WriteBytes
-
 	}
 	labels := probe.BuildStandardMetricsLabelValues(entity)
 	emit(IOReadSyscall, labels, float64(readSyscall))
@@ -97,7 +96,7 @@ func collectProcessIO(entity *nettop.Entity, emit probe.Emit) {
 }
 
 // IO creates a new ProcIO instance from a given Proc instance.
-func getProccessIoStat(pid int) (procfs.ProcIO, error) {
+func getProcessIOStat(pid int) (procfs.ProcIO, error) {
 	pio := procfs.ProcIO{}
 
 	data, err := readFileNoStat(fmt.Sprintf("/proc/%d/io", pid))

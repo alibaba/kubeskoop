@@ -50,7 +50,7 @@ KubeSkoop是一个Kubernetes网络诊断工具。针对不同的网络插件和I
 你可以通过[skoopbundle.yaml](deploy/skoopbundle.yaml)文件快速部署KubeSkoop、Prometheus、Grafana和Loki至你的集群。
 
 ```bash
-kubectl apply -f https://github.com/alibaba/kubeskoop/deploy/skoopbundle.yaml
+kubectl apply -f https://raw.githubusercontent.com/alibaba/kubeskoop/main/deploy/skoopbundle.yaml
 ```
 
 ***备注: skoopbundle.yaml以最小副本和默认配置启动，不适用于生产环境***

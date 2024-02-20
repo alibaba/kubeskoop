@@ -250,7 +250,7 @@ func (p *netifTxlatencyProbe) loadAndAttachBPF() error {
 	}
 
 	// 获取Loaded的程序/map的fd信息
-	if err := loadBpfObjects(p.objs, &opts); err != nil {
+	if err := loadBpfObjects(&p.objs, &opts); err != nil {
 		return fmt.Errorf("loading objects: %v", err)
 	}
 
