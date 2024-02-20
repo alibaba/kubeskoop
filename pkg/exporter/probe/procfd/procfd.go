@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
 	log "k8s.io/klog/v2"
 
@@ -19,7 +21,6 @@ const (
 var (
 	OpenFD     = "openfd"
 	OpenSocket = "opensocket"
-	FDMetrics  = []string{OpenFD, OpenSocket}
 )
 
 func init() {
@@ -29,9 +30,18 @@ func init() {
 func fdProbeCreator() (probe.MetricsProbe, error) {
 	p := &ProcFD{}
 
-	batchMetrics := probe.NewLegacyBatchMetrics(probeName, FDMetrics, p.CollectOnce)
+	opts := probe.BatchMetricsOpts{
+		Namespace:      probe.MetricsNamespace,
+		Subsystem:      probeName,
+		VariableLabels: probe.StandardMetricsLabels,
+		SingleMetricsOpts: []probe.SingleMetricsOpts{
+			{Name: OpenFD, ValueType: prometheus.GaugeValue},
+			{Name: OpenSocket, ValueType: prometheus.GaugeValue},
+		},
+	}
+	metrics := probe.NewBatchMetrics(opts, p.collectOnce)
 
-	return probe.NewMetricsProbe(probeName, p, batchMetrics), nil
+	return probe.NewMetricsProbe(probeName, p, metrics), nil
 }
 
 type ProcFD struct {
@@ -45,42 +55,41 @@ func (s *ProcFD) Stop(_ context.Context) error {
 	return nil
 }
 
-func (s *ProcFD) CollectOnce() (map[string]map[uint32]uint64, error) {
+func (s *ProcFD) collectOnce(emit probe.Emit) error {
 	ets := nettop.GetAllEntity()
 	if len(ets) == 0 {
 		log.Warningf("procfd: no entity found")
-		return map[string]map[uint32]uint64{}, nil
+		return nil
 	}
-	return getAllProcessFd(ets)
+	for _, entity := range ets {
+		collectProcessFd(entity, emit)
+		emit(OpenFD, probe.BuildStandardMetricsLabelValues(entity), 0)
+	}
+	return nil
 }
 
-func getAllProcessFd(nslist []*nettop.Entity) (map[string]map[uint32]uint64, error) {
-	resMap := make(map[string]map[uint32]uint64)
+func collectProcessFd(entity *nettop.Entity, emit probe.Emit) {
+	var (
+		fdCount   int
+		sockCount int
+	)
+	for _, idx := range entity.GetPids() {
+		procfds, err := getProcessFdStat(idx)
+		if err != nil {
+			log.Warningf("failed open proc fd for pod %s: %v", entity, err)
+			return
+		}
 
-	for _, m := range FDMetrics {
-		resMap[m] = make(map[uint32]uint64)
-	}
-
-	for _, nslogic := range nslist {
-		nsprocfd := map[string]struct{}{}
-		nsprocfsock := map[string]struct{}{}
-		for _, idx := range nslogic.GetPids() {
-			procfds, err := getProcessFdStat(idx)
-			if err != nil && !os.IsNotExist(err) {
-				return resMap, err
-			}
-
-			for fd := range procfds {
-				nsprocfd[fd] = struct{}{}
-				if strings.HasPrefix(fd, "socket:") {
-					nsprocfsock[fd] = struct{}{}
-				}
+		for fd := range procfds {
+			fdCount++
+			if strings.HasPrefix(fd, "socket:") {
+				sockCount++
 			}
 		}
-		resMap[OpenFD][uint32(nslogic.GetNetns())] = uint64(len(nsprocfd))
-		resMap[OpenSocket][uint32(nslogic.GetNetns())] = uint64(len(nsprocfsock))
 	}
-	return resMap, nil
+	labels := probe.BuildStandardMetricsLabelValues(entity)
+	emit(OpenFD, labels, float64(fdCount))
+	emit(OpenSocket, labels, float64(sockCount))
 }
 
 func getProcessFdStat(pid int) (map[string]struct{}, error) {
@@ -93,7 +102,7 @@ func getProcessFdStat(pid int) (map[string]struct{}, error) {
 
 	names, err := d.Readdirnames(-1)
 	if err != nil {
-		return nil, fmt.Errorf("could not read %q: %w", d.Name(), err)
+		return nil, fmt.Errorf("could not read %s: %w", fdpath, err)
 	}
 
 	fds := map[string]struct{}{}

@@ -52,7 +52,7 @@ func (s *ProcSoftnet) Stop(_ context.Context) error {
 }
 
 func (s *ProcSoftnet) CollectOnce() (map[string]map[uint32]uint64, error) {
-	ets := nettop.GetAllEntity()
+	ets := nettop.GetAllUniqueNetnsEntity()
 	if len(ets) == 0 {
 		slog.Info("collect", "mod", probeName, "ignore", "no entity found")
 	}

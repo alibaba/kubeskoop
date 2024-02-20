@@ -118,7 +118,7 @@ func (s *ProcNetstat) Stop(_ context.Context) error {
 }
 
 func (s *ProcNetstat) CollectOnce() (map[string]map[uint32]uint64, error) {
-	ets := nettop.GetAllEntity()
+	ets := nettop.GetAllUniqueNetnsEntity()
 	if len(ets) == 0 {
 		log.Errorf("%s error, no entity found", probeName)
 	}

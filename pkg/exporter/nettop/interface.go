@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/exp/slices"
 )
@@ -38,20 +39,35 @@ func GetEntityByPid(pid int) (*Entity, error) {
 	return nil, fmt.Errorf("entify for process %d not found", pid)
 }
 
-func GetAllEntity() []*Entity {
-	v := nsCache.Items()
+// GetAllUniqueNetnsEntity returns all entities, include host network pods
+func GetAllUniqueNetnsEntity() []*Entity {
+	return getAllEntity(func(entity *Entity) bool {
+		return entity == defaultEntity || !entity.IsHostNetwork()
+	})
+}
 
-	res := []*Entity{}
-	for _, item := range v {
-		et := item.Object.(*Entity)
-		// filter unknow netns, such as extra test netns created by cni-plugin, cilium/calico etc..
-		if et == nil || et.GetPodName() == "unknow" {
+// GetAllEntity returns all entites that have unique netns
+func GetAllEntity() []*Entity {
+	return getAllEntity(nil)
+}
+
+func getAllEntity(filter func(entity *Entity) bool) []*Entity {
+	var ret []*Entity
+	ets := entities.Load()
+	if ets == nil {
+		log.Errorf("entities is nil")
+		return nil
+	}
+	for _, entity := range *ets {
+		if entity == nil {
 			continue
 		}
-		res = append(res, et)
+		if filter != nil && !filter(entity) {
+			continue
+		}
+		ret = append(ret, entity)
 	}
-
-	return res
+	return ret
 }
 
 func GetNodeName() string {
