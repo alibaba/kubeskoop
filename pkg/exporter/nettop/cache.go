@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/vishvananda/netlink"
@@ -22,6 +23,7 @@ import (
 
 var (
 	cacheUpdateInterval = 10 * time.Second
+	entities            = atomic.Pointer[[]*Entity]{}
 	nsCache             = cache.New(20*cacheUpdateInterval, 20*cacheUpdateInterval)
 	pidCache            = cache.New(20*cacheUpdateInterval, 20*cacheUpdateInterval)
 	ipCache             = cache.New(20*cacheUpdateInterval, 20*cacheUpdateInterval)
@@ -96,7 +98,7 @@ func initDefaultEntity(sidecarMode bool) error {
 
 	//add host network
 	defaultEntity = &Entity{
-		netnsMeta: netnsMeta{
+		netnsMeta: &netnsMeta{
 			inum:          hostNetNSId,
 			mountPath:     fmt.Sprintf("/proc/%d/ns/net", self),
 			isHostNetwork: !sidecarMode,
@@ -111,15 +113,9 @@ func initDefaultEntity(sidecarMode bool) error {
 			return fmt.Errorf("failed get current pod info: %w", err)
 		}
 
-		podIP := ""
-		if len(ipList) > 0 {
-			podIP = ipList[0]
-		}
-
 		defaultEntity.podMeta = podMeta{
 			namespace: namespace,
 			name:      name,
-			ip:        podIP,
 		}
 	}
 
@@ -160,18 +156,17 @@ type netnsMeta struct {
 type podMeta struct {
 	name      string
 	namespace string
-	ip        string
 }
 
 type Entity struct {
-	netnsMeta
+	*netnsMeta
 	podMeta
 	initPid int
 	pids    []int
 }
 
-func (e *Entity) GetIP() string {
-	return e.podMeta.ip
+func (e *Entity) String() string {
+	return fmt.Sprintf("%s/%s", e.GetPodNamespace(), e.GetPodName())
 }
 
 func (e *Entity) GetPodName() string {
@@ -285,8 +280,10 @@ func cachePodsWithTimeout(timeout time.Duration) error {
 	}
 }
 
-func addEntityToCache(e *Entity) {
-	nsCache.Set(fmt.Sprintf("%d", e.inum), e, 3*cacheUpdateInterval)
+func addEntityToCache(e *Entity, ignoreHostPod bool) {
+	if !(ignoreHostPod && e.IsHostNetwork()) {
+		nsCache.Set(fmt.Sprintf("%d", e.inum), e, 3*cacheUpdateInterval)
+	}
 	for _, ip := range e.ipList {
 		ipCache.Set(ip, e, 3*cacheUpdateInterval)
 	}
@@ -331,7 +328,9 @@ func cacheNetTopology(ctx context.Context) error {
 	lock.Lock()
 	defer lock.Unlock()
 
-	addEntityToCache(defaultEntity)
+	var newEntities []*Entity
+	newEntities = append(newEntities, defaultEntity)
+	addEntityToCache(defaultEntity, false)
 
 	sandboxList, err := criClient.ListPodSandbox(&v1.PodSandboxFilter{
 		State: &v1.PodSandboxStateValue{
@@ -387,37 +386,39 @@ func cacheNetTopology(ctx context.Context) error {
 			}
 		}
 
-		status := sandboxStatus.Status
+		var ns *netnsMeta
 
 		if netnsNum == defaultEntity.inum {
-			log.Infof("skip host network pod %s/%s", namespace, name)
-			continue
-		}
-
-		if sandboxStatus.Status.Network == nil || sandboxStatus.Status.Network.Ip == "" {
-			log.Errorf("sanbox %s/%s: invalid sandbox status, no ip", sandbox.Metadata.Namespace, sandbox.Metadata.Name)
-			continue
-		}
-
-		e := &Entity{
-			netnsMeta: netnsMeta{
+			ns = defaultEntity.netnsMeta
+		} else {
+			status := sandboxStatus.Status
+			if status.Network == nil || status.Network.Ip == "" {
+				log.Errorf("sanbox %s/%s: invalid sandbox status, no ip", sandbox.Metadata.Namespace, sandbox.Metadata.Name)
+				continue
+			}
+			ns = &netnsMeta{
 				inum:          netnsNum,
 				mountPath:     fmt.Sprintf("/proc/%d/ns/net", info.Pid),
 				isHostNetwork: false,
 				ipList:        []string{status.Network.Ip},
-			},
+			}
+		}
+
+		e := &Entity{
+			netnsMeta: ns,
 			podMeta: podMeta{
 				name:      name,
 				namespace: namespace,
-				ip:        sandboxStatus.Status.Network.Ip,
 			},
 			initPid: info.Pid,
 			pids:    pids,
 		}
 
-		addEntityToCache(e)
+		newEntities = append(newEntities, e)
+		addEntityToCache(e, true)
 	}
 
+	entities.Store(&newEntities)
 	log.Debug("finished cache process")
 	return nil
 }

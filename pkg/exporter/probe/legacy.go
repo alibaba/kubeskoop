@@ -9,7 +9,11 @@ import (
 )
 
 var legacyMetricsLabels = []string{"target_node", "target_namespace", "target_pod", "node", "namespace", "pod"}
-var newMetricsLabels = []string{"k8s_node", "k8s_namespace", "k8s_pod"}
+var StandardMetricsLabels = []string{"k8s_node", "k8s_namespace", "k8s_pod"}
+
+func BuildStandardMetricsLabelValues(entity *nettop.Entity) []string {
+	return []string{nettop.GetNodeName(), entity.GetPodNamespace(), entity.GetPodName()}
+}
 
 type legacyBatchMetrics struct {
 	module     string
@@ -40,7 +44,7 @@ func newLegacyBatchMetrics(module string, underscore bool, metrics []string, col
 		legacyName := legacyMetricsName(module, m, underscore)
 		newName := newMetricsName(module, m)
 		descs[legacyName] = prometheus.NewDesc(legacyName, "", legacyMetricsLabels, nil)
-		descs[newName] = prometheus.NewDesc(newName, "", newMetricsLabels, nil)
+		descs[newName] = prometheus.NewDesc(newName, "", StandardMetricsLabels, nil)
 	}
 	return &legacyBatchMetrics{
 		module:     module,

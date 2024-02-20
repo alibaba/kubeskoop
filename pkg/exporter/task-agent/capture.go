@@ -30,7 +30,7 @@ type capture struct {
 func (a *Agent) generateCaptures(id string, task *rpc.CaptureInfo) ([]capture, error) {
 	if task.Pod != nil && !task.Pod.HostNetwork {
 		var podEntry *nettop.Entity
-		entries := nettop.GetAllEntity()
+		entries := nettop.GetAllUniqueNetnsEntity()
 		for _, e := range entries {
 			if e.GetPodNamespace() == task.Pod.Namespace && e.GetPodName() == task.Pod.Name {
 				podEntry = e
