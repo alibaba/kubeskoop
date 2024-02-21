@@ -256,7 +256,10 @@ func (p *socketLatencyProbe) collect() (map[string]map[uint32]uint64, error) {
 
 		if key.Action == ACTION_READ {
 			if key.Bucket == BUCKET100MS {
+				// In kernel space, metric READ1MS and metric READ100MS are counted separately,
+				// so the value of BUCKET100MS needs to be added to metric READ1MS in user space at the same time.
 				res[READ100MS][key.Netns] += value
+				res[READ1MS][key.Netns] += value
 			} else if key.Bucket == BUCKET1MS {
 				res[READ1MS][key.Netns] += value
 			}
@@ -265,6 +268,7 @@ func (p *socketLatencyProbe) collect() (map[string]map[uint32]uint64, error) {
 		if key.Action == ACTION_WRITE {
 			if key.Bucket == BUCKET100MS {
 				res[WRITE100MS][key.Netns] += value
+				res[WRITE1MS][key.Netns] += value
 			} else if key.Bucket == BUCKET1MS {
 				res[WRITE1MS][key.Netns] += value
 			}
