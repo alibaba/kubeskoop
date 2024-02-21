@@ -269,20 +269,20 @@ func (p *softirqProbe) perfLoop() {
 		*/
 		switch event.Phase {
 		case 1:
-			if event.Latency > 100000000 {
+			evt.Type = "SOFTIRQ_SCHED_SLOW"
+			p.updateMetrics(SOFTIRQ_SCHED_SLOW, event.VecNr)
+
+			if event.Latency > 100_000_000 {
 				evt.Type = "SOFTIRQ_SCHED_100MS"
 				p.updateMetrics(SOFTIRQ_SCHED_100MS, event.VecNr)
-			} else {
-				evt.Type = "SOFTIRQ_SCHED_SLOW"
-				p.updateMetrics(SOFTIRQ_SCHED_SLOW, event.VecNr)
 			}
 		case 2:
-			if event.Latency > 100000000 {
+			evt.Type = "SOFTIRQ_EXCUTE_SLOW"
+			p.updateMetrics(SOFTIRQ_EXCUTE_SLOW, event.VecNr)
+
+			if event.Latency > 100_000_000 {
 				evt.Type = "SOFTIRQ_EXCUTE_100MS"
 				p.updateMetrics(SOFTIRQ_EXCUTE_100MS, event.VecNr)
-			} else {
-				evt.Type = "SOFTIRQ_EXCUTE_SLOW"
-				p.updateMetrics(SOFTIRQ_EXCUTE_SLOW, event.VecNr)
 			}
 
 		default:
