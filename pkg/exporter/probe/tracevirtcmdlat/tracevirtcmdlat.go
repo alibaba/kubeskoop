@@ -24,10 +24,10 @@ import (
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -cflags $BPF_CFLAGS -type insp_virtcmdlat_event_t  bpf ../../../../bpf/virtcmdlatency.c -- -I../../../../bpf/headers -D__TARGET_ARCH_x86
 
 const (
-	VIRTCMD100MS        = "latency100ms"
-	VIRTCMD             = "latency"
-	VIRTCMDEXCUTE       = "VIRTCMDEXCUTE"
-	VIRTCMDEXCUTE_100MS = "VIRTCMDEXCUTE_100MS"
+	VIRTCMD100MS       = "latency100ms"
+	VIRTCMD            = "latency"
+	VIRTCMDEXCUTE      = "VIRTCMDEXCUTE"
+	VIRTCMDEXCUTE100MS = "VIRTCMDEXCUTE_100MS"
 
 	fn        = "virtnet_send_command"
 	probeName = "virtcmdlatency"
@@ -212,7 +212,7 @@ func (p *virtcmdLatencyProbe) perfLoop() {
 
 		p.updateMetrics(VIRTCMD)
 		if event.Latency > 100_000_000 {
-			evt.Type = VIRTCMDEXCUTE_100MS
+			evt.Type = VIRTCMDEXCUTE100MS
 			p.updateMetrics(VIRTCMD100MS)
 		}
 
