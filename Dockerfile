@@ -19,7 +19,7 @@ WORKDIR /webconsole
 ADD ./webui /webconsole
 RUN yarn install && yarn build
 
-FROM docker.io/library/alpine
+FROM docker.io/library/alpine:3.19
 ARG GOPROXY
 ARG ALPINE_MIRROR
 ENV GOPROXY=$GOPROXY
