@@ -19,7 +19,7 @@ require (
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/golang/snappy v0.0.4
 	github.com/google/gops v0.3.26
-	github.com/gorilla/mux v1.8.0
+	github.com/gorilla/mux v1.8.1
 	github.com/hashicorp/golang-lru/v2 v2.0.6
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/json-iterator/go v1.1.12
