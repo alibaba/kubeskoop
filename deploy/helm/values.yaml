@@ -4,15 +4,15 @@ runtimeEndpoint: /run/containerd/containerd.sock
 appName: kubeskoop-exporter
 
 image:
-  repository: kubeskoop/kubeskoop
+  repository: kubeskoop/agent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: v0.1.1
+  tag: v1.0.0
   imagePullPolicy: IfNotPresent
 
 initContainer:
   enabled: true
-  repository: kubeskoop/btfhack
-  tag: v0.1.1
+  repository: kubeskoop/agent
+  tag: v1.0.0
   imagePullPolicy: IfNotPresent
 
 resources:

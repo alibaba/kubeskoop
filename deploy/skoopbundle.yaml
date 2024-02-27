@@ -31,7 +31,7 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       initContainers:
         - name: inspector-prepare
-          image: kubeskoop/kubeskoop:v1.0.0
+          image: kubeskoop/agent:v1.0.0
           volumeMounts:
             - name: btf-rawdata
               mountPath: /etc/net-exporter/btf
@@ -39,7 +39,7 @@ spec:
               name: boot
           command: [btfhack, discover, -p, /etc/net-exporter/btf/]
       containers:
-      - image: kubeskoop/kubeskoop:v1.0.0
+      - image: kubeskoop/agent:v1.0.0
         name: inspector
         env:
         - name: INSPECTOR_NODENAME
@@ -385,7 +385,7 @@ spec:
             name: grafana-datasources
             readOnly: false
       - name: register-dashboard
-        image: kubeskoop/kubeskoop:v1.0.0
+        image: kubeskoop/controller:v1.0.0
         env:
           - name: GRAFANA_PASSWORD
             value: "kubeskoop"
@@ -602,7 +602,7 @@ spec:
     spec:
       containers:
       - name: controller
-        image: kubeskoop/kubeskoop:v1.0.0
+        image: kubeskoop/controller:v1.0.0
         command: ["/bin/controller"]
         env:
           - name: LOKI_ENDPOINT
@@ -653,7 +653,7 @@ spec:
     spec:
       containers:
       - name: controller
-        image: kubeskoop/kubeskoop:v1.0.0
+        image: kubeskoop/controller:v1.0.0
         command: ["/bin/webconsole"]
         env:
           - name: CONTROLLER_ENDPOINT
