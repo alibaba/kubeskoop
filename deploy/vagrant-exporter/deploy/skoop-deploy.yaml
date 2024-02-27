@@ -30,7 +30,7 @@ spec:
       hostIPC: true
       dnsPolicy: ClusterFirstWithHostNet
       containers:
-      - image: "kubeskoop/kubeskoop:latest"
+      - image: "kubeskoop/agent:latest"
         name: inspector
         env:
         - name: INSPECTOR_NODENAME
@@ -354,7 +354,7 @@ spec:
             name: grafana-datasources
             readOnly: false
       - name: register-dashboard
-        image: kubeskoop/kubeskoop:latest
+        image: kubeskoop/controller:latest
         env:
           - name: GRAFANA_PASSWORD
             value: "kubeskoop"
