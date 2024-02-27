@@ -38,20 +38,20 @@ curl {{kubeskoop-exporter的pod ip}}:9102/status |jq .
 
 ## VARIABLES
 
-| Setting                      | Description                                                                                                        | Default                                         |
-|------------------------------|--------------------------------------------------------------------------------------------------------------------| ----------------------------------------------- |
-| name                         | DaemonSet name of KubeSkoop exporter.                                                                              | `kubeskoop-exporter`                            |
-| debugmode                    | Enable `debugmode` for kubeskoop-exporter, with debug interface, debug log level and pprof support.                | `false`                                         |
-| appName                      | Pod `app` label.                                                                                                   | `kubeskoop-exporter`                            |
+| Setting                      | Description                                                                                                        | Default                                                   |
+|------------------------------|--------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------|
+| name                         | DaemonSet name of KubeSkoop exporter.                                                                              | `kubeskoop-exporter`                                      |
+| debugmode                    | Enable `debugmode` for kubeskoop-exporter, with debug interface, debug log level and pprof support.                | `false`                                                   |
+| appName                      | Pod `app` label.                                                                                                   | `kubeskoop-exporter`                                      |
 | runtimeEndpoint              | CRI runtime endpoint socket, you can use  `crictl info                                                             | awk -F":" '/containerdEndpoint/ {print $2'` to obtain it. | `/run/containerd/containerd.sock`               |
-| image.repository             | Image repository for KubeSkoop exporter container.                                                                 | `kubeskoop/kubeskoop`                           |
-| image.tag                    | Image tag for KubeSkoop exporter container.                                                                        | `latest`                                        |
-| image.imagePullPolicy        | `imagePullPolicy` for KubeSkoop exporter container.                                                                | `Always`                                        |
-| initContainer.enabled        | Enable `btfhack` as initContainer to automate discover btf file when kernel does not carry btf information itself. | `true`                                          |
-| initContainer.repository     | Image repository for `btfhack` container.                                                                          | `registry.cn-hangzhou.aliyuncs.com/acs/btfhack` |
-| initContainer.tag            | Image tag for `btfhack` container.                                                                                 | `latest`                                        |
-| initContainer.imagePullPolicy | `imagePullPolicy` for `btfhack` container.                                                                         | `Always`                                        |
-| config.serverPort            | kubeskoop metrics server port, provide HTTP service.                                                               | 9102                                            |
-| config.metricsProbes         | Metric probes to enable.                                                                                           | Refer to the probe guide.                       |
-| config.eventProbes           | Event probes to enable.                                                                                            | Refer to the probe guide.                       |
-| config.eventSinks            | Sink config for events, stderr/file/loki are supported now.                                                        | 15                                              |
+| image.repository             | Image repository for KubeSkoop exporter container.                                                                 | `kubeskoop/agent`                                         |
+| image.tag                    | Image tag for KubeSkoop exporter container.                                                                        | `latest`                                                  |
+| image.imagePullPolicy        | `imagePullPolicy` for KubeSkoop exporter container.                                                                | `Always`                                                  |
+| initContainer.enabled        | Enable `btfhack` as initContainer to automate discover btf file when kernel does not carry btf information itself. | `true`                                                    |
+| initContainer.repository     | Image repository for `btfhack` container.                                                                          | `registry.cn-hangzhou.aliyuncs.com/acs/btfhack`           |
+| initContainer.tag            | Image tag for `btfhack` container.                                                                                 | `latest`                                                  |
+| initContainer.imagePullPolicy | `imagePullPolicy` for `btfhack` container.                                                                         | `Always`                                                  |
+| config.serverPort            | kubeskoop metrics server port, provide HTTP service.                                                               | 9102                                                      |
+| config.metricsProbes         | Metric probes to enable.                                                                                           | Refer to the probe guide.                                 |
+| config.eventProbes           | Event probes to enable.                                                                                            | Refer to the probe guide.                                 |
+| config.eventSinks            | Sink config for events, stderr/file/loki are supported now.                                                        | 15                                                        |

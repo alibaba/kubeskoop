@@ -1,5 +1,3 @@
-SKOOP_REPO ?= kubeskoop/kubeskoop
-
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # This is a requirement for 'setup-envtest.sh' in the test target.
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
@@ -11,7 +9,7 @@ TARGETARCH?=amd64
 
 TAG?=${shell git describe --tags --abbrev=7}
 GIT_COMMIT=${shell git rev-parse HEAD}
-ldflags="-X $(VERSION_PKG).Version=$(TAG) -X $(VERSION_PKG).Commit=${GIT_COMMIT}"
+ldflags="-X $(VERSION_PKG).Version=$(TAG) -X $(VERSION_PKG).Commit=${GIT_COMMIT} -w -s"
 
 .PHONY: all
 all: build-exporter build-skoop build-controller build-collector build-btfhack build-webconsole
@@ -38,7 +36,7 @@ build-collector:
 
 .PHONY: build-controller
 build-controller:
-	go build -o bin/controller -ldflags $(ldflags) ./cmd/controller
+	CGO_ENABLED=0 go build -o bin/controller -ldflags $(ldflags) ./cmd/controller
 
 .PHONY: build-btfhack
 build-btfhack:
@@ -51,11 +49,3 @@ build-webconsole:
 .PHONY: generate-btf
 generate-btf:
 	go generate ./pkg/exporter/probe/...
-
-.PHONY: image
-image: ## build kubeskoop image
-	docker build -t $(SKOOP_REPO):$(TAG) .
-
-.PHONY: push
-push: image ## push kubeskoop image
-	docker push $(SKOOP_REPO):$(TAG)
