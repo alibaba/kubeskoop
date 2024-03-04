@@ -8,7 +8,7 @@ require (
 	github.com/alibabacloud-go/ecs-20140526/v2 v2.1.3
 	github.com/alibabacloud-go/slb-20140515/v4 v4.0.2
 	github.com/alibabacloud-go/tea v1.1.20
-	github.com/alibabacloud-go/vpc-20160428/v2 v2.0.15
+	github.com/alibabacloud-go/vpc-20160428/v2 v2.0.117
 	github.com/bastjan/netstat v1.0.0
 	github.com/beevik/etree v1.1.0
 	github.com/cilium/ebpf v0.9.3
