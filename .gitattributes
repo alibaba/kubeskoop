@@ -6,4 +6,4 @@
 **/generated.pb.go linguist-generated=true
 **/generated.proto
 
-bpf/headers/** -linguist-vendored
+bpf/headers/** linguist-vendored
