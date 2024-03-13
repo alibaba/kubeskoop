@@ -10,6 +10,9 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/alibaba/kubeskoop/pkg/controller/k8s"
+	"k8s.io/apimachinery/pkg/labels"
+
 	"github.com/alibaba/kubeskoop/pkg/controller/rpc"
 	"github.com/samber/lo"
 	corev1 "k8s.io/api/core/v1"
@@ -48,9 +51,25 @@ type Node struct {
 	Labels map[string]string `json:"labels"`
 }
 
+func podListWithInformer() ([]*Pod, error) {
+	pods, err := k8s.PodInformer.Lister().Pods("").List(labels.Everything())
+	if err != nil {
+		return nil, fmt.Errorf("list pods failed: %v", err)
+	}
+	return lo.Map[*corev1.Pod, *Pod](pods, func(pod *corev1.Pod, idx int) *Pod {
+		return &Pod{
+			Name:      pod.Name,
+			Namespace: pod.Namespace,
+			Nodename:  pod.Spec.NodeName,
+			Labels:    pod.Labels,
+		}
+	}), nil
+
+}
+
 func (c *controller) PodList(ctx context.Context) ([]*Pod, error) {
-	if c.podInformer != nil {
-		return c.podListWithInformer(ctx)
+	if k8s.PodInformer != nil {
+		return podListWithInformer()
 	}
 
 	pods, err := c.k8sClient.CoreV1().Pods("").List(ctx, v1.ListOptions{})

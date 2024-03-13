@@ -1,5 +1,6 @@
 debugmode: true
 port: 9102
+enable_controller: true
 metrics:
   probes:
   - name: conntrack
@@ -13,12 +14,14 @@ metrics:
   - name: udp
   - name: kernellatency
   - name: packetloss
+  - name: flow
 event:
-  probes:
+  probes: 
   - name: biolatency
   - name: kernellatency
   - name: packetloss
   - name: tcpreset
-  sinks:
+  sinks: 
   - name: stderr
+  
 

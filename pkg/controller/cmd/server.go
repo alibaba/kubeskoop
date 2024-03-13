@@ -14,6 +14,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/alibaba/kubeskoop/pkg/controller/ipcache"
+	"github.com/alibaba/kubeskoop/pkg/controller/k8s"
+
 	"github.com/alibaba/kubeskoop/pkg/controller/graph"
 	"github.com/alibaba/kubeskoop/pkg/controller/rpc"
 	"github.com/alibaba/kubeskoop/pkg/controller/service"
@@ -30,26 +33,32 @@ const (
 )
 
 type Server struct {
-	config     ServerConfig
-	controller service.ControllerService
+	config         ServerConfig
+	controller     service.ControllerService
+	ipCacheService *ipcache.Service
 }
 
 func NewServer(config *Config) *Server {
-	ctrlSVC, err := service.NewControllerService(&config.Controller)
+	ctrlSVC, err := service.NewControllerService(k8s.Client, &config.Controller)
 	if err != nil {
 		log.Fatalf("error create controller service: %v", err)
 	}
+
+	cache := ipcache.NewService(k8s.PodInformer, k8s.NodeInformer)
+
 	return &Server{
-		config:     config.Server,
-		controller: ctrlSVC,
+		config:         config.Server,
+		controller:     ctrlSVC,
+		ipCacheService: cache,
 	}
 }
 
 func (s *Server) Run() {
 	done := make(chan struct{})
+	k8s.StartInformer(done)
+
 	go s.RunAgentServer(s.config.AgentPort, done)
 	go s.RunHTTPServer(s.config.HTTPPort, done)
-	go s.controller.Run(done)
 
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGTERM)
@@ -63,6 +72,8 @@ func (s *Server) RunAgentServer(port int, done <-chan struct{}) {
 	}
 	grpcServer := grpc.NewServer(grpc.MaxRecvMsgSize(102 * 1024 * 1024))
 	rpc.RegisterControllerRegisterServiceServer(grpcServer, s.controller)
+	rpc.RegisterIPCacheServiceServer(grpcServer, s.ipCacheService)
+
 	listener, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", port))
 	if err != nil {
 		log.Fatalf("err listen on %d: %v", port, err)

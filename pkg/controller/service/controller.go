@@ -2,27 +2,22 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"os"
 	"sync"
 	"time"
 
 	"github.com/alibaba/kubeskoop/pkg/controller/db"
-	log "github.com/sirupsen/logrus"
-
 	exporter "github.com/alibaba/kubeskoop/pkg/exporter/cmd"
 	lokiwrapper "github.com/alibaba/kubeskoop/pkg/exporter/loki"
 
 	"github.com/alibaba/kubeskoop/pkg/controller/diagnose"
 	"github.com/alibaba/kubeskoop/pkg/controller/rpc"
 	skoopContext "github.com/alibaba/kubeskoop/pkg/skoop/context"
-	"github.com/alibaba/kubeskoop/pkg/skoop/utils"
 	"github.com/prometheus/client_golang/api"
 	promv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 )
 
 const (
@@ -32,7 +27,6 @@ const (
 
 type ControllerService interface {
 	rpc.ControllerRegisterServiceServer
-	Run(done <-chan struct{})
 	GetAgentList() []*rpc.AgentInfo
 	Capture(ctx context.Context, capture *CaptureArgs) (int, error)
 	CaptureList(ctx context.Context) (map[int][]*CaptureTaskResult, error)
@@ -51,43 +45,21 @@ type ControllerService interface {
 }
 
 type Config struct {
-	KubeConfig string          `yaml:"kubeConfig"`
+	KubeConfig string
 	Prometheus string          `yaml:"prometheus"`
 	DB         db.Config       `yaml:"database"`
 	Diagnose   diagnose.Config `yaml:"diagnose"`
 }
 
-func NewControllerService(config *Config) (ControllerService, error) {
+func NewControllerService(k8sClient *kubernetes.Clientset, config *Config) (ControllerService, error) {
 	ctrl := &controller{
 		taskWatcher:    sync.Map{},
 		resultWatchers: sync.Map{},
 		Namespace:      Namespace,
 		ConfigMapName:  ExporterConfigMap,
 	}
-	var (
-		restConfig *rest.Config
-		err        error
-	)
 
-	if config.KubeConfig != "" {
-		log.Infof("load kubeconfig from %s", config.KubeConfig)
-		restConfig, _, err = utils.NewConfig(config.KubeConfig)
-	} else if os.Getenv("KUBERNETES_SERVICE_HOST") != "" {
-		log.Infof("load incluster kubeconfig")
-		restConfig, err = rest.InClusterConfig()
-	} else {
-		log.Infof("try load kubeconfig from ~/.kube/config")
-		restConfig, _, err = utils.NewConfig("~/.kube/config")
-	}
-	if err != nil {
-		return nil, fmt.Errorf("error get incluster config, err: %v", err)
-	}
-	ctrl.k8sClient, err = kubernetes.NewForConfig(restConfig)
-	if err != nil {
-		return nil, fmt.Errorf("error create k8s client, err: %v", err)
-	}
-
-	ctrl.InitInformer()
+	ctrl.k8sClient = k8sClient
 
 	//init db
 	if err := db.InitializeDB(&config.DB); err != nil {
@@ -123,7 +95,6 @@ func NewControllerService(config *Config) (ControllerService, error) {
 
 type controller struct {
 	rpc.UnimplementedControllerRegisterServiceServer
-	ControllerInformer
 	diagnostor     diagnose.Controller
 	k8sClient      *kubernetes.Clientset
 	taskWatcher    sync.Map
@@ -132,8 +103,4 @@ type controller struct {
 	lokiClient     *lokiwrapper.Client
 	Namespace      string
 	ConfigMapName  string
-}
-
-func (c *controller) Run(stop <-chan struct{}) {
-	c.RunInformer(stop)
 }

@@ -19,6 +19,7 @@ require (
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/golang/snappy v0.0.4
 	github.com/google/gops v0.3.26
+	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.1
 	github.com/hashicorp/golang-lru/v2 v2.0.6
 	github.com/jmoiron/sqlx v1.3.5
@@ -129,7 +130,6 @@ require (
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/pprof v0.0.0-20210720184732-4bb14d4b1be1 // indirect
-	github.com/google/uuid v1.3.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
 	github.com/inconshreveable/mousetrap v1.0.1 // indirect
