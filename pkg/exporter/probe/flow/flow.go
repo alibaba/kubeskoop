@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 	"strings"
 	"sync"
 	"syscall"
@@ -216,7 +217,7 @@ func metricsProbeCreator(args flowArgs) (probe.MetricsProbe, error) {
 	opts := probe.BatchMetricsOpts{
 		Namespace:      probe.MetricsNamespace,
 		Subsystem:      probeName,
-		VariableLabels: []string{"protocol", "src", "dst", "sport", "dport"},
+		VariableLabels: []string{"protocol", "src", "src_type", "src_node", "src_namespace", "src_pod", "dst", "dst_type", "dst_node", "dst_namespace", "dst_pod", "sport", "dport"},
 		SingleMetricsOpts: []probe.SingleMetricsOpts{
 			{Name: metricsBytes, ValueType: prometheus.CounterValue},
 			{Name: metricsPackets, ValueType: prometheus.CounterValue},
@@ -286,13 +287,33 @@ func (p *metricsProbe) collectOnce(emit probe.Emit) error {
 			log.Errorf("%s unknown ip protocol number %d", probeName, key.Proto)
 		}
 
-		labels := []string{
-			protocol,
-			toIPString(key.Src),
-			toIPString(key.Dst),
-			fmt.Sprintf("%d", htons(key.Sport)),
-			fmt.Sprintf("%d", htons(key.Dport)),
+		ipInfo := func(ip string) []string {
+			info := nettop.GetIPInfo(ip)
+			if info == nil {
+				return []string{"unknown", "", "", ""}
+			}
+
+			switch info.Type {
+			case nettop.IPTypeNode:
+				return []string{"node", info.NodeName, "", ""}
+			case nettop.IPTypePod:
+				return []string{"pod", "", info.PodNamespace, info.PodName}
+			default:
+				log.Warningf("unkonwn ip type %s for %s", ip, info.Type)
+			}
+			return []string{"unknown", "", "", ""}
 		}
+
+		labels := []string{protocol}
+		srcIP := toIPString(key.Src)
+		labels = append(labels, srcIP)
+		labels = append(labels, ipInfo(srcIP)...)
+
+		dstIP := toIPString(key.Dst)
+		labels = append(labels, dstIP)
+		labels = append(labels, ipInfo(dstIP)...)
+		labels = append(labels, fmt.Sprintf("%d", htons(key.Sport)))
+		labels = append(labels, fmt.Sprintf("%d", htons(key.Dport)))
 
 		emit("bytes", labels, float64(val.Bytes))
 		emit("packets", labels, float64(val.Packets))

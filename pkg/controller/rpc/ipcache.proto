@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package controller_rpc;
+option go_package = "./;rpc";
+
+service IPCacheService{
+  rpc ListCache(ListCacheRequest) returns (ListCacheResponse);
+  rpc WatchCache(WatchCacheRequest) returns (stream WatchCacheResponse);
+}
+
+enum AddressFamily {
+  AF_INET = 0;
+  AF_INET6 = 1;
+}
+enum ValueType{
+  Pod = 0;
+  Node = 1;
+}
+message PodMeta {
+  string namespace = 1;
+  string name = 2;
+}
+message NodeMeta {
+  string name = 1;
+}
+
+message CacheEntry{
+  string  IP = 1;
+  ValueType type = 2;
+  oneof meta {
+    PodMeta pod = 3;
+    NodeMeta node = 4;
+  }
+}
+
+message ListCacheRequest{}
+
+message ListCacheResponse{
+  string period = 1;
+  uint64 revision = 2;
+  repeated CacheEntry entries = 3;
+}
+
+message WatchCacheRequest{
+  string period = 1;
+  uint64  revision = 2;
+}
+
+enum OpCode {
+  Set = 0;
+  Del = 1;
+}
+
+message WatchCacheResponse{
+  uint64 revision = 1;
+  OpCode opcode = 2;
+  CacheEntry entry = 3;
+}
