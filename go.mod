@@ -13,7 +13,7 @@ require (
 	github.com/beevik/etree v1.1.0
 	github.com/cilium/ebpf v0.9.3
 	github.com/containerd/containerd v1.6.15
-	github.com/docker/docker v20.10.22+incompatible
+	github.com/docker/docker v24.0.9+incompatible
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/go-sql-driver/mysql v1.6.0
