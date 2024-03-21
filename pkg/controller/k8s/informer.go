@@ -2,13 +2,14 @@ package k8s
 
 import (
 	"fmt"
+	"time"
+
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/informers"
 	v1 "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-	"time"
 )
 
 var sharedInformerFactory informers.SharedInformerFactory

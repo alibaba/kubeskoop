@@ -3,10 +3,11 @@ package taskagent
 import (
 	"context"
 	"fmt"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"os"
 	"time"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -47,7 +48,7 @@ func retry(msg string, maxAttempts int, work func() error) error {
 		if err == nil {
 			return nil
 		}
-		attempts += 1
+		attempts++
 		if maxAttempts > 0 && attempts >= maxAttempts {
 			return fmt.Errorf("failed %s after %d attempts", msg, attempts)
 		}

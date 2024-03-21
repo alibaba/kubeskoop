@@ -2,9 +2,10 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/alibaba/kubeskoop/pkg/controller/k8s"
 	log "github.com/sirupsen/logrus"
-	"os"
 
 	"github.com/spf13/cobra"
 )

@@ -1,11 +1,12 @@
 package k8s
 
 import (
+	"os"
+
 	"github.com/alibaba/kubeskoop/pkg/skoop/utils"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"os"
 )
 
 var Client *kubernetes.Clientset

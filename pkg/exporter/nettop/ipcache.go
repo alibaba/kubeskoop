@@ -2,9 +2,10 @@ package nettop
 
 import (
 	"fmt"
-	"github.com/alibaba/kubeskoop/pkg/controller/rpc"
 	"sync"
 	"sync/atomic"
+
+	"github.com/alibaba/kubeskoop/pkg/controller/rpc"
 )
 
 type IPType string

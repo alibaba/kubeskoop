@@ -4,6 +4,11 @@ import (
 	"container/list"
 	"context"
 	"fmt"
+	"reflect"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"github.com/alibaba/kubeskoop/pkg/controller/rpc"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -14,10 +19,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"reflect"
-	"sync"
-	"sync/atomic"
-	"time"
 )
 
 const (
@@ -40,8 +41,8 @@ type snapshot struct {
 type storage struct {
 	revision atomic.Uint64
 	snapshot snapshot
-	full     map[string]*rpc.CacheEntry
-	log      []*changeLog
+	//full     map[string]*rpc.CacheEntry
+	log []*changeLog
 }
 
 type clientstate int
@@ -61,7 +62,6 @@ type client struct {
 
 type Service struct {
 	rpc.UnimplementedIPCacheServiceServer
-	podInformer coreinformers.PodInformer
 	storage     storage
 	clients     *list.List
 	clientsLock sync.RWMutex
@@ -145,22 +145,6 @@ func findNext(slice []*changeLog, target uint64) int {
 			start = mid + 1
 		} else {
 			ret = mid
-			end = mid - 1
-		}
-	}
-	return ret
-}
-
-func findPrevious(slice []*changeLog, target uint64) int {
-	start := 0
-	end := len(slice) - 1
-	ret := -1
-	for start <= end {
-		mid := (start + end) / 2
-		if slice[mid].revision < target {
-			ret = mid
-			start = mid + 1
-		} else {
 			end = mid - 1
 		}
 	}
@@ -457,7 +441,7 @@ func (s *Service) copyClients(filter ...clientstate) []*client {
 }
 
 func (s *Service) syncControl() {
-	ticker := time.Tick(500 * time.Millisecond)
+	ticker := time.NewTicker(500 * time.Millisecond)
 
 	var pendingLogs []*changeLog
 
@@ -479,7 +463,7 @@ func (s *Service) syncControl() {
 				maxSyncedRevision = pendingLogs[len(pendingLogs)-1].revision
 				pendingLogs = nil
 			}
-		case <-ticker:
+		case <-ticker.C:
 			if len(pendingLogs) > 0 {
 				s.syncUpToDateClients(pendingLogs, maxSyncedRevision)
 				maxSyncedRevision = pendingLogs[len(pendingLogs)-1].revision
@@ -533,7 +517,7 @@ func (s *Service) syncOne(c *client, upToDateRevision uint64) {
 		cl := s.storage.log[index]
 		select {
 		case c.ch <- cl:
-			index += 1
+			index++
 			c.revision = cl.revision
 			if cl.revision == upToDateRevision {
 				c.state = uptodate

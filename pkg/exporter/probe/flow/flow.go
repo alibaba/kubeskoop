@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 	"strings"
 	"sync"
 	"syscall"
+
+	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -299,7 +300,7 @@ func (p *metricsProbe) collectOnce(emit probe.Emit) error {
 			case nettop.IPTypePod:
 				return []string{"pod", "", info.PodNamespace, info.PodName}
 			default:
-				log.Warningf("unkonwn ip type %s for %s", ip, info.Type)
+				log.Warningf("unknown ip type %s for %s", ip, info.Type)
 			}
 			return []string{"unknown", "", "", ""}
 		}

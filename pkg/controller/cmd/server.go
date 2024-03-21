@@ -2,8 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/alibaba/kubeskoop/pkg/controller/ipcache"
-	"github.com/alibaba/kubeskoop/pkg/controller/k8s"
 	"io"
 	"log"
 	"net"
@@ -15,6 +13,9 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/alibaba/kubeskoop/pkg/controller/ipcache"
+	"github.com/alibaba/kubeskoop/pkg/controller/k8s"
 
 	"github.com/alibaba/kubeskoop/pkg/controller/graph"
 	"github.com/alibaba/kubeskoop/pkg/controller/rpc"

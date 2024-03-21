@@ -2,8 +2,9 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/alibaba/kubeskoop/pkg/controller/k8s"
 	"os"
+
+	"github.com/alibaba/kubeskoop/pkg/controller/k8s"
 
 	"github.com/alibaba/kubeskoop/pkg/controller/service"
 	"gopkg.in/yaml.v3"
