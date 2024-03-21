@@ -14,8 +14,14 @@ metrics:
   - name: udp
   - name: kernellatency
   - name: packetloss
+  - name: flow
 event:
-  probes: []
-  sinks: []
+  probes: 
+  - name: biolatency
+  - name: kernellatency
+  - name: packetloss
+  - name: tcpreset
+  sinks: 
+  - stderr
   
 
