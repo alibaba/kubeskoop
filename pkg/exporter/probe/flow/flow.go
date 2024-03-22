@@ -2,7 +2,6 @@ package flow
 
 import (
 	"context"
-	"encoding/binary"
 	"fmt"
 	"strings"
 	"sync"
@@ -218,7 +217,7 @@ func metricsProbeCreator(args flowArgs) (probe.MetricsProbe, error) {
 	opts := probe.BatchMetricsOpts{
 		Namespace:      probe.MetricsNamespace,
 		Subsystem:      probeName,
-		VariableLabels: []string{"protocol", "src", "src_type", "src_node", "src_namespace", "src_pod", "dst", "dst_type", "dst_node", "dst_namespace", "dst_pod", "sport", "dport"},
+		VariableLabels: probe.TupleMetricsLabels,
 		SingleMetricsOpts: []probe.SingleMetricsOpts{
 			{Name: metricsBytes, ValueType: prometheus.CounterValue},
 			{Name: metricsPackets, ValueType: prometheus.CounterValue},
@@ -252,12 +251,8 @@ func (p *metricsProbe) Stop(_ context.Context) error {
 	}
 	return p.bpfObjs.Close()
 }
+
 func (p *metricsProbe) collectOnce(emit probe.Emit) error {
-	htons := func(port uint16) uint16 {
-		data := make([]byte, 2)
-		binary.BigEndian.PutUint16(data, port)
-		return binary.LittleEndian.Uint16(data)
-	}
 	var values []bpfFlowMetrics
 	var key bpfFlowTuple4
 	iterator := p.bpfObjs.bpfMaps.InspFlow4Metrics.Iterate()
@@ -271,21 +266,6 @@ func (p *metricsProbe) collectOnce(emit probe.Emit) error {
 		for i := 0; i < len(values); i++ {
 			val.Bytes += values[i].Bytes
 			val.Packets += values[i].Packets
-		}
-
-		var protocol string
-
-		switch key.Proto {
-		case 1:
-			protocol = "icmp"
-		case 6:
-			protocol = "tcp"
-		case 17:
-			protocol = "udp"
-		case 132:
-			protocol = "sctp"
-		default:
-			log.Errorf("%s unknown ip protocol number %d", probeName, key.Proto)
 		}
 
 		ipInfo := func(ip string) []string {
@@ -305,16 +285,16 @@ func (p *metricsProbe) collectOnce(emit probe.Emit) error {
 			return []string{"unknown", "", "", ""}
 		}
 
-		labels := []string{protocol}
-		srcIP := toIPString(key.Src)
+		labels := []string{bpfutil.GetProtoStr(key.Proto)}
+		srcIP := bpfutil.GetV4AddrStr(key.Src)
 		labels = append(labels, srcIP)
 		labels = append(labels, ipInfo(srcIP)...)
 
-		dstIP := toIPString(key.Dst)
+		dstIP := bpfutil.GetV4AddrStr(key.Dst)
 		labels = append(labels, dstIP)
 		labels = append(labels, ipInfo(dstIP)...)
-		labels = append(labels, fmt.Sprintf("%d", htons(key.Sport)))
-		labels = append(labels, fmt.Sprintf("%d", htons(key.Dport)))
+		labels = append(labels, fmt.Sprintf("%d", bpfutil.Htons(key.Sport)))
+		labels = append(labels, fmt.Sprintf("%d", bpfutil.Htons(key.Dport)))
 
 		emit("bytes", labels, float64(val.Bytes))
 		emit("packets", labels, float64(val.Packets))
@@ -364,15 +344,6 @@ func (f *ebpfFlow) stop() error {
 
 func (f *ebpfFlow) cleanup() error {
 	return cleanQdisc(f.dev)
-}
-
-func toIPString(addr uint32) string {
-	var bytes [4]byte
-	bytes[0] = byte(addr & 0xff)
-	bytes[1] = byte(addr >> 8 & 0xff)
-	bytes[2] = byte(addr >> 16 & 0xff)
-	bytes[3] = byte(addr >> 24 & 0xff)
-	return fmt.Sprintf("%d.%d.%d.%d", bytes[0], bytes[1], bytes[2], bytes[3])
 }
 
 func (f *ebpfFlow) setupTCFilter(link netlink.Link) error {

@@ -1,6 +1,7 @@
 package bpfutil
 
 import (
+	"encoding/binary"
 	"fmt"
 	"net"
 	"strings"
@@ -8,13 +9,28 @@ import (
 )
 
 // GetAddrStr get string format ip address,default in ipv4
-func GetAddrStr(proto uint16, addr [16]byte) string {
+func GetAddrStr(proto uint16, addr [16]uint8) string {
 	switch proto {
 	case syscall.ETH_P_IPV6:
 		return fmt.Sprintf("[%s]", net.IP(addr[:]).String())
 	default:
 		return net.IP(addr[:4]).String()
 	}
+}
+
+func GetV4AddrStr(addr uint32) string {
+	var bytes [4]byte
+	bytes[0] = byte(addr & 0xff)
+	bytes[1] = byte(addr >> 8 & 0xff)
+	bytes[2] = byte(addr >> 16 & 0xff)
+	bytes[3] = byte(addr >> 24 & 0xff)
+	return fmt.Sprintf("%d.%d.%d.%d", bytes[0], bytes[1], bytes[2], bytes[3])
+}
+
+func Htons(i uint16) uint16 {
+	data := make([]byte, 2)
+	binary.BigEndian.PutUint16(data, i)
+	return binary.LittleEndian.Uint16(data)
 }
 
 /*

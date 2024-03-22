@@ -8,17 +8,17 @@ import (
 	"fmt"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
-	"github.com/alibaba/kubeskoop/pkg/exporter/util"
 	log "github.com/sirupsen/logrus"
 
-	"math/bits"
 	"strings"
 	"sync"
 	"unsafe"
 
 	"github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
-	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
@@ -26,45 +26,60 @@ import (
 	"github.com/cilium/ebpf/rlimit"
 )
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -cflags $BPF_CFLAGS -type insp_pl_event_t -type insp_pl_metric_t bpf ../../../../bpf/packetloss.c -- -I../../../../bpf/headers -D__TARGET_ARCH_x86
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -cflags $BPF_CFLAGS -type insp_pl_event_t -type addr -type tuple bpf ../../../../bpf/packetloss.c -- -I../../../../bpf/headers -D__TARGET_ARCH_x86
 
 // nolint
 const (
-	PACKETLOSS_ABNORMAL  = "abnormal"
-	PACKETLOSS_TOTAL     = "total"
-	PACKETLOSS_NETFILTER = "netfilter"
-	PACKETLOSS_TCPSTATEM = "tcpstatm"
-	PACKETLOSS_TCPRCV    = "tcprcv"
-	PACKETLOSS_TCPHANDLE = "tcphandle"
+	packetLossTotal     = "total"
+	packetLossNetfilter = "netfilter"
+	//PACKETLOSS_ABNORMAL  = "abnormal"
+	//PACKETLOSS_TCPSTATEM = "tcpstatm"
+	//PACKETLOSS_TCPRCV    = "tcprcv"
+	//PACKETLOSS_TCPHANDLE = "tcphandle"
 
-	PACKETLOSS = "PACKETLOSS"
+	PacketLoss = "PacketLoss"
 )
 
 var (
-	ignoreSymbolList  = map[string]struct{}{}
-	uselessSymbolList = map[string]struct{}{}
+	ignoreSymbolList = map[string]struct{}{}
+	uselessSymbols   = map[string]bool{
+		"sk_stream_kill_queues": true,
+		"unix_release_sock":     true,
+	}
 
 	netfilterSymbol = "nf_hook_slow"
-	tcpstatmSymbol  = "tcp_rcv_state_process"
-	tcprcvSymbol    = "tcp_v4_rcv"
-	tcpdorcvSymbol  = "tcp_v4_do_rcv"
+	//tcpstatmSymbol  = "tcp_rcv_state_process"
+	//tcprcvSymbol    = "tcp_v4_rcv"
+	//tcpdorcvSymbol  = "tcp_v4_do_rcv"
 
 	probeName = "packetloss"
-
-	packetLossMetrics = []string{PACKETLOSS_TCPHANDLE, PACKETLOSS_TCPRCV, PACKETLOSS_ABNORMAL, PACKETLOSS_TOTAL, PACKETLOSS_NETFILTER, PACKETLOSS_TCPSTATEM}
 
 	_packetLossProbe = &packetLossProbe{}
 )
 
 func init() {
+	var err error
+	_packetLossProbe.cache, err = lru.New[probe.Tuple, *Counter](102400)
+	if err != nil {
+		panic(fmt.Sprintf("cannot create lru cache for packetloss probe:%v", err))
+	}
 	probe.MustRegisterMetricsProbe(probeName, metricsProbeCreator)
 	probe.MustRegisterEventProbe(probeName, eventProbeCreator)
 }
 
 func metricsProbeCreator() (probe.MetricsProbe, error) {
 	p := &metricsProbe{}
-	batchMetrics := probe.NewLegacyBatchMetricsWithUnderscore(probeName, packetLossMetrics, p.CollectOnce)
 
+	opts := probe.BatchMetricsOpts{
+		Namespace:      probe.MetricsNamespace,
+		Subsystem:      probeName,
+		VariableLabels: probe.TupleMetricsLabels,
+		SingleMetricsOpts: []probe.SingleMetricsOpts{
+			{Name: packetLossTotal, ValueType: prometheus.CounterValue},
+			{Name: packetLossNetfilter, ValueType: prometheus.CounterValue},
+		},
+	}
+	batchMetrics := probe.NewBatchMetrics(opts, p.collectOnce)
 	return probe.NewMetricsProbe(probeName, p, batchMetrics), nil
 }
 
@@ -86,8 +101,19 @@ func (p *metricsProbe) Stop(ctx context.Context) error {
 	return _packetLossProbe.stop(ctx, probe.ProbeTypeMetrics)
 }
 
-func (p *metricsProbe) CollectOnce() (map[string]map[uint32]uint64, error) {
-	return _packetLossProbe.collect()
+func (p *metricsProbe) collectOnce(emit probe.Emit) error {
+	keys := _packetLossProbe.cache.Keys()
+	for _, tuple := range keys {
+		counter, ok := _packetLossProbe.cache.Get(tuple)
+		if !ok || counter == nil {
+			continue
+		}
+
+		labels := probe.BuildTupleMetricsLabels(&tuple)
+		emit(packetLossTotal, labels, float64(counter.Total))
+		emit(packetLossNetfilter, labels, float64(counter.Netfilter))
+	}
+	return nil
 }
 
 type eventProbe struct {
@@ -108,6 +134,11 @@ func (e *eventProbe) Stop(ctx context.Context) error {
 	return _packetLossProbe.stop(ctx, probe.ProbeTypeEvent)
 }
 
+type Counter struct {
+	Total     uint32
+	Netfilter uint32
+}
+
 type packetLossProbe struct {
 	objs       bpfObjects
 	links      []link.Link
@@ -115,6 +146,8 @@ type packetLossProbe struct {
 	refcnt     [probe.ProbeTypeCount]int
 	lock       sync.Mutex
 	perfReader *perf.Reader
+
+	cache *lru.Cache[probe.Tuple, *Counter]
 }
 
 func (p *packetLossProbe) stop(_ context.Context, probeType probe.Type) error {
@@ -188,84 +221,6 @@ func (p *packetLossProbe) start(ctx context.Context, probeType probe.Type) (err 
 	return nil
 }
 
-func (p *packetLossProbe) collect() (map[string]map[uint32]uint64, error) {
-	//TODO metrics of packetloss should be counter, not gauge.
-	// we should create metrics from events
-	resMap := make(map[string]map[uint32]uint64)
-	for _, metric := range packetLossMetrics {
-		resMap[metric] = make(map[uint32]uint64)
-	}
-
-	m := p.objs.bpfMaps.InspPlMetric
-	if m == nil {
-		log.Warnf("%s get metric map with nil", probeName)
-		return nil, nil
-	}
-	var (
-		value   uint64
-		entries = m.Iterate()
-		key     = bpfInspPlMetricT{}
-	)
-
-	// if no entity found, do not report metric
-	ets := nettop.GetAllUniqueNetnsEntity()
-	if len(ets) == 0 {
-		return resMap, nil
-	}
-
-	for _, et := range ets {
-		// default set all stat to zero to prevent empty metric
-		for _, metric := range packetLossMetrics {
-			resMap[metric][uint32(et.GetNetns())] = 0
-		}
-	}
-
-	for entries.Next(&key, &value) {
-		// in tcp_v4_do_rcv situation, after sock_rps_save_rxhash, skb->dev was removed and sock was not bind
-		if key.Netns == 0 {
-			continue
-		}
-
-		// if _, ok := res[PACKETLOSS_TOTAL][key.Netns]; ok {
-		// 	res[PACKETLOSS_TOTAL][key.Netns] += value
-		// } else {
-		// 	res[PACKETLOSS_TOTAL][key.Netns] += value
-		// }
-
-		sym, err := bpfutil.GetSymPtFromBpfLocation(key.Location)
-		if err != nil {
-			log.Warnf("%s get sym failed, location: %x, err: %v", probeName, key.Location, err)
-			continue
-		}
-
-		switch sym.GetName() {
-		case netfilterSymbol:
-			resMap[PACKETLOSS_NETFILTER][key.Netns] += value
-		case tcpstatmSymbol:
-			resMap[PACKETLOSS_TCPSTATEM][key.Netns] += value
-		case tcprcvSymbol:
-			resMap[PACKETLOSS_TCPRCV][key.Netns] += value
-		case tcpdorcvSymbol:
-			resMap[PACKETLOSS_TCPHANDLE][key.Netns] += value
-		default:
-			if _, ok := ignoreSymbolList[sym.GetName()]; !ok {
-				resMap[PACKETLOSS_ABNORMAL][key.Netns] += value
-			}
-			resMap[PACKETLOSS_TOTAL][key.Netns] += value
-		}
-
-		// if _, ok := ignoreSymbolList[sym.GetName()]; !ok {
-		// 	if _, ok := res[PACKETLOSS_ABNORMAL][key.Netns]; ok {
-		// 		res[PACKETLOSS_ABNORMAL][key.Netns] += value
-		// 	} else {
-		// 		res[PACKETLOSS_ABNORMAL][key.Netns] += value
-		// 	}
-		// }
-	}
-
-	return resMap, nil
-}
-
 func (p *packetLossProbe) loadAndAttachBPF() error {
 	// Allow the current process to lock memory for eBPF resources.
 	if err := rlimit.RemoveMemlock(); err != nil {
@@ -291,6 +246,42 @@ func (p *packetLossProbe) loadAndAttachBPF() error {
 	return nil
 }
 
+func ignoreLocation(loc uint64) bool {
+	sym, err := bpfutil.GetSymPtFromBpfLocation(loc)
+	if err != nil {
+		log.Infof("cannot find location %d", loc)
+		// emit the event anyway
+		return false
+	}
+
+	_, ok := uselessSymbols[sym.GetName()]
+	return !ok
+}
+
+func toProbeTuple(t *bpfTuple) *probe.Tuple {
+	return &probe.Tuple{
+		Protocol: t.L4Proto,
+		Src:      bpfutil.GetAddrStr(t.L3Proto, t.Saddr.V6addr),
+		Dst:      bpfutil.GetAddrStr(t.L3Proto, t.Daddr.V6addr),
+		Sport:    t.Sport,
+		Dport:    t.Dport,
+	}
+}
+
+func (p *packetLossProbe) countByLocation(loc uint64, counter *Counter) {
+	sym, err := bpfutil.GetSymPtFromBpfLocation(loc)
+	if err != nil {
+		log.Warnf("%s get sym failed, location: %x, err: %v", probeName, loc, err)
+		return
+	}
+
+	switch sym.GetName() {
+	case netfilterSymbol:
+		counter.Netfilter++
+	}
+
+}
+
 func (p *packetLossProbe) perfLoop() {
 	for {
 	anotherLoop:
@@ -310,45 +301,48 @@ func (p *packetLossProbe) perfLoop() {
 		}
 
 		var event bpfInspPlEventT
-		if err := binary.Read(bytes.NewBuffer(record.RawSample), binary.LittleEndian, &event); err != nil {
+		if err := binary.Read(bytes.NewBuffer(record.RawSample), binary.NativeEndian, &event); err != nil {
 			log.Errorf("%s failed parsing event, err: %v", probeName, err)
 			continue
 		}
-		// filter netlink/unixsock/tproxy packet
-		if event.Tuple.Dport == 0 && event.Tuple.Sport == 0 {
+
+		if ignoreLocation(event.Location) {
 			continue
 		}
 
+		tuple := toProbeTuple(&event.Tuple)
+
+		v, ok := p.cache.Get(*tuple)
+		if !ok {
+			v = &Counter{}
+			p.cache.Add(*tuple, v)
+		}
+		v.Total++
+		p.countByLocation(event.Location, v)
+
 		evt := &probe.Event{
 			Timestamp: time.Now().UnixNano(),
-			Type:      PACKETLOSS,
-			Labels:    probe.LagacyEventLabels(event.SkbMeta.Netns),
+			Type:      PacketLoss,
+			Labels:    probe.BuildTupleEventLabels(tuple),
 		}
 
-		tuple := fmt.Sprintf("protocol=%s saddr=%s sport=%d daddr=%s dport=%d ", bpfutil.GetProtoStr(event.Tuple.L4Proto), bpfutil.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Saddr))), bits.ReverseBytes16(event.Tuple.Sport), bpfutil.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Daddr))), bits.ReverseBytes16(event.Tuple.Dport))
-
+		//TODO add trigger to enable/disable stack
 		stacks, err := bpfutil.GetSymsByStack(uint32(event.StackId), p.objs.InspPlStack)
 		if err != nil {
 			log.Warnf("%s failed get sym by stack, err: %v", probeName, err)
 			continue
 		}
-		strs := []string{}
+		var strs []string
 		for _, sym := range stacks {
 			if _, ok := ignoreSymbolList[sym.GetName()]; ok {
 				goto anotherLoop
 			}
-			if _, ok := uselessSymbolList[sym.GetName()]; ok {
-				continue
-			}
 			strs = append(strs, sym.GetExpr())
 		}
 
-		stackStr := strings.Join(strs, "\n")
-
-		evt.Message = fmt.Sprintf("%s\nstacktrace:\n%s", tuple, stackStr)
+		evt.Message = strings.Join(strs, "\n")
 
 		if p.sink != nil {
-			log.Debugf("%s sink event %s", probeName, util.ToJSONString(evt))
 			p.sink <- evt
 		}
 	}

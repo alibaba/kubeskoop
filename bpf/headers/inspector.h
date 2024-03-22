@@ -29,11 +29,8 @@ struct flow_tuple_4 {
 };
 
 union addr {
+  unsigned char v6addr[16];
   u32 v4addr;
-  struct {
-    u64 d1;
-    u64 d2;
-  } v6addr;
 } __attribute__((packed));
 
 struct skb_meta {

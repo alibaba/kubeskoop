@@ -3,6 +3,7 @@ package probe
 import (
 	"fmt"
 
+	"github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
 	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
@@ -10,6 +11,7 @@ import (
 
 var legacyMetricsLabels = []string{"target_node", "target_namespace", "target_pod", "node", "namespace", "pod"}
 var StandardMetricsLabels = []string{"k8s_node", "k8s_namespace", "k8s_pod"}
+var TupleMetricsLabels = []string{"protocol", "src", "src_type", "src_node", "src_namespace", "src_pod", "dst", "dst_type", "dst_node", "dst_namespace", "dst_pod", "sport", "dport"}
 
 func BuildStandardMetricsLabelValues(entity *nettop.Entity) []string {
 	return []string{nettop.GetNodeName(), entity.GetPodNamespace(), entity.GetPodName()}
@@ -108,6 +110,91 @@ func LagacyEventLabels(netns uint32) []Label {
 		{Name: "namespace", Value: et.GetPodNamespace()},
 		{Name: "node", Value: nettop.GetNodeName()},
 	}
+}
+
+func BuildTupleMetricsLabels(tuple *Tuple) []string {
+	ipInfo := func(ip string) []string {
+		info := nettop.GetIPInfo(ip)
+		if info == nil {
+			return []string{"unknown", "", "", ""}
+		}
+
+		switch info.Type {
+		case nettop.IPTypeNode:
+			return []string{"node", info.NodeName, "", ""}
+		case nettop.IPTypePod:
+			return []string{"pod", "", info.PodNamespace, info.PodName}
+		default:
+			log.Warningf("unknown ip type %s for %s", ip, info.Type)
+		}
+		return []string{"unknown", "", "", ""}
+	}
+
+	labels := []string{bpfutil.GetProtoStr(tuple.Protocol)}
+	labels = append(labels, tuple.Src)
+	labels = append(labels, ipInfo(tuple.Src)...)
+
+	labels = append(labels, tuple.Dst)
+	labels = append(labels, ipInfo(tuple.Dst)...)
+	labels = append(labels, fmt.Sprintf("%d", bpfutil.Htons(tuple.Sport)))
+	labels = append(labels, fmt.Sprintf("%d", bpfutil.Htons(tuple.Dport)))
+	return labels
+}
+
+func BuildTupleEventLabels(tuple *Tuple) []Label {
+	ipInfo := func(prefix, ip string) (ret []Label) {
+		var values [4]string
+
+		defer func() {
+			ret = []Label{
+				{Name: prefix + "_type", Value: values[0]},
+				{Name: prefix + "_node", Value: values[1]},
+				{Name: prefix + "_namespace", Value: values[2]},
+				{Name: prefix + "_pod", Value: values[3]},
+			}
+
+		}()
+
+		info := nettop.GetIPInfo(ip)
+		if info == nil {
+			values = [...]string{"unknown", "", "", ""}
+			return
+		}
+
+		switch info.Type {
+		case nettop.IPTypeNode:
+			values = [...]string{"node", info.NodeName, "", ""}
+		case nettop.IPTypePod:
+			values = [...]string{"pod", "", info.PodNamespace, info.PodName}
+		default:
+			log.Warningf("unknown ip type %s for %s", ip, info.Type)
+		}
+		values = [...]string{"unknown", "", "", ""}
+		return
+	}
+
+	labels := []Label{
+		{Name: "protocol", Value: bpfutil.GetProtoStr(tuple.Protocol)},
+	}
+	labels = append(labels, Label{
+		Name: "src", Value: tuple.Src,
+	})
+
+	labels = append(labels, ipInfo("src", tuple.Src)...)
+
+	labels = append(labels, Label{
+		Name: "dst", Value: tuple.Dst,
+	})
+	labels = append(labels, ipInfo("dst", tuple.Dst)...)
+	labels = append(labels, Label{
+		Name: "sport", Value: fmt.Sprintf("%d", bpfutil.Htons(tuple.Sport)),
+	})
+
+	labels = append(labels, Label{
+		Name: "dport", Value: fmt.Sprintf("%d", bpfutil.Htons(tuple.Dport)),
+	})
+
+	return labels
 }
 
 func CopyLegacyMetricsMap(m map[string]map[uint32]uint64) map[string]map[uint32]uint64 {
