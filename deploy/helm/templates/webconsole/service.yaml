@@ -1,0 +1,17 @@
+{{- if and .Values.controller.enabled .Values.webconsole.enabled}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: webconsole
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    {{- .Values.webconsole.service.annotations | toYaml | nindent 4 }}
+spec:
+  type: {{ .Values.webconsole.service.type }}
+  selector:
+    app: webconsole
+  ports:
+    - name: http
+      port: {{ .Values.webconsole.service.port }}
+      targetPort: 8080
+{{- end }}

@@ -1,0 +1,54 @@
+{{- if and .Values.controller.enabled .Values.webconsole.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webconsole
+  namespace: {{ .Release.Namespace }}
+{{- with .Values.webconsole }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: webconsole
+  template:
+    metadata:
+      name: webconsole
+      labels:
+        app: webconsole
+    spec:
+      containers:
+        - name: webconsole
+          image: "{{ .image.repository }}:{{ .image.tag }}"
+          imagePullPolicy: {{ .image.imagePullPolicy }}
+          command: [ "/bin/webconsole" ]
+          env:
+            - name: CONTROLLER_ENDPOINT
+              value: "http://controller:10264"
+            - name: GRAFANA_PROXY
+              value: "{{ .grafana.proxy }}"
+            - name: GRAFANA_ENDPOINT
+              value: "{{ .grafana.endpoint }}"
+            - name: GRAFANA_USERNAME
+              value: "{{ .grafana.username }}"
+            - name: GRAFANA_PASSWORD
+              value: "{{ .grafana.password }}"
+            - name: AUTH_USERNAME
+              value: "{{ .auth.username }}"
+            - name: AUTH_PASSWORD
+              value: "{{ .auth.password }}"
+          resources:
+            {{- toYaml .resources | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+      {{ with .nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{ with .tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
+{{- end }}

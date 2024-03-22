@@ -1,0 +1,19 @@
+{{- if .Values.controller.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: controller
+  namespace: {{ .Release.Namespace }}
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  resourceNames: ["kubeskoop-config"]
+  verbs: ["get", "update"]
+- apiGroups: [""]
+  resources:
+  - pods
+  verbs: ["get", "list", "watch", "delete", "create"]
+- apiGroups: [""]
+  resources: ["pods/exec", "pods/attach", "pods/portforward"]
+  verbs: ["create", "get", "list", "update", "delete"]
+{{- end }}
