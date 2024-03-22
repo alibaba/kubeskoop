@@ -77,9 +77,8 @@ var (
 			insp.v.WatchConfig()
 
 			if insp.config.EnableController {
-				err = task_agent.NewTaskAgent().Run()
-				if err != nil {
-					log.Errorf("start task agent err: %v", err)
+				if err := task_agent.NewTaskAgent().Run(); err != nil {
+					log.Errorf("failed start agent: %v", err)
 					return
 				}
 			}

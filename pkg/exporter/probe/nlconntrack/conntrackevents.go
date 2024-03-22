@@ -49,7 +49,7 @@ func (p *conntrackEventProbe) Start(ctx context.Context) error {
 		select {
 		case <-ticker.C:
 			slog.Ctx(ctx).Info("start update netns list", "module", probeName)
-			ets := nettop.GetAllEntity()
+			ets := nettop.GetAllUniqueNetnsEntity()
 			for _, et := range ets {
 				if et == nil {
 					slog.Ctx(ctx).Info("skip empty entity", "module", probeName)

@@ -83,7 +83,7 @@ func (p *Probe) CollectOnce() (map[string]map[uint32]uint64, error) {
 		resMap[metric] = make(map[uint32]uint64)
 	}
 
-	ets := nettop.GetAllEntity()
+	ets := nettop.GetAllUniqueNetnsEntity()
 	for _, et := range ets {
 		stats, err := getQdiscStats(et)
 		if err != nil {
