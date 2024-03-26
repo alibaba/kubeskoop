@@ -33,6 +33,8 @@ union addr {
   u32 v4addr;
 } __attribute__((packed));
 
+const union addr *unused_addr __attribute__((unused));
+
 struct skb_meta {
   u32 netns;
   u32 mark;
@@ -112,7 +114,6 @@ static __always_inline int set_flow_tuple4(struct __sk_buff *skb, struct flow_tu
 	struct ethhdr *eth = data;
 	void *data_end = (void *)(long)skb->data_end;
 	u16 l4_off = 0;
-	const char fmt[] = "source port %d\n";
 	//u16 bytes = 0;
 
 	if (data + sizeof(*eth) > data_end)
@@ -157,7 +158,7 @@ static __always_inline int set_flow_tuple4(struct __sk_buff *skb, struct flow_tu
     return 0;
 }
 
-static __always_inline void set_tuple(struct sk_buff *skb, struct tuple *tpl) {
+static __always_inline int set_tuple(struct sk_buff *skb, struct tuple *tpl) {
   unsigned char *skb_head = 0;
   u16 l3_off;
   u16 l4_off;
@@ -183,6 +184,8 @@ static __always_inline void set_tuple(struct sk_buff *skb, struct tuple *tpl) {
     bpf_probe_read(&tpl->daddr, sizeof(tpl->daddr), &ip6->daddr);
     bpf_probe_read(&tpl->l4_proto, 1, &ip6->nexthdr);
     tpl->l3_proto = ETH_P_IPV6;
+  }else {
+    return -1;
   }
   if (tpl->l4_proto == IPPROTO_TCP) {
     struct tcphdr *tcp = (struct tcphdr *)(skb_head + l4_off);
@@ -193,6 +196,11 @@ static __always_inline void set_tuple(struct sk_buff *skb, struct tuple *tpl) {
     bpf_probe_read(&tpl->sport, sizeof(tpl->sport), &udp->source);
     bpf_probe_read(&tpl->dport, sizeof(tpl->dport), &udp->dest);
   }
+
+  tpl->sport = bpf_htons(tpl->sport);
+  tpl->dport = bpf_htons(tpl->dport);
+
+  return 0;
 }
 
 static __always_inline void set_meta(struct sk_buff *skb,

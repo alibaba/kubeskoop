@@ -42,9 +42,9 @@ int kfree_skb(struct kfree_skb_args *args) {
 
   set_tuple(skb, &event.tuple);
   event.location = (u64)args->location;
-  event.stack_id = bpf_get_stackid((struct pt_regs *)args, &insp_pl_stack,
+  event.stack_id = bpf_get_stackid(args, &insp_pl_stack,
                                 KERN_STACKID_FLAGS);
-  bpf_perf_event_output((struct pt_regs *)args, &insp_pl_event,
+  bpf_perf_event_output(args, &insp_pl_event,
                         BPF_F_CURRENT_CPU, &event, sizeof(event));
 
 out:

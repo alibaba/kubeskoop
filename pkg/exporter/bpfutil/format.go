@@ -12,7 +12,7 @@ import (
 func GetAddrStr(proto uint16, addr [16]uint8) string {
 	switch proto {
 	case syscall.ETH_P_IPV6:
-		return fmt.Sprintf("[%s]", net.IP(addr[:]).String())
+		return net.IP(addr[:]).String()
 	default:
 		return net.IP(addr[:4]).String()
 	}

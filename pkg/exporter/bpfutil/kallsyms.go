@@ -134,7 +134,7 @@ func getAllSyms() error {
 
 	r := bufio.NewScanner(f)
 	for r.Scan() {
-		rawsym := strings.Split(r.Text(), " ")
+		rawsym := strings.Fields(r.Text())
 		pt, err := strconv.ParseUint(rawsym[0], 16, 64)
 		if err != nil {
 			fmt.Println(err)

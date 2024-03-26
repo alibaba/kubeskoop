@@ -136,8 +136,8 @@ func BuildTupleMetricsLabels(tuple *Tuple) []string {
 
 	labels = append(labels, tuple.Dst)
 	labels = append(labels, ipInfo(tuple.Dst)...)
-	labels = append(labels, fmt.Sprintf("%d", bpfutil.Htons(tuple.Sport)))
-	labels = append(labels, fmt.Sprintf("%d", bpfutil.Htons(tuple.Dport)))
+	labels = append(labels, fmt.Sprintf("%d", tuple.Sport))
+	labels = append(labels, fmt.Sprintf("%d", tuple.Dport))
 	return labels
 }
 
@@ -187,11 +187,11 @@ func BuildTupleEventLabels(tuple *Tuple) []Label {
 	})
 	labels = append(labels, ipInfo("dst", tuple.Dst)...)
 	labels = append(labels, Label{
-		Name: "sport", Value: fmt.Sprintf("%d", bpfutil.Htons(tuple.Sport)),
+		Name: "sport", Value: fmt.Sprintf("%d", tuple.Sport),
 	})
 
 	labels = append(labels, Label{
-		Name: "dport", Value: fmt.Sprintf("%d", bpfutil.Htons(tuple.Dport)),
+		Name: "dport", Value: fmt.Sprintf("%d", tuple.Dport),
 	})
 
 	return labels

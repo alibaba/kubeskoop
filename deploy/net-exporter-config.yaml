@@ -15,14 +15,14 @@ metrics:
   - name: kernellatency
   - name: packetloss
   - name: flow
+  - name: tcpretrans
 event:
   probes: 
   - name: biolatency
   - name: kernellatency
   - name: packetloss
   - name: tcpreset
+  - name: tcpretrans
   sinks: 
   - name: stderr
-  
-  
 
