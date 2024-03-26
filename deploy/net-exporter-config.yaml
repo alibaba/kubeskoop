@@ -1,6 +1,6 @@
 debugmode: true
 port: 9102
-  #enable_controller: true
+enable_controller: true
 metrics:
   probes:
   - name: conntrack
@@ -21,7 +21,8 @@ event:
   - name: kernellatency
   - name: packetloss
   - name: tcpreset
-  sinks: []
+  sinks: 
+  - name: stderr
   
   
 
