@@ -17,30 +17,12 @@ struct kfree_skb_args {
 };
 
 struct insp_pl_event_t {
-  char target[TASK_COMM_LEN];
   struct tuple tuple;
-  struct skb_meta skb_meta;
-  u32 pid;
-  u32 cpu;
   u64 location;
   s64 stack_id;
 };
 
-struct insp_pl_metric_t {
-  u64 location;
-  u32 netns;
-  u8 protocol;
-};
-
-struct insp_pl_event_t *unused_event __attribute__((unused));
-struct insp_pl_metric_t *unused_event2 __attribute__((unused));
-
-struct {
-  __uint(type, BPF_MAP_TYPE_HASH);
-  __type(key, struct insp_pl_metric_t);
-  __type(value, u64);
-  __uint(max_entries, 4096);
-} insp_pl_metric SEC(".maps");
+const struct insp_pl_event_t *unused_insp_pl_event_t __attribute__((unused));
 
 struct {
 	__uint(type, BPF_MAP_TYPE_STACK_TRACE);
@@ -56,26 +38,9 @@ struct {
 SEC("tracepoint/skb/kfree_skb")
 int kfree_skb(struct kfree_skb_args *args) {
   struct sk_buff *skb = (struct sk_buff *)args->skb;
-  struct insp_pl_metric_t mkey = {0};
   struct insp_pl_event_t event = {0};
 
   set_tuple(skb, &event.tuple);
-  set_meta(skb, &event.skb_meta);
-
-  mkey.netns = get_netns(skb);
-  mkey.location = (u64)args->location;
-  mkey.protocol = (u8)args->protocol;
-  u64 *valp = bpf_map_lookup_elem(&insp_pl_metric, &mkey);
-  if (!valp) {
-    u64 initval = 1;
-    bpf_map_update_elem(&insp_pl_metric, &mkey, &initval, 0);
-  } else {
-    __sync_fetch_and_add(valp, 1);
-  }
-
-  bpf_get_current_comm(&event.target, sizeof(event.target));
-  event.pid = bpf_get_current_pid_tgid()>> 32;
-  event.cpu = bpf_get_smp_processor_id();
   event.location = (u64)args->location;
   event.stack_id = bpf_get_stackid((struct pt_regs *)args, &insp_pl_stack,
                                 KERN_STACKID_FLAGS);

@@ -24,7 +24,7 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.6
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/json-iterator/go v1.1.12
-	github.com/mattn/go-sqlite3 v1.14.6
+	github.com/mattn/go-sqlite3 v1.14.22
 	github.com/mdlayher/netlink v1.7.1
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/moby/ipvs v1.1.0

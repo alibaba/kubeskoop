@@ -1,14 +1,10 @@
-FROM docker.io/library/golang:1.20.5-alpine AS build
-# --build-arg GOPROXY=https://goproxy.cn,direct
-ARG GOPROXY
-# --build-arg ALPINE_MIRROR=mirrors.aliyun.com
+FROM docker.io/library/golang:1.22.1-alpine AS build
+
 ARG ALPINE_MIRROR
-ENV GOPROXY=$GOPROXY
 ENV ALPINE_MIRROR=$ALPINE_MIRROR
 
 RUN if [ ! -z "$ALPINE_MIRROR" ]; then sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories; fi && \
-    apk add gcc g++ linux-headers git make bash && \
-    go env -w GOPROXY=$GOPROXY
+    apk add gcc g++ linux-headers git make bash 
 
 WORKDIR /go/src/github.com/alibaba/kubeskoop/
 RUN go env -w GOMODCACHE=/root/.cache/go-build
@@ -24,10 +20,10 @@ ADD ./webui /webconsole
 RUN yarn install && yarn build
 
 FROM docker.io/library/alpine:3.19 as base
-ARG GOPROXY
+
 ARG ALPINE_MIRROR
-ENV GOPROXY=$GOPROXY
 ENV ALPINE_MIRROR=$ALPINE_MIRROR
+
 RUN if [ ! -z "$ALPINE_MIRROR" ]; then sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories; fi && \
     apk add --no-cache \
     iproute2 \

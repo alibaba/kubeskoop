@@ -13,44 +13,22 @@ import (
 	"github.com/cilium/ebpf"
 )
 
+type bpfAddr struct{ V6addr [16]uint8 }
+
 type bpfInspPlEventT struct {
-	Target [20]int8
-	Tuple  struct {
-		Saddr struct {
-			V4addr uint32
-			_      [12]byte
-		}
-		Daddr struct {
-			V4addr uint32
-			_      [12]byte
-		}
-		Sport   uint16
-		Dport   uint16
-		L3Proto uint16
-		L4Proto uint8
-		Pad     uint8
-	}
-	SkbMeta struct {
-		Netns    uint32
-		Mark     uint32
-		Ifindex  uint32
-		Len      uint32
-		Mtu      uint32
-		SkState  uint32
-		Protocol uint16
-		Pad      uint16
-	}
-	Pid      uint32
-	Cpu      uint32
+	Tuple    bpfTuple
 	Location uint64
 	StackId  int64
 }
 
-type bpfInspPlMetricT struct {
-	Location uint64
-	Netns    uint32
-	Protocol uint8
-	_        [3]byte
+type bpfTuple struct {
+	Saddr   bpfAddr
+	Daddr   bpfAddr
+	Sport   uint16
+	Dport   uint16
+	L3Proto uint16
+	L4Proto uint8
+	Pad     uint8
 }
 
 // loadBpf returns the embedded CollectionSpec for bpf.
@@ -101,9 +79,8 @@ type bpfProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type bpfMapSpecs struct {
-	InspPlEvent  *ebpf.MapSpec `ebpf:"insp_pl_event"`
-	InspPlMetric *ebpf.MapSpec `ebpf:"insp_pl_metric"`
-	InspPlStack  *ebpf.MapSpec `ebpf:"insp_pl_stack"`
+	InspPlEvent *ebpf.MapSpec `ebpf:"insp_pl_event"`
+	InspPlStack *ebpf.MapSpec `ebpf:"insp_pl_stack"`
 }
 
 // bpfObjects contains all objects after they have been loaded into the kernel.
@@ -125,15 +102,13 @@ func (o *bpfObjects) Close() error {
 //
 // It can be passed to loadBpfObjects or ebpf.CollectionSpec.LoadAndAssign.
 type bpfMaps struct {
-	InspPlEvent  *ebpf.Map `ebpf:"insp_pl_event"`
-	InspPlMetric *ebpf.Map `ebpf:"insp_pl_metric"`
-	InspPlStack  *ebpf.Map `ebpf:"insp_pl_stack"`
+	InspPlEvent *ebpf.Map `ebpf:"insp_pl_event"`
+	InspPlStack *ebpf.Map `ebpf:"insp_pl_stack"`
 }
 
 func (m *bpfMaps) Close() error {
 	return _BpfClose(
 		m.InspPlEvent,
-		m.InspPlMetric,
 		m.InspPlStack,
 	)
 }
