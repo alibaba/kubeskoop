@@ -21,5 +21,6 @@ import (
 	_ "github.com/alibaba/kubeskoop/pkg/exporter/probe/tracesocketlatency"
 	_ "github.com/alibaba/kubeskoop/pkg/exporter/probe/tracesoftirq"
 	_ "github.com/alibaba/kubeskoop/pkg/exporter/probe/tracetcpreset"
+	_ "github.com/alibaba/kubeskoop/pkg/exporter/probe/tracetcpretrans"
 	_ "github.com/alibaba/kubeskoop/pkg/exporter/probe/tracevirtcmdlat"
 )
