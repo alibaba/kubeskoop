@@ -16,6 +16,7 @@ export default function Dashboard() {
       dashboardConfigDispatcher.fetchDashboardConfig()
       .then(() => {
         localStorage.setItem("SearchBar_Hidden", "true")
+        localStorage.setItem("grafana.navigation.docked", "false")
         if(effectsState.fetchDashboardConfig.error) {
           Message.error(`Error when fetching dashboard config: ${effectsState.fetchDashboardConfig.error.response.data.error}`)
         }
