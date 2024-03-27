@@ -67,7 +67,7 @@ You may need a `Nodeport` or `LoadBalancer` to acess from outside of the cluster
 
 Default username is `admin`, and password is `kubeskoop`.
 
-![Web Console](docs/images/web_console.png)
+![Web Console](docs/images/web_console.jpg)
 
 ### Network diagnosis
 
@@ -75,43 +75,43 @@ Default username is `admin`, and password is `kubeskoop`.
 
 Connectivity diagnosis can be submitted through the web console.
 
-![Diagnose](docs/images/diagnose.png)
+![Diagnose](docs/images/diagnose.jpg)
 
 Under **Diagnosis - Connectivity Diagnosis**, you can enter the source address, destination address, port, and protocol for diagnosis, and click `Diagnose` to submit the diagnosis. After the diagnosis is complete, you can see the result in the history list.
 
-![Diagnosis Result](docs/images/diagnosis_result.png)
+![Diagnosis Result](docs/images/diagnosis_result.jpg)
 
 #### Packet Capturing
 
 Under **Diagnosis - Packet Capturing**，you can perform packet capturing for node/pod in the cluster.
 
-![Packet Capturing](docs/images/packet_capturing.png)
+![Packet Capturing](docs/images/packet_capturing.jpg)
 
 #### Latency Detection
 
 Under **Diagnosis - Latency Detection**，you can detect latencies between multiple nodes and pods.
 
-![Latency Detection](docs/images/ping_mesh.png)
+![Latency Detection](docs/images/ping_mesh.jpg)
 
 ### Monitor network jitter and bottlenecks
 
 #### Network Performance Dashboard
 
 View the network permance dashboard from **Monitoring - Dashboard**. In the dashboard, you can check the water level of each monitor item corresponding to the time point of the performance problem.  
-![grafana_performance](docs/images/monitoring.png)
+![grafana_performance](docs/images/monitoring.jpg)
 
 #### Network Jitter & Anomy Event Analysis
 
 Under **Monitoring - Event**, you can view the anomaly events occurring within the cluster at the current time point. You can also manually select the desired time range, or filter based on event type, node, and information such as the namespace/name of the Pod where the event occurred.
 
 Click `Live` on the right top to view the live event stream according to the current filters.
-![Events](docs/images/events.png)
+![Events](docs/images/events.jpg)
 
 #### Network Link Graph
 
 Under the homepage or **Monitoring - Network Graph**, you can see the actual network link graph in the cluster, with time and namespaces. You can also switch view mode to `Table` to view each connection.
 
-![Network Graph Table](docs/images/network_graph_table.png)
+![Network Graph Table](docs/images/network_graph_table.jpg)
 
 ## Contributing
 
