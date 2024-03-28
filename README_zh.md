@@ -65,7 +65,7 @@ kubectl get svc -n kubeskoop webconsole
 
 控制台的默认用户为`admin`，密码为`kubeskoop`。
 
-![Web Console](docs/images/web_console.png)
+![Web Console](docs/images/web_console.jpg)
 
 ### 诊断网络问题
 
@@ -73,30 +73,30 @@ kubectl get svc -n kubeskoop webconsole
 
 可以通过Web控制台对集群内网络发起连通性诊断。
 
-![Diagnose](docs/images/diagnose.png)
+![Diagnose](docs/images/diagnose.jpg)
 
 在Diagnosis - Connectivity Diagnosis下输入诊断的源地址、目的地址、端口和协议，点击`Diagnose` 发起诊断。诊断完成后，可以在列表中看到诊断结果。
 
-![Diagnosis Result](docs/images/diagnosis_result.png)
+![Diagnosis Result](docs/images/diagnosis_result.jpg)
 
 #### 抓包
 
 你可以在Diagnosis - Packet Capturing中进行集群内Node/Pod的抓包操作。
 
-![Packet Capturing](docs/images/packet_capturing.png)
+![Packet Capturing](docs/images/packet_capturing.jpg)
 
 #### 延迟探测
 
 在Diagnosis - Latency Detection中，对集群内多个Node/Pod之间的网络延迟进行探测。
 
-![Latency Detection](docs/images/ping_mesh.png)
+![Latency Detection](docs/images/ping_mesh.jpg)
 
 ### 监控集群网络
 
 #### 查看网络抖动和性能大盘
 
 在Monitoring - Dashboard中，可以查看当前集群内网络大盘，从大盘中可查询对应性能问题时间点的各深度指标的水位情况。
-![grafana_performance](docs/images/monitoring.png)
+![grafana_performance](docs/images/monitoring.jpg)
 
 #### 查看网络抖动事件
 
@@ -104,13 +104,13 @@ kubectl get svc -n kubeskoop webconsole
 
 点击右上角的`Live`，可以实时根据当前筛选条件，实时监控集群内事件。
 
-![Events](docs/images/events.png)
+![Events](docs/images/events.jpg)
 
 #### 网络链路图
 
 在主页或Monitoring - Network Graph中，可以看到当前集群内的网络实际链路图，并通过时间、命名空间进行筛选。你也可以将模式改为`Table`按条查看连接信息。
 
-![Network Graph Table](docs/images/network_graph_table.png)
+![Network Graph Table](docs/images/network_graph_table.jpg)
 
 ## 贡献说明
 
