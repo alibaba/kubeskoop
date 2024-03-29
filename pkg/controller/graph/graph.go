@@ -26,23 +26,13 @@ type Edge struct {
 	Protocol string `json:"protocol"`
 	Bytes    int    `json:"bytes"`
 	Packets  int    `json:"packets"`
+	Dropped  int    `json:"dropped"`
+	Retrans  int    `json:"retrans"`
 }
 
 type FlowGraph struct {
 	Nodes map[string]*Node `json:"nodes"`
 	Edges map[string]*Edge `json:"edges"`
-}
-
-type podInfo struct {
-	Name      string
-	Namespace string
-	NodeName  string
-	IP        string
-}
-
-type nodeInfo struct {
-	NodeName string
-	IP       string
 }
 
 func NewFlowGraph() *FlowGraph {
@@ -52,53 +42,25 @@ func NewFlowGraph() *FlowGraph {
 	}
 }
 
-func toPodInfo(m model.Vector) (map[string]podInfo, error) {
-	ret := make(map[string]podInfo)
-	for _, m := range m {
-		if _, ok := ret[string(m.Metric["ip"])]; ok {
-			continue
-		}
-		ret[string(m.Metric["ip"])] = podInfo{
-			Name:      string(m.Metric["pod_name"]),
-			Namespace: string(m.Metric["pod_namespace"]),
-			NodeName:  string(m.Metric["node_name"]),
-			IP:        string(m.Metric["ip"]),
-		}
-	}
-	return ret, nil
-}
-
-func toNodeInfo(m model.Vector) (map[string]nodeInfo, error) {
-	ret := make(map[string]nodeInfo)
-	for _, m := range m {
-		if _, ok := ret[string(m.Metric["ip"])]; ok {
-			continue
-		}
-		ret[string(m.Metric["ip"])] = nodeInfo{
-			NodeName: string(m.Metric["node_name"]),
-			IP:       string(m.Metric["ip"]),
-		}
-	}
-	return ret, nil
-}
-
-func createNode(ip string, podInfo map[string]podInfo, nodeInfo map[string]nodeInfo) Node {
+func createNode(t, ip, podNamespace, podName, nodeName string) Node {
 	n := Node{
 		ID: ip,
 		IP: ip,
 	}
 
-	if i, ok := podInfo[ip]; ok {
+	switch t {
+	case "pod":
 		n.Type = "pod"
-		n.Name = i.Name
-		n.Namespace = i.Namespace
-		n.NodeName = i.NodeName
-	} else if i, ok := nodeInfo[ip]; ok {
+		n.Name = podName
+		n.Namespace = podNamespace
+		n.NodeName = nodeName
+	case "node":
 		n.Type = "node"
-		n.NodeName = i.NodeName
-	} else {
+		n.NodeName = nodeName
+	default:
 		n.Type = "external"
 	}
+
 	return n
 }
 
@@ -112,7 +74,9 @@ func getEdgeID(v *model.Sample) string {
 		protocol, src, sport, dst, dport)
 }
 
-func createEdge(src, dst string, v *model.Sample) Edge {
+func createEdge(v *model.Sample) Edge {
+	src := string(v.Metric["src"])
+	dst := string(v.Metric["dst"])
 	sport, _ := strconv.Atoi(string(v.Metric["sport"]))
 	dport, _ := strconv.Atoi(string(v.Metric["dport"]))
 	protocol := string(v.Metric["protocol"])
@@ -126,24 +90,29 @@ func createEdge(src, dst string, v *model.Sample) Edge {
 	}
 }
 
-func FromVector(m model.Vector, podInfo model.Vector, nodeInfo model.Vector) (*FlowGraph, error) {
+func FromVector(m model.Vector) (*FlowGraph, error) {
 	g := NewFlowGraph()
-	pi, err := toPodInfo(podInfo)
-	if err != nil {
-		return nil, err
-	}
-	ni, err := toNodeInfo(nodeInfo)
-	if err != nil {
-		return nil, err
-	}
 	for _, v := range m {
-		src := string(v.Metric["src"])
-		dst := string(v.Metric["dst"])
-		g.AddNode(createNode(src, pi, ni))
-		g.AddNode(createNode(dst, pi, ni))
-		g.AddEdge(createEdge(src, dst, v))
+		g.AddNodesFromSample(v)
+		g.AddEdge(createEdge(v))
 	}
 	return g, nil
+}
+
+func (g *FlowGraph) AddNodesFromSample(v *model.Sample) {
+	ip := string(v.Metric["src"])
+	t := string(v.Metric["src_type"])
+	podName := string(v.Metric["src_pod"])
+	podNamespace := string(v.Metric["src_namespace"])
+	nodeName := string(v.Metric["src_node"])
+	g.AddNode(createNode(t, ip, podNamespace, podName, nodeName))
+
+	ip = string(v.Metric["dst"])
+	t = string(v.Metric["dst_type"])
+	podName = string(v.Metric["dst_pod"])
+	podNamespace = string(v.Metric["dst_namespace"])
+	nodeName = string(v.Metric["dst_node"])
+	g.AddNode(createNode(t, ip, podNamespace, podName, nodeName))
 }
 
 func (g *FlowGraph) AddNode(n Node) {
@@ -172,6 +141,24 @@ func (g *FlowGraph) SetEdgePacketsFromVector(m model.Vector) {
 		id := getEdgeID(v)
 		if _, ok := g.Edges[id]; ok {
 			g.Edges[id].Packets = int(v.Value)
+		}
+	}
+}
+
+func (g *FlowGraph) SetEdgeDroppedFromVector(m model.Vector) {
+	for _, v := range m {
+		id := getEdgeID(v)
+		if _, ok := g.Edges[id]; ok {
+			g.Edges[id].Dropped = int(v.Value)
+		}
+	}
+}
+
+func (g *FlowGraph) SetEdgeRetransFromVector(m model.Vector) {
+	for _, v := range m {
+		id := getEdgeID(v)
+		if _, ok := g.Edges[id]; ok {
+			g.Edges[id].Retrans = int(v.Value)
 		}
 	}
 }

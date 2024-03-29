@@ -42,7 +42,7 @@ build-controller:
 build-btfhack:
 	CGO_ENABLED=0 go build -o bin/btfhack -ldflags $(ldflags) ./cmd/btfhack
 
-.PHONY: build-btfhack
+.PHONY: build-webconsole
 build-webconsole:
 	cd webui && CGO_ENABLED=0 go build -o ../bin/webconsole -ldflags $(ldflags) .
 

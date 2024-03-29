@@ -1,5 +1,5 @@
 import PageHeader from '@/components/PageHeader';
-import FlowGraph from './components/FlowGraph'
+import FlowGraph from './components/FlowGraph';
 import FlowTable from './components/FlowTable'
 import { useEffect, useMemo, useState } from 'react';
 import { Card, Select, Radio, Switch, Box, Message, Button, Icon, Loading, DatePicker2 } from '@alifd/next';
@@ -13,30 +13,37 @@ import { definePageConfig } from "ice";
 const getNamespaces = (data: any) => {
   return data.nodes.map((node: any) => {
     return node.namespace || 'default'
-  }).filter((item, index, arr) => {
-    return arr.indexOf(item) === index
   })
 }
 
-const filterFlowData = (data: FlowData, namespaces: string[], nodes: string[], showExternal: boolean) => {
-  const filteredNode = data.nodes.filter((node: any) => {
-    return !namespaces || node.type != 'pod' || namespaces.includes(node.namespace)
+const filterFlowData = (data: FlowData, namespaces: string[], nodes: string[], showSeparate: boolean) => {
+  let filteredNode = data.nodes.filter((node: any) => {
+    return (namespaces?.length ?? 0) === 0 || node.type != 'pod' || namespaces.includes(node.namespace)
   })
     .filter((node: any) => {
-      return !node.length || node.type == 'external' || nodes.includes(node.nodeName)
+      return !nodes.length || node.type != 'node' || nodes.includes(node.nodeName)
     })
-    .filter((node: any) => {
-      return showExternal || node.type !== 'external'
-    });
 
-  const nodeMap = {};
+  const nodeSet = new Set();
   filteredNode.forEach(i => {
-    nodeMap[i.id] = true
+    nodeSet.add(i.id);
   });
 
   const filteredEdge = data.edges.filter((edge: any) => {
-    return nodeMap[edge.src] && nodeMap[edge.dst]
+    return nodeSet.has(edge.src) && nodeSet.has(edge.dst)
   });
+
+  if (!showSeparate) {
+    const s = new Set();
+    filteredEdge.forEach(e => {
+      s.add(e.src)
+      s.add(e.dst)
+    })
+
+    filteredNode = filteredNode.filter(n => {
+      return s.has(n.id)
+    })
+  }
 
   filteredNode.sort((a, b) => {
     return a.id.localeCompare(b.id)
@@ -56,20 +63,19 @@ export default function FlowDashboard() {
   const [data, setData] = useState({ nodes: [], edges: [] });
   const [selectedNamespaces, setSelectedNamespaces] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  const [time, setTime] = useState<Dayjs | null>(null);
+  const [time, setTime] = useState<Dayjs[] | null>(null);
 
-  const getFlowData = (initial: boolean) => {
+  const getFlowData = () => {
+    const [from, to] = time || [dayjs().subtract(15, 'minute'), dayjs()];
     setLoading(true);
-    flowService.getFlowData(time?.unix() || dayjs().unix()).then((res) => {
-      if (initial) setSelectedNamespaces(getNamespaces(res));
+    flowService.getFlowData(from?.unix() || dayjs().subtract(15, 'minute').unix(), to?.unix() || dayjs().unix()).then((res) => {
       setData(res);
       setLoading(false);
     }).catch(err => {
       Message.error(`Error fetching data: ${getErrorMessage(err)}`)
     });
   };
-  useEffect(() => getFlowData(true), []);
-  useEffect(() => getFlowData(false), [time])
+  useEffect(() => getFlowData(), [time])
 
   const [viewMode, setViewMode] = useState('graph');
   const onViewModeChange = (value: string) => {
@@ -77,20 +83,19 @@ export default function FlowDashboard() {
   }
 
   const namespaces = useMemo(() => getNamespaces(data), [data]);
-  const [showExternal, setShowExternal] = useState(false);
+  const [showSeparateEndpoints, setShowSeparateEndpoints] = useState(false);
 
   const onNamespacesChange = (value: string[]) => {
-    console.log(value);
     setSelectedNamespaces(value);
   }
 
   const onShowExternalChange = (checked: boolean) => {
-    setShowExternal(checked);
+    setShowSeparateEndpoints(checked);
   }
 
   const filtered = useMemo(
-    () => filterFlowData(data, selectedNamespaces, [], showExternal),
-    [data, selectedNamespaces, showExternal]
+    () => filterFlowData(data, selectedNamespaces, [], showSeparateEndpoints),
+    [data, selectedNamespaces, showSeparateEndpoints]
   )
 
   return (
@@ -102,8 +107,8 @@ export default function FlowDashboard() {
       <Card contentHeight="auto">
         <Card.Content style={{ paddingLeft: 0 }}>
           <Box direction="row" className={styles.contentBox}>
-            <span className={styles.optionLabel}>Time</span>
-            <DatePicker2 showTime onChange={v => setTime(v)} />
+            <span className={styles.optionLabel}>Time Range</span>
+            <DatePicker2.RangePicker placeholder={['Start Time', 'End Time']} showTime onChange={v => setTime(v)} />
           </Box>
           <Box className={styles.contentBox} direction='row'>
             <span className={styles.optionLabel}>Namespaces</span>
@@ -121,7 +126,7 @@ export default function FlowDashboard() {
             />
           </Box>
           <Box direction='row'>
-            <span className={styles.optionLabel}>Show External Endpoints</span>
+            <span className={styles.optionLabel}>Show Endpoints Without Link</span>
             <Switch id='showExternal' style={{ marginRight: '10px' }} onChange={onShowExternalChange} />
             <span className={styles.optionLabel}>ViewMode</span>
             <Radio.Group shape='button' defaultValue='graph' style={{ marginRight: '10px' }} onChange={onViewModeChange}>
@@ -132,7 +137,7 @@ export default function FlowDashboard() {
               type="secondary"
               size="medium"
               style={{ marginLeft: 'auto', padding: "0 13px" }}
-              onClick={() => getFlowData(false)}
+              onClick={() => getFlowData()}
             >
               <Icon type="refresh" />
               <span>Refresh</span>

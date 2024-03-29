@@ -43,7 +43,7 @@
             "name": "udp"
         },
         {
-            "name": "info"
+            "name": "tcpretrans"
         },
         {
             "name": "qdisc"

@@ -234,8 +234,9 @@ func (s *Server) PingMesh(ctx *gin.Context) {
 }
 
 func (s *Server) GetFlowGraph(ctx *gin.Context) {
-	var ts time.Time
-	t := ctx.Query("time")
+	var ts, fs time.Time
+	f := ctx.Query("from")
+	t := ctx.Query("to")
 	if t != "" {
 		ti, err := strconv.Atoi(t)
 		if err != nil {
@@ -245,33 +246,55 @@ func (s *Server) GetFlowGraph(ctx *gin.Context) {
 	} else {
 		ts = time.Now()
 	}
-	result, _, err := s.controller.QueryPrometheus(ctx, "kubeskoop_flow_bytes", ts)
+	if f != "" {
+		ti, err := strconv.Atoi(f)
+		if err != nil {
+			ctx.AsciiJSON(http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("cannot convert timestamp: %v", err)})
+		}
+		fs = time.Unix(int64(ti), 0)
+	} else {
+		fs = ts.Add(-15 * time.Minute)
+	}
+
+	r := int(ts.Sub(fs).Seconds())
+
+	result, _, err := s.controller.QueryPrometheus(ctx, fmt.Sprintf("increase(kubeskoop_flow_bytes[%ds])", r), ts)
 	if err != nil {
 		ctx.AsciiJSON(http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("error query flow metrics: %v", err)})
 		return
 	}
 	vector := result.(model.Vector)
 
-	podInfo, nodeInfo, err := s.controller.GetPodNodeInfoFromMetrics(ctx, ts)
-	if err != nil {
-		ctx.AsciiJSON(http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("error get pod info from metrics: %v", err)})
-		return
-	}
-
-	g, err := graph.FromVector(vector, podInfo, nodeInfo)
+	g, err := graph.FromVector(vector)
 	if err != nil {
 		ctx.AsciiJSON(http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("error convert flow metrics to graph: %v", err)})
 		return
 	}
 	g.SetEdgeBytesFromVector(vector)
 
-	result, _, err = s.controller.QueryPrometheus(ctx, "kubeskoop_flow_packets", ts)
+	result, _, err = s.controller.QueryPrometheus(ctx, fmt.Sprintf("increase(kubeskoop_flow_packets[%ds])", r), ts)
 	if err != nil {
 		ctx.AsciiJSON(http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("error query flow metrics: %v", err)})
 		return
 	}
 	vector = result.(model.Vector)
 	g.SetEdgePacketsFromVector(vector)
+
+	result, _, err = s.controller.QueryPrometheus(ctx, fmt.Sprintf("increase(kubeskoop_packetloss_total[%ds])", r), ts)
+	if err != nil {
+		ctx.AsciiJSON(http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("error query flow metrics: %v", err)})
+		return
+	}
+	vector = result.(model.Vector)
+	g.SetEdgeDroppedFromVector(vector)
+
+	result, _, err = s.controller.QueryPrometheus(ctx, fmt.Sprintf("increase(kubeskoop_tcpretrans_total[%ds])", r), ts)
+	if err != nil {
+		ctx.AsciiJSON(http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("error query flow metrics: %v", err)})
+		return
+	}
+	vector = result.(model.Vector)
+	g.SetEdgeRetransFromVector(vector)
 
 	jstr, err := g.ToJSON()
 	if err != nil {

@@ -39,6 +39,18 @@ const columns = [
     sortable: true,
     sortDirections: ["desc", "asc"],
   },
+  {
+    title: "Dropped",
+    dataIndex: 'dropped',
+    sortable: true,
+    sortDirections: ["desc", "asc"],
+  },
+  {
+    title: "Retransmitted",
+    dataIndex: 'retrans',
+    sortable: true,
+    sortDirections: ["desc", "asc"],
+  },
 ];
 
 const getName = (node: any) => {
