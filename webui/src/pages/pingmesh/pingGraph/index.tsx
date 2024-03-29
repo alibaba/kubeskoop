@@ -1,5 +1,7 @@
 import { useRef, useEffect } from "react"
 import ForceGraph2D from 'react-force-graph-2d';
+import * as d3 from 'd3';
+
 
 
 interface GraphData {
@@ -20,6 +22,9 @@ const nodeID = (node: any) => {
     case 'Node':
       id = `${node.type}/${node.name}`
       break
+    case 'IP':
+      id = `${node.type}/${node.name}`
+      break
   }
   return id
 }
@@ -35,12 +40,26 @@ const toGraphData = (data: any): GraphData => {
         case 'Node':
           label = item.name
           break
+        case 'IP':
+          label = item.name
+          break
       }
       let id = `${item.type}/${label}`
+      let group = ""
+      for (let lat in data.latencies) {
+        if(id == nodeID(data.latencies[lat].source)) {
+          group = "SRC"
+          break
+        } else if (id == nodeID(data.latencies[lat].destination)) {
+          group = "DST"
+          break
+        }
+      }
       return {
         id: id,
         name: id,
         label: label,
+        group: group,
         ...item,
       }
     });
@@ -55,7 +74,6 @@ const toGraphData = (data: any): GraphData => {
       curvature: 0.3,
     }
   });
-
   return {
     nodes,
     links,
@@ -68,28 +86,36 @@ const PingGraph: React.FC<PingGraphProps> = (props: PingGraphProps): JSX.Element
   const graphData = data ? toGraphData(data) : null
   useEffect(() => {
     const fg = ref.current;
-    fg.d3Force('link').distance(link => 100);
+    if(fg == null){
+      return
+    }
+    fg.d3Force('link').distance(link => 200);
+
+    fg.d3Force('x', d3.forceX().x(node => node.targetX || 0).strength(0.2));
+    fg.d3Force('y', d3.forceY().y(node => 0).strength(0.2));
+    fg.d3Force('charge', d3.forceManyBody().strength(-100))
+
   }, []);
   return (
     <div style={{
       position: "relative",
-      height: "400px",
-      width: "1000px",
+      height: "600px",
+      width: "1300px",
       display: "inline-flex",
     }}>
       <div style={{
-        height: "400px",
-        width: "1000px",
+        height: "600px",
+        width: "1300px",
       }}>
       <ForceGraph2D ref={ref} graphData={graphData}
                     linkCurveRotation="rotation"
                     linkDirectionalArrowLength={3}
                     linkDirectionalArrowRelPos={1}
                     linkDirectionalParticles={2}
-                    linkCurvature={0.3}
+                    linkCurvature={0.1}
                     nodeRelSize={6}
-                    width={1000}
-                    height={400}
+                    width={1300}
+                    height={600}
                     enableNodeDrag={true}
                     onNodeDragEnd={node => {
                       node.fx = node.x;
@@ -98,6 +124,11 @@ const PingGraph: React.FC<PingGraphProps> = (props: PingGraphProps): JSX.Element
                     nodeLabel={(node) => node.name}
                     nodeCanvasObjectMode={() => 'after'}
                     nodeCanvasObject={(node, ctx, globalScale) => {
+                      if(node.group === "SRC") {
+                        node.targetX = -60;
+                      } else if(node.group === "DST") {
+                        node.targetX = 60;
+                      }
                       const label = node.name;
                       const fontSize = 12 / globalScale;
                       ctx.font = `${fontSize}px Sans-Serif`;

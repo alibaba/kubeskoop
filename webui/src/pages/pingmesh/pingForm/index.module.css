@@ -1,10 +1,25 @@
 .btn {
   margin-left: 5px;
+  margin-top: 3px;
+}
+
+.directionSel {
+  font-size: 30px;
+  height: 30px;
+  margin-top: 20px;
+  display: inline-block;
+  position: absolute;
 }
 
 .custom {
   border: 1px dashed;
   padding: 4px;
+  height: 80px;
+  display: inline-block;
+}
+
+.selectorGroup {
+  margin-left: 150px;
   display: inline-block;
 }
 

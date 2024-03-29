@@ -10,54 +10,101 @@ interface PingFormProps {
 
 const PingForm: React.FunctionComponent<PingFormProps> = (props: PingFormProps) => {
   const { onSubmit } = props;
+  const [showSourceSelectorDialog, setShowSourceSelectorDialog] = useState(false)
   const [showSelectorDialog, setShowSelectorDialog] = useState(false)
 
+  const [pingMeshSourceList, setPingMeshSourceList] = useState([])
   const [pingMeshList, setPingMeshList] = useState([])
   const handleSubmit = (values: PingMeshArgs, errors: any) => {
     if (errors) {
       return
     }
-    if (pingMeshList.length < 2) {
-      Message.error("You have to select at least two targets.")
+    if (pingMeshList.length == 0 || pingMeshSourceList.length == 0) {
+      Message.error("You have to select src and dst object to detect the latency")
       return
     }
+    values.ping_mesh_source_list = pingMeshSourceList
     values.ping_mesh_list = pingMeshList
     onSubmit(values);
   };
 
   return (
     <Form inline labelAlign='left'>
-      <Form.Item label="Targets" >
+      <Form.Item>
         <div className={styles.custom}>
-          {pingMeshList.map((v, i) => {
-            if (v.type == "Node") {
-              return <Button className={styles.btn} key={i}>{v.type + ": " + v.name}</Button>;
-            } else {
-              return <Button className={styles.btn} key={i}>{v.type + ": " + v.namespace + "/" + v.name}</Button>;
-            }
-          })}
-          <Button className={styles.btn} type="primary" onClick={() => { setShowSelectorDialog(!showSelectorDialog) }}>
+          <span className={styles.directionSel}>Source: </span>
+          <div className={styles.selectorGroup}>
+          <Button className={styles.btn} type="primary" onClick={() => { setShowSourceSelectorDialog(!showSourceSelectorDialog) }}>
             Add ＋{" "}
           </Button>
-          <Button className={styles.btn} warning type="primary" onClick={() => { setPingMeshList([]) }}>
+          <Button className={styles.btn} warning type="primary" onClick={() => { setPingMeshSourceList([]) }}>
             Clear
           </Button>
-          <SelectorDialog visible={showSelectorDialog}
+          <div>
+            {pingMeshSourceList.map((v, i) => {
+              if (v.type == "Node" || v.type == "IP") {
+                return <Button className={styles.btn} key={i}>{v.type + ": " + v.name}</Button>;
+              } else {
+                return <Button className={styles.btn} key={i}>{v.type + ": " + v.namespace + "/" + v.name}</Button>;
+              }
+            })}
+          </div>
+
+          <SelectorDialog visible={showSourceSelectorDialog}
             submitSelector={(value) => {
               let toAdd = []
               skip: for (const v of value.values()) {
-                for (const c of pingMeshList.values()) {
+                for (const c of pingMeshSourceList.values()) {
                   if (v.name == c.name) {
                     continue skip
                   }
                 }
                 toAdd = [...toAdd, v]
               }
-              setPingMeshList([...pingMeshList, ...toAdd])
-              setShowSelectorDialog(!showSelectorDialog)
+              setPingMeshSourceList([...pingMeshSourceList, ...toAdd])
+              setShowSourceSelectorDialog(!showSourceSelectorDialog)
             }}
-            onClose={() => { setShowSelectorDialog(!showSelectorDialog) }}></SelectorDialog>
+            onClose={() => { setShowSourceSelectorDialog(!showSourceSelectorDialog) }}></SelectorDialog>
+          </div>
         </div>
+      </Form.Item>
+      <br/>
+      <Form.Item>
+        <span className={styles.directionSel}>Destination: </span>
+        <div className={styles.custom}>
+          <div className={styles.selectorGroup}>
+            <Button className={styles.btn} type="primary" onClick={() => { setShowSelectorDialog(!showSelectorDialog) }}>
+              Add ＋{" "}
+            </Button>
+            <Button className={styles.btn} warning type="primary" onClick={() => { setPingMeshList([]) }}>
+              Clear
+            </Button>
+            <br/>
+          {pingMeshList.map((v, i) => {
+            if (v.type == "Node" || v.type == "IP") {
+              return <Button className={styles.btn} key={i}>{v.type + ": " + v.name}</Button>;
+            } else {
+              return <Button className={styles.btn} key={i}>{v.type + ": " + v.namespace + "/" + v.name}</Button>;
+            }
+          })}
+
+          <SelectorDialog visible={showSelectorDialog} displayIPSelector={true}
+                          submitSelector={(value) => {
+                            let toAdd = []
+                            skip: for (const v of value.values()) {
+                              for (const c of pingMeshList.values()) {
+                                if (v.name == c.name) {
+                                  continue skip
+                                }
+                              }
+                              toAdd = [...toAdd, v]
+                            }
+                            setPingMeshList([...pingMeshList, ...toAdd])
+                            setShowSelectorDialog(!showSelectorDialog)
+                          }}
+                          onClose={() => { setShowSelectorDialog(!showSelectorDialog) }}></SelectorDialog>
+          </div>
+          </div>
       </Form.Item>
       <br />
       <Form.Item>
