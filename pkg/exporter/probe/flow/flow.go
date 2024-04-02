@@ -7,8 +7,6 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
-
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
@@ -43,7 +41,8 @@ func init() {
 }
 
 type flowArgs struct {
-	Dev string `mapstructure:"interface-name"`
+	Dev               string `mapstructure:"interfaceName"`
+	EnablePortInLabel bool   `mapstructure:"enablePortInLabel"`
 }
 
 func getDefaultRouteDevice() (netlink.Link, error) {
@@ -176,7 +175,9 @@ func (h *dynamicLinkFlowHelper) stop() error {
 }
 
 func metricsProbeCreator(args flowArgs) (probe.MetricsProbe, error) {
-	p := &metricsProbe{}
+	p := &metricsProbe{
+		enablePort: args.EnablePortInLabel,
+	}
 
 	if args.Dev == "" {
 		log.Infof("flow: auto detect network device with default route")
@@ -228,8 +229,9 @@ func metricsProbeCreator(args flowArgs) (probe.MetricsProbe, error) {
 }
 
 type metricsProbe struct {
-	bpfObjs bpfObjects
-	helper  linkFlowHelper
+	enablePort bool
+	bpfObjs    bpfObjects
+	helper     linkFlowHelper
 }
 
 func (p *metricsProbe) Start(_ context.Context) error {
@@ -252,6 +254,16 @@ func (p *metricsProbe) Stop(_ context.Context) error {
 	return p.bpfObjs.Close()
 }
 
+func toProbeTuple(t *bpfFlowTuple4) *probe.Tuple {
+	return &probe.Tuple{
+		Protocol: t.Proto,
+		Src:      bpfutil.GetV4AddrStr(t.Src),
+		Dst:      bpfutil.GetV4AddrStr(t.Dst),
+		Sport:    t.Sport,
+		Dport:    t.Dport,
+	}
+}
+
 func (p *metricsProbe) collectOnce(emit probe.Emit) error {
 	var values []bpfFlowMetrics
 	var key bpfFlowTuple4
@@ -268,33 +280,13 @@ func (p *metricsProbe) collectOnce(emit probe.Emit) error {
 			val.Packets += values[i].Packets
 		}
 
-		ipInfo := func(ip string) []string {
-			info := nettop.GetIPInfo(ip)
-			if info == nil {
-				return []string{"unknown", "", "", ""}
-			}
-
-			switch info.Type {
-			case nettop.IPTypeNode:
-				return []string{"node", info.NodeName, "", ""}
-			case nettop.IPTypePod:
-				return []string{"pod", "", info.PodNamespace, info.PodName}
-			default:
-				log.Warningf("unknown ip type %s for %s", ip, info.Type)
-			}
-			return []string{"unknown", "", "", ""}
+		tuple := toProbeTuple(&key)
+		if !p.enablePort {
+			tuple.Dport = 0
+			tuple.Sport = 0
 		}
 
-		labels := []string{bpfutil.GetProtoStr(key.Proto)}
-		srcIP := bpfutil.GetV4AddrStr(key.Src)
-		labels = append(labels, srcIP)
-		labels = append(labels, ipInfo(srcIP)...)
-
-		dstIP := bpfutil.GetV4AddrStr(key.Dst)
-		labels = append(labels, dstIP)
-		labels = append(labels, ipInfo(dstIP)...)
-		labels = append(labels, fmt.Sprintf("%d", bpfutil.Htons(key.Sport)))
-		labels = append(labels, fmt.Sprintf("%d", bpfutil.Htons(key.Dport)))
+		labels := probe.BuildTupleMetricsLabels(tuple)
 
 		emit("bytes", labels, float64(val.Bytes))
 		emit("packets", labels, float64(val.Packets))

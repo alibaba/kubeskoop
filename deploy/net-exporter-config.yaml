@@ -14,13 +14,19 @@ metrics:
   - name: udp
   - name: kernellatency
   - name: packetloss
+    args:
+      enableStack: false
   - name: flow
+    args:
+      enablePortInLabel: false
   - name: tcpretrans
 event:
   probes: 
   - name: biolatency
   - name: kernellatency
   - name: packetloss
+    args:
+      enableStack: false
   - name: tcpreset
   - name: tcpretrans
   sinks: 

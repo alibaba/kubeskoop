@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
 // +build ignore
 
+#pragma once
+
 #include <bpf/bpf_endian.h>
 #include "bpf_core_read.h"
 #include "bpf_helpers.h"

@@ -69,6 +69,10 @@ func init() {
 	probe.MustRegisterEventProbe(probeName, eventProbeCreator)
 }
 
+type packetlossArgs struct {
+	EnableStack bool `mapstructure:"EnableStack"`
+}
+
 func metricsProbeCreator() (probe.MetricsProbe, error) {
 	p := &metricsProbe{}
 
@@ -85,8 +89,9 @@ func metricsProbeCreator() (probe.MetricsProbe, error) {
 	return probe.NewMetricsProbe(probeName, p, batchMetrics), nil
 }
 
-func eventProbeCreator(sink chan<- *probe.Event, _ map[string]interface{}) (probe.EventProbe, error) {
+func eventProbeCreator(sink chan<- *probe.Event, args packetlossArgs) (probe.EventProbe, error) {
 	p := &eventProbe{
+		args: args,
 		sink: sink,
 	}
 	return probe.NewEventProbe(probeName, p), nil
@@ -95,12 +100,13 @@ func eventProbeCreator(sink chan<- *probe.Event, _ map[string]interface{}) (prob
 type metricsProbe struct {
 }
 
-func (p *metricsProbe) Start(ctx context.Context) error {
-	return _packetLossProbe.start(ctx, probe.ProbeTypeMetrics)
+func (p *metricsProbe) Start(_ context.Context) error {
+	cfg := probeConfig{}
+	return _packetLossProbe.start(probe.ProbeTypeMetrics, &cfg)
 }
 
-func (p *metricsProbe) Stop(ctx context.Context) error {
-	return _packetLossProbe.stop(ctx, probe.ProbeTypeMetrics)
+func (p *metricsProbe) Stop(_ context.Context) error {
+	return _packetLossProbe.stop(probe.ProbeTypeMetrics)
 }
 
 func (p *metricsProbe) collectOnce(emit probe.Emit) error {
@@ -119,11 +125,15 @@ func (p *metricsProbe) collectOnce(emit probe.Emit) error {
 }
 
 type eventProbe struct {
+	args packetlossArgs
 	sink chan<- *probe.Event
 }
 
-func (e *eventProbe) Start(ctx context.Context) error {
-	err := _packetLossProbe.start(ctx, probe.ProbeTypeEvent)
+func (e *eventProbe) Start(_ context.Context) error {
+	cfg := probeConfig{
+		enableStack: e.args.EnableStack,
+	}
+	err := _packetLossProbe.start(probe.ProbeTypeEvent, &cfg)
 	if err != nil {
 		return err
 	}
@@ -132,8 +142,8 @@ func (e *eventProbe) Start(ctx context.Context) error {
 	return nil
 }
 
-func (e *eventProbe) Stop(ctx context.Context) error {
-	return _packetLossProbe.stop(ctx, probe.ProbeTypeEvent)
+func (e *eventProbe) Stop(_ context.Context) error {
+	return _packetLossProbe.stop(probe.ProbeTypeEvent)
 }
 
 type Counter struct {
@@ -141,39 +151,59 @@ type Counter struct {
 	Netfilter uint32
 }
 
+type probeConfig struct {
+	enableStack bool
+}
+
 type packetLossProbe struct {
-	objs       bpfObjects
-	links      []link.Link
-	sink       chan<- *probe.Event
-	refcnt     [probe.ProbeTypeCount]int
-	lock       sync.Mutex
-	perfReader *perf.Reader
+	objs        bpfObjects
+	links       []link.Link
+	sink        chan<- *probe.Event
+	probeConfig [probe.ProbeTypeCount]*probeConfig
+	lock        sync.Mutex
+	perfReader  *perf.Reader
 
 	cache *lru.Cache[probe.Tuple, *Counter]
 }
 
-func (p *packetLossProbe) stop(_ context.Context, probeType probe.Type) error {
+func (p *packetLossProbe) probeCount() int {
+	var ret int
+	for _, cfg := range p.probeConfig {
+		if cfg != nil {
+			ret++
+		}
+	}
+	return ret
+}
+
+func (p *packetLossProbe) stop(probeType probe.Type) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	if p.refcnt[probeType] == 0 {
+	if p.probeConfig[probeType] == nil {
 		return fmt.Errorf("probe %s never start", probeType)
 	}
 
-	p.refcnt[probeType]--
+	p.probeConfig[probeType] = nil
 
-	if p.refcnt[probe.ProbeTypeEvent] == 0 {
-		if p.perfReader != nil {
-			p.perfReader.Close()
-		}
+	if probeType == probe.ProbeTypeEvent {
+		p.closePerfReader()
 	}
 
-	if p.totalReferenceCountLocked() == 0 {
-		return p.cleanup()
+	if p.probeCount() == 0 {
+		p.cleanup()
 	}
+
 	return nil
 }
 
-func (p *packetLossProbe) cleanup() error {
+func (p *packetLossProbe) closePerfReader() {
+	if p.perfReader != nil {
+		p.perfReader.Close()
+		p.perfReader = nil
+	}
+}
+
+func (p *packetLossProbe) cleanup() {
 	for _, link := range p.links {
 		link.Close()
 	}
@@ -182,45 +212,64 @@ func (p *packetLossProbe) cleanup() error {
 
 	p.objs.Close()
 
-	return nil
 }
 
-func (p *packetLossProbe) totalReferenceCountLocked() int {
-	var c int
-	for _, n := range p.refcnt {
-		c += n
-	}
-	return c
-}
-
-func (p *packetLossProbe) start(ctx context.Context, probeType probe.Type) (err error) {
+func (p *packetLossProbe) start(probeType probe.Type, cfg *probeConfig) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	if p.refcnt[probeType] != 0 {
+	if p.probeConfig[probeType] != nil {
 		return fmt.Errorf("%s(%s) has already started", probeName, probeType)
 	}
 
-	p.refcnt[probeType]++
-	if p.totalReferenceCountLocked() == 1 {
-		if err = p.loadAndAttachBPF(); err != nil {
-			log.Errorf("%s failed load and attach bpf, err: %v", probeName, err)
-			_ = p.cleanup()
-			return
-		}
+	p.probeConfig[probeType] = cfg
+
+	if err := p.reinstallBPFLocked(); err != nil {
+		return fmt.Errorf("%s failed install ebpf: %w", probeName, err)
 	}
 
-	if p.refcnt[probe.ProbeTypeEvent] == 1 {
+	var err error
+
+	if probeType == probe.ProbeTypeEvent {
 		p.perfReader, err = perf.NewReader(p.objs.bpfMaps.InspPlEvent, int(unsafe.Sizeof(bpfInspPlEventT{})))
 		if err != nil {
 			log.Errorf("%s error create perf reader, err: %v", probeName, err)
-			_ = p.stop(ctx, probeType)
-			return
+			return err
 		}
 
 		go p.perfLoop()
 	}
+
 	return nil
+}
+
+func (p *packetLossProbe) reinstallBPFLocked() error {
+	p.closePerfReader()
+	p.cleanup()
+
+	if err := p.loadAndAttachBPF(); err != nil {
+		log.Errorf("%s failed load and attach bpf, err: %v", probeName, err)
+		p.cleanup()
+		return err
+	}
+
+	if p.probeConfig[probe.ProbeTypeEvent] != nil {
+		var err error
+		p.perfReader, err = perf.NewReader(p.objs.bpfMaps.InspPlEvent, int(unsafe.Sizeof(bpfInspPlEventT{})))
+		if err != nil {
+			log.Errorf("%s error create perf reader, err: %v", probeName, err)
+			return err
+		}
+
+		go p.perfLoop()
+	}
+
+	return nil
+}
+
+func (p *packetLossProbe) enableStack() bool {
+	cfg := p.probeConfig[probe.ProbeTypeEvent]
+	return cfg != nil && cfg.enableStack
 }
 
 func (p *packetLossProbe) loadAndAttachBPF() error {
@@ -229,20 +278,32 @@ func (p *packetLossProbe) loadAndAttachBPF() error {
 		return fmt.Errorf("remove limit failed: %s", err.Error())
 	}
 
-	opts := ebpf.CollectionOptions{}
-
-	opts.Programs = ebpf.ProgramOptions{
-		KernelTypes: bpfutil.LoadBTFSpecOrNil(),
+	spec, err := loadBpf()
+	if err != nil {
+		return fmt.Errorf("failed loading bpf: %w", err)
 	}
 
-	// Load pre-compiled programs and maps into the kernel.
-	if err := loadBpfObjects(&p.objs, &opts); err != nil {
+	if p.enableStack() {
+		m := map[string]interface{}{
+			"enable_packetloss_stack": uint8(1),
+		}
+		if err := spec.RewriteConstants(m); err != nil {
+			return fmt.Errorf("failed rewrite constants: %w", err)
+		}
+	}
+
+	opts := ebpf.CollectionOptions{
+		Programs: ebpf.ProgramOptions{
+			KernelTypes: bpfutil.LoadBTFSpecOrNil(),
+		},
+	}
+	if err := spec.LoadAndAssign(&p.objs, &opts); err != nil {
 		return fmt.Errorf("loading objects: %s", err.Error())
 	}
 
 	pl, err := link.Tracepoint("skb", "kfree_skb", p.objs.KfreeSkb, &link.TracepointOptions{})
 	if err != nil {
-		return fmt.Errorf("link tracepoint kfree_skb failed: %s", err.Error())
+		return fmt.Errorf("link tracepoint kfree_skb failed: %w", err)
 	}
 	p.links = append(p.links, pl)
 	return nil
@@ -328,21 +389,21 @@ func (p *packetLossProbe) perfLoop() {
 			Labels:    probe.BuildTupleEventLabels(tuple),
 		}
 
-		//TODO add trigger to enable/disable stack
-		stacks, err := bpfutil.GetSymsByStack(uint32(event.StackId), p.objs.InspPlStack)
-		if err != nil {
-			log.Warnf("%s failed get sym by stack, err: %v", probeName, err)
-			continue
-		}
-		var strs []string
-		for _, sym := range stacks {
-			if _, ok := ignoreSymbolList[sym.GetName()]; ok {
-				goto anotherLoop
+		if p.enableStack() {
+			stacks, err := bpfutil.GetSymsByStack(uint32(event.StackId), p.objs.InspPlStack)
+			if err != nil {
+				log.Warnf("%s failed get sym by stack, err: %v", probeName, err)
+				continue
 			}
-			strs = append(strs, sym.GetExpr())
+			var strs []string
+			for _, sym := range stacks {
+				if _, ok := ignoreSymbolList[sym.GetName()]; ok {
+					goto anotherLoop
+				}
+				strs = append(strs, sym.GetExpr())
+			}
+			evt.Message = strings.Join(strs, "\n")
 		}
-
-		evt.Message = strings.Join(strs, "\n")
 
 		if p.sink != nil {
 			p.sink <- evt
