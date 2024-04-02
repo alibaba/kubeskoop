@@ -21,6 +21,7 @@ export interface PingMeshLatency {
 }
 
 export interface PingMeshArgs {
+    ping_mesh_source_list: NodeInfo[]
     ping_mesh_list: NodeInfo[]
 }
 

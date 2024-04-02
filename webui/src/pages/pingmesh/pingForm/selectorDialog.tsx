@@ -10,6 +10,7 @@ interface SelectorProps {
   podList: PodInfo[];
   nodeList: NodeInfo[];
   visible: boolean;
+  displayIPSelector: boolean
   onClose: () => void
 }
 
@@ -24,6 +25,8 @@ const SelectorDialog: React.FunctionComponent<SelectorProps> = (props: SelectorP
   const [labelSelectorValues, setLabelSelectorValues] = useState([])
   const [labelSelectorValue, setLabelSelectorValue] = useState("")
   const [formNamespace, setFormNamespace] = useState("")
+  const [ipAddress, setIPAddress] = useState("")
+  const [ipAddressCheckState, setIPAddressCheckState] = useState("error")
 
   const filterCaptureObject = (type, ns) => {
     if (type == "Node") {
@@ -123,8 +126,20 @@ const SelectorDialog: React.FunctionComponent<SelectorProps> = (props: SelectorP
           }
         }).filter(item => item))]
       }
+    } else if (formCaptureType == "IP") {
+      setFormCaptureType("Pod")
+      return [
+        {
+          name: ipAddress,
+          type: "IP"
+        }
+      ]
     }
     return []
+  }
+
+  const isPodOrNode = (type) => {
+    return type == "Pod" || type == "Node"
   }
 
   return (
@@ -134,7 +149,7 @@ const SelectorDialog: React.FunctionComponent<SelectorProps> = (props: SelectorP
       footerActions={['ok']}
       visible={props.visible}
       onClose={props.onClose}
-      onOk={() => props.submitSelector(selectedResult())}
+      onOk={() => {!(formCaptureType=="IP"&&ipAddressCheckState!="success") && props.submitSelector(selectedResult())}}
     >
       <Form
         labelAlign='left'
@@ -145,22 +160,35 @@ const SelectorDialog: React.FunctionComponent<SelectorProps> = (props: SelectorP
           <Radio.Group
             shape="button"
             value={formCaptureType}
-            onChange={(value) => { setFormCaptureType(value); setFormNamespace(""); setFormName(""); filterCaptureObject(value) }}
+            onChange={(value) => {setFormCaptureType(value); setFormNamespace(""); setFormName(""); filterCaptureObject(value) }}
           >
             <Radio value="Node">Node</Radio>
             <Radio value="Pod">Pod</Radio>
+            {props.displayIPSelector &&
+              <Radio value="IP">IP</Radio>
+            }
           </Radio.Group>
         </Form.Item>
-        <Form.Item label="Select Target By">
-          <Radio.Group
-            shape="button"
-            value={captureSelectorType}
-            onChange={(value) => { setCaptureSelectorType(value); setFormNamespace(""); setFormName(""); filterCaptureObject(formCaptureType) }}
-          >
-            <Radio value="Name">Namespace & Name</Radio>
-            <Radio value="Selector">Label Selector</Radio>
-          </Radio.Group>
-        </Form.Item>
+        {isPodOrNode(formCaptureType)  &&
+          <Form.Item label="Select Target By">
+            <Radio.Group
+              shape="button"
+              value={captureSelectorType}
+              onChange={(value) => { setCaptureSelectorType(value); setFormNamespace(""); setFormName(""); filterCaptureObject(formCaptureType) }}
+            >
+              <Radio value="Name">Namespace & Name</Radio>
+              <Radio value="Selector">Label Selector</Radio>
+            </Radio.Group>
+          </Form.Item>
+        }
+        {!isPodOrNode(formCaptureType) &&
+          <Form.Item label="IP Address">
+            <Input onChange={(value) => {setIPAddressCheckState(/^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.?\b){4}$/.test(value) ? "success" : "error");setIPAddress(value)}}
+              state={ipAddressCheckState}
+              placeholder="Input IP Address, eg: 1.1.1.1"
+            />
+          </Form.Item>
+        }
 
         {formCaptureType == "Pod" &&
           <Form.Item label="Namespace" required >
@@ -172,7 +200,7 @@ const SelectorDialog: React.FunctionComponent<SelectorProps> = (props: SelectorP
           </Form.Item>
         }
 
-        {captureSelectorType == "Selector" &&
+        {isPodOrNode(formCaptureType)  && captureSelectorType == "Selector" &&
           <Form.Item label="LabelSelector" required>
             <Box direction="row" style={{alignItems: "center"}}>
               <Select showSearch value={labelSelectorKey} onChange={setLabelSelectorKey} dataSource={labelSelectorKeys} style={{ width: 200 }} name="labelKey" placeholder="key" />
@@ -181,7 +209,7 @@ const SelectorDialog: React.FunctionComponent<SelectorProps> = (props: SelectorP
             </Box>
           </Form.Item>
         }
-        {captureSelectorType == "Name" &&
+        {isPodOrNode(formCaptureType) && captureSelectorType == "Name" &&
           <Form.Item label="Name" required>
             <Select className={styles.selector} name="name" placeholder="Please select name" useDetailValue showSearch
               value={formName}

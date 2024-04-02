@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strconv"
 	"sync"
 	"time"
@@ -27,7 +28,8 @@ type Latency struct {
 }
 
 type PingMeshArgs struct {
-	PingMeshList []NodeInfo `json:"ping_mesh_list"`
+	PingMeshSourceList []NodeInfo `json:"ping_mesh_source_list"`
+	PingMeshList       []NodeInfo `json:"ping_mesh_list"`
 }
 
 type PingMeshResult struct {
@@ -52,6 +54,8 @@ func (c *controller) dispatchPingTask(ctx context.Context, src, dst NodeInfo, ta
 		if err != nil {
 			return err
 		}
+	case "IP":
+		return fmt.Errorf("not support ip as source")
 	}
 	switch dst.Type {
 	case "Pod":
@@ -64,6 +68,8 @@ func (c *controller) dispatchPingTask(ctx context.Context, src, dst NodeInfo, ta
 		if err != nil {
 			return err
 		}
+	case "IP":
+		pingInfo.Destination = dst.Name
 	}
 
 	_, err = c.commitTask(src.Nodename, &rpc.Task{
@@ -113,19 +119,24 @@ func (c *controller) PingMesh(ctx context.Context, pingmesh *PingMeshArgs) (*Pin
 	taskGroup := sync.WaitGroup{}
 	timeoutCtx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
-	latencyResult := make(chan *Latency, len(pingmesh.PingMeshList)*len(pingmesh.PingMeshList))
+	latencyResult := make(chan *Latency, len(pingmesh.PingMeshSourceList)*len(pingmesh.PingMeshList))
 	pingResult := &PingMeshResult{}
 	var err error
-	for sidx, src := range pingmesh.PingMeshList {
-		pingResult.Nodes = append(pingResult.Nodes, src)
-		for didx, dst := range pingmesh.PingMeshList {
-			if sidx == didx {
+	NodeSet := make(map[NodeInfo]interface{})
+	for _, src := range pingmesh.PingMeshSourceList {
+		NodeSet[src] = struct{}{}
+		for _, dst := range pingmesh.PingMeshList {
+			if reflect.DeepEqual(src, dst) {
 				continue
 			}
+			NodeSet[dst] = struct{}{}
 			if err = c.dispatchPingTask(timeoutCtx, src, dst, &taskGroup, latencyResult); err != nil {
 				log.Errorf("dispatch ping task error: %v", err)
 			}
 		}
+	}
+	for node := range NodeSet {
+		pingResult.Nodes = append(pingResult.Nodes, node)
 	}
 	taskGroup.Wait()
 	close(latencyResult)
