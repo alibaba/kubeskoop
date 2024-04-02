@@ -23,6 +23,7 @@ struct insp_pl_event_t {
 };
 
 const struct insp_pl_event_t *unused_insp_pl_event_t __attribute__((unused));
+const volatile u8 enable_packetloss_stack = 0;
 
 struct {
 	__uint(type, BPF_MAP_TYPE_STACK_TRACE);
@@ -42,8 +43,12 @@ int kfree_skb(struct kfree_skb_args *args) {
 
   set_tuple(skb, &event.tuple);
   event.location = (u64)args->location;
-  event.stack_id = bpf_get_stackid(args, &insp_pl_stack,
-                                KERN_STACKID_FLAGS);
+
+  if (enable_packetloss_stack){
+      event.stack_id = bpf_get_stackid(args, &insp_pl_stack,
+                                    KERN_STACKID_FLAGS);
+  }
+
   bpf_perf_event_output(args, &insp_pl_event,
                         BPF_F_CURRENT_CPU, &event, sizeof(event));
 
