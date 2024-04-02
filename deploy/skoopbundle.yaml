@@ -116,9 +116,9 @@ spec:
 apiVersion: v1
 data:
   config.yaml: |-
-    debugmode: true
+    debugMode: true
     port: 9102
-    enable_controller: true
+    enableController: true
     metrics:
       probes:
       - name: info

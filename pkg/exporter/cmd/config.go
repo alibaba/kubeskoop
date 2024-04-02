@@ -8,9 +8,9 @@ import (
 )
 
 type InspServerConfig struct {
-	DebugMode        bool          `yaml:"debugmode" mapstructure:"debugmode" json:"debugmode"`
+	DebugMode        bool          `yaml:"debugMode" mapstructure:"debugMode" json:"debugMode"`
 	Port             uint16        `yaml:"port" mapstructure:"port" json:"port"`
-	EnableController bool          `yaml:"enable_controller" mapstructure:"enable_controller" json:"enable_controller"`
+	EnableController bool          `yaml:"enableController" mapstructure:"enableController" json:"enableController"`
 	MetricsConfig    MetricsConfig `yaml:"metrics" mapstructure:"metrics" json:"metrics"`
 	EventConfig      EventConfig   `yaml:"event" mapstructure:"event" json:"event"`
 }

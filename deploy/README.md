@@ -88,7 +88,7 @@ curl {{skoop-exporter的pod ip}}:9102/status |jq .
 |------------------------------------|----------------------------------------------------------------------------------------------------------------------|------------------------------------|
 | name                               | Skoop-exporter daemonset name                                                                                        | `skoop-exporter`                   |
 | namespace                          | The namespace of skoop-exporter workload                                                                             | `skoop`                            |
-| debugmode                          | Enable the debugmode of skoop-exporter, with debug interface, debug log level and pprof support                      | `false`                            |
+| debugMode                          | Enable the debug mode of skoop-exporter, with debug interface, debug log level and pprof support                      | `false`                            |
 | config.serverPort                  | Metric server port, provide HTTP service                                                                             | 9102                               |
 | config.metricsProbes               | Metric probes to enable                                                                                              | refer to the probe guide           |
 | config.eventProbes                 | Event probes to enable                                                                                               | refer to the probe guide           |
@@ -107,7 +107,7 @@ Skoop-exporter支持的配置项如下:
 
 | Setting                            | Description                                                                                                          | Default                            |
 |------------------------------------|----------------------------------------------------------------------------------------------------------------------|------------------------------------|
-| debugmode                          | Enable the debugmode of skoop-exporter, with debug interface, debug log level and pprof support                      | `false`                            |
+| debugMode                          | Enable the debug mode of skoop-exporter, with debug interface, debug log level and pprof support                      | `false`                            |
 | port                               | metrics server port                                                                                                  | 9102                               |
 | metrics.probes                     | Metric probes to enable                                                                                              | refer to the probe guide           |
 | event.probes                       | Event  probes to enable                                                                                              | refer to the probe guide           |

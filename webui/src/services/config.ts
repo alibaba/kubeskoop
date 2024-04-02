@@ -1,9 +1,9 @@
 import { request } from 'ice'
 
 export interface ExporterConfig {
-    debugmode: boolean
+    debugMode: boolean
     port: number
-    enable_controller: boolean
+    enableController: boolean
     metrics: MetricsConfig
     event: EventConfig
 }

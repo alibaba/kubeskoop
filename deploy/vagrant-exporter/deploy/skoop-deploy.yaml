@@ -100,7 +100,7 @@ spec:
 apiVersion: v1
 data:
   config.yaml: |-
-    debugmode: true
+    debugMode: true
     metric_config:
       interval: 15
       port: 9102
