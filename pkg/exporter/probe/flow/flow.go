@@ -30,6 +30,8 @@ const (
 
 	metricsBytes   = "bytes"
 	metricsPackets = "packets"
+
+	ClsactQdisc = "clsact"
 )
 
 var (
@@ -327,78 +329,149 @@ func (p *metricsProbe) loadBPF() error {
 }
 
 type ebpfFlow struct {
-	dev     netlink.Link
-	bpfObjs *bpfObjects
+	cleanQdisc bool
+	dev        netlink.Link
+	bpfObjs    *bpfObjects
 }
 
 func (f *ebpfFlow) start() error {
 	err := f.attachBPF()
 	if err != nil {
 		log.Errorf("%s failed attach ebpf to dev %s, cleanup", probeName, f.dev)
-		_ = f.cleanup()
+		f.cleanup()
 	}
 	return err
 }
 
 func (f *ebpfFlow) stop() error {
-	err := f.cleanup()
-	if err != nil {
-		log.Errorf("failed stop flow on dev %s", f.dev.Attrs().Name)
-	}
-	return err
+	f.cleanup()
+	return nil
 }
 
-func (f *ebpfFlow) cleanup() error {
-	return cleanQdisc(f.dev)
+func (f *ebpfFlow) cleanup() {
+	clean := func(dir direction) {
+		filter, err := f.getFlowFilter(dir)
+		if err != nil {
+			log.Errorf("%s cannot list ingress filter for dev %s: %v", probeName, f.dev.Attrs().Name, err)
+			return
+		}
+		if err := netlink.FilterDel(filter); err != nil {
+			log.Errorf("%s cannot delete ingress filter for dev %s: %v", probeName, f.dev.Attrs().Name, err)
+		}
+
+	}
+	clean(ingress)
+	clean(egress)
+
+	if f.cleanQdisc {
+		_ = netlink.QdiscDel(clsact(f.dev))
+	}
+}
+
+func directionName(dir direction) string {
+	switch dir {
+	case ingress:
+		return "ingress"
+	case egress:
+		return "egress"
+	}
+	return ""
+}
+
+func filterParent(dir direction) uint32 {
+	switch dir {
+	case ingress:
+		return netlink.HANDLE_MIN_INGRESS
+	case egress:
+		return netlink.HANDLE_MIN_EGRESS
+	}
+	return 0
+}
+
+func filterName(dev string, dir direction) string {
+	directionName := directionName(dir)
+	return fmt.Sprintf("kubeskoop-flow-%s-%s", dev, directionName)
+}
+
+func (f *ebpfFlow) getFlowFilter(direction direction) (*netlink.BpfFilter, error) {
+	filterParent := filterParent(direction)
+	filterName := filterName(f.dev.Attrs().Name, direction)
+
+	filters, err := netlink.FilterList(f.dev, filterParent)
+	if err != nil {
+		return nil, fmt.Errorf("failed list filters: %w", err)
+	}
+
+	for _, filter := range filters {
+		if filter.Type() != "bpf" {
+			continue
+		}
+		f, ok := filter.(*netlink.BpfFilter)
+		if !ok {
+			continue
+		}
+		if f.Name != filterName {
+			continue
+		}
+		return f, nil
+	}
+	return nil, nil
 }
 
 func (f *ebpfFlow) setupTCFilter(link netlink.Link) error {
-	if err := replaceQdisc(link); err != nil {
-		return errors.Wrapf(err, "failed replace qdics clsact for dev %s", link.Attrs().Name)
+	var (
+		err error
+	)
+	if f.cleanQdisc, err = ensureClsactQdisc(link); err != nil {
+		return fmt.Errorf("failed replace qdics clsact for dev %s: %w", link.Attrs().Name, err)
 	}
 
-	replaceFilter := func(direction direction) error {
-		directionName := ""
-		var filterParent uint32
+	setup := func(dir direction) error {
+		filterParent := filterParent(dir)
+		filterName := filterName(f.dev.Attrs().Name, dir)
+		directionName := directionName(dir)
+
 		var prog *ebpf.Program
-		switch direction {
+
+		switch dir {
 		case ingress:
-			directionName = "ingress"
-			filterParent = netlink.HANDLE_MIN_INGRESS
 			prog = f.bpfObjs.bpfPrograms.TcIngress
 		case egress:
-			directionName = "egress"
-			filterParent = netlink.HANDLE_MIN_EGRESS
 			prog = f.bpfObjs.bpfPrograms.TcEgress
-		default:
-			return fmt.Errorf("invalid direction value: %d", direction)
 		}
 
 		filter := &netlink.BpfFilter{
 			FilterAttrs: netlink.FilterAttrs{
 				LinkIndex: link.Attrs().Index,
 				Parent:    filterParent,
-				Handle:    1,
 				Protocol:  unix.ETH_P_IP,
-				Priority:  1,
+				Priority:  0xffff,
 			},
 			Fd:           prog.FD(),
-			Name:         fmt.Sprintf("%s-%s", link.Attrs().Name, directionName),
+			Name:         filterName,
 			DirectAction: true,
 		}
 
+		oldFilter, err := f.getFlowFilter(dir)
+		if err != nil {
+			return fmt.Errorf("failed list %s filter for dev %s: %w", directionName, link.Attrs().Name, err)
+		}
+		if oldFilter != nil {
+			filter.Handle = oldFilter.Handle
+		}
 		if err := netlink.FilterReplace(filter); err != nil {
-			return fmt.Errorf("replace tc filter: %w", err)
+			return fmt.Errorf("failed replace %s filter for dev %s: %w", directionName, link.Attrs().Name, err)
 		}
 		return nil
 	}
 
-	if err := replaceFilter(ingress); err != nil {
-		return errors.Wrapf(err, "cannot set ingress filter for dev %s", link.Attrs().Name)
+	if err = setup(ingress); err != nil {
+		return err
 	}
-	if err := replaceFilter(egress); err != nil {
-		return errors.Wrapf(err, "cannot set egress filter for dev %s", link.Attrs().Name)
+	if err = setup(egress); err != nil {
+		return err
 	}
+
 	return nil
 }
 
@@ -407,10 +480,6 @@ func (f *ebpfFlow) attachBPF() error {
 		return fmt.Errorf("failed replace %s qdisc with clsact, err: %v", f.dev, err)
 	}
 	return nil
-}
-
-func cleanQdisc(link netlink.Link) error {
-	return netlink.QdiscDel(clsact(link))
 }
 
 func clsact(link netlink.Link) netlink.Qdisc {
@@ -422,10 +491,20 @@ func clsact(link netlink.Link) netlink.Qdisc {
 
 	return &netlink.GenericQdisc{
 		QdiscAttrs: attrs,
-		QdiscType:  "clsact",
+		QdiscType:  ClsactQdisc,
 	}
 }
 
-func replaceQdisc(link netlink.Link) error {
-	return netlink.QdiscReplace(clsact(link))
+func ensureClsactQdisc(link netlink.Link) (bool, error) {
+	qdicsList, err := netlink.QdiscList(link)
+	if err != nil {
+		return false, err
+	}
+	for _, q := range qdicsList {
+		if q.Attrs().Parent == netlink.HANDLE_CLSACT && q.Type() == ClsactQdisc {
+			log.Infof("got a old clsact, not create")
+			return false, nil
+		}
+	}
+	return true, netlink.QdiscAdd(clsact(link))
 }
