@@ -41,7 +41,10 @@ int kfree_skb(struct kfree_skb_args *args) {
   struct sk_buff *skb = (struct sk_buff *)args->skb;
   struct insp_pl_event_t event = {0};
 
-  set_tuple(skb, &event.tuple);
+  if (set_tuple(skb, &event.tuple) < 0){
+    //invalid packet, skip
+    goto out;
+  }
   event.location = (u64)args->location;
 
   if (enable_packetloss_stack){
