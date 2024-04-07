@@ -111,7 +111,7 @@ static __always_inline u32 get_netns(struct sk_buff *skb) {
   return netns;
 }
 
-static __always_inline int set_flow_tuple4(struct __sk_buff *skb, struct flow_tuple_4 *tuple){
+static __always_inline int set_flow_tuple4(struct __sk_buff *skb, struct flow_tuple_4 *tuple, bool port){
 	void *data = (void *)(long)skb->data;
 	struct ethhdr *eth = data;
 	void *data_end = (void *)(long)skb->data_end;
@@ -130,6 +130,9 @@ static __always_inline int set_flow_tuple4(struct __sk_buff *skb, struct flow_tu
         tuple->src = iph->saddr;
         tuple->dst = iph->daddr;
         tuple->proto = iph->protocol;
+        if (!port){
+            return 0;
+        }
 
         l4_off = sizeof(*eth) + iph->ihl * 4;
 

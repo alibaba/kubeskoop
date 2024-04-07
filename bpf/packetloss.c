@@ -23,7 +23,7 @@ struct insp_pl_event_t {
 };
 
 const struct insp_pl_event_t *unused_insp_pl_event_t __attribute__((unused));
-const volatile u8 enable_packetloss_stack = 0;
+const volatile bool enable_packetloss_stack = 0;
 
 struct {
 	__uint(type, BPF_MAP_TYPE_STACK_TRACE);
