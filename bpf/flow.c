@@ -6,6 +6,8 @@
 
 #define TC_ACT_OK 0
 
+volatile const bool enable_flow_port = 0;
+
 //todo aggregate all flow based metrics in one map to save memory.
 struct flow_metrics {
     u64 packets;
@@ -24,7 +26,7 @@ struct {
 
 static inline int __do_flow(struct __sk_buff *skb){
     struct flow_tuple_4 tuple = {0};
-    if(set_flow_tuple4(skb, &tuple) < 0){
+    if(set_flow_tuple4(skb, &tuple, enable_flow_port) < 0){
         goto out;
     }
 
