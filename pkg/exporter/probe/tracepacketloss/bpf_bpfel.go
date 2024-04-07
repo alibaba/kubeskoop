@@ -79,9 +79,8 @@ type bpfProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type bpfMapSpecs struct {
-	InspFeatureSwitch *ebpf.MapSpec `ebpf:"insp_feature_switch"`
-	InspPlEvent       *ebpf.MapSpec `ebpf:"insp_pl_event"`
-	InspPlStack       *ebpf.MapSpec `ebpf:"insp_pl_stack"`
+	InspPlEvent *ebpf.MapSpec `ebpf:"insp_pl_event"`
+	InspPlStack *ebpf.MapSpec `ebpf:"insp_pl_stack"`
 }
 
 // bpfObjects contains all objects after they have been loaded into the kernel.
@@ -103,14 +102,12 @@ func (o *bpfObjects) Close() error {
 //
 // It can be passed to loadBpfObjects or ebpf.CollectionSpec.LoadAndAssign.
 type bpfMaps struct {
-	InspFeatureSwitch *ebpf.Map `ebpf:"insp_feature_switch"`
-	InspPlEvent       *ebpf.Map `ebpf:"insp_pl_event"`
-	InspPlStack       *ebpf.Map `ebpf:"insp_pl_stack"`
+	InspPlEvent *ebpf.Map `ebpf:"insp_pl_event"`
+	InspPlStack *ebpf.Map `ebpf:"insp_pl_stack"`
 }
 
 func (m *bpfMaps) Close() error {
 	return _BpfClose(
-		m.InspFeatureSwitch,
 		m.InspPlEvent,
 		m.InspPlStack,
 	)
