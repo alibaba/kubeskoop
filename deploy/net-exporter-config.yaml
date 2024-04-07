@@ -14,8 +14,6 @@ metrics:
   - name: udp
   - name: kernellatency
   - name: packetloss
-    args:
-      enableStack: false
   - name: flow
     args:
       enablePortInLabel: false
