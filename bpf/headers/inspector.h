@@ -174,6 +174,10 @@ static __always_inline int set_tuple(struct sk_buff *skb, struct tuple *tpl) {
   l3_off = BPF_CORE_READ(skb, network_header);
   l4_off = BPF_CORE_READ(skb, transport_header);
 
+  if (l3_off == 0){
+    return -1;
+  }
+
   ip = (struct iphdr *)(skb_head + l3_off);
   bpf_probe_read(&iphdr_first_byte, 1, ip);
   ip_vsn = iphdr_first_byte >> 4;
