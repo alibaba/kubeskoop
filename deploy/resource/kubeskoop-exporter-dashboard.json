@@ -249,8 +249,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "rate(kubeskoop_packetloss_abnormal{k8s_node=~\"$node\"}[2m])",
-          "legendFormat": "{{k8s_pod}}/{{k8s_node}}",
+          "expr": "sum(rate(kubeskoop_packetloss_total{k8s_node=~\"$node\"}[2m])) by (k8s_node)",
+          "legendFormat": "{{k8s_node}}",
           "range": true,
           "refId": "A"
         }

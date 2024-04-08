@@ -121,21 +121,28 @@ data:
     enableController: true
     metrics:
       probes:
-      - name: info
+      - name: conntrack
+      - name: qdisc
       - name: netdev
       - name: io
-      - name: socketlatency
-      - name: packetloss
       - name: sock
       - name: tcpsummary
       - name: tcp
       - name: tcpext
       - name: udp
+      - name: socketlatency
+      - name: packetloss
       - name: flow
+        args:
+          enablePortInLabel: false
+      - name: tcpretrans
     event:
       probes:
-      - name: packetloss
       - name: tcpreset
+      - name: packetloss
+        args:
+          enableStack: false
+      - name: tcpretrans
       sinks:
       - name: stderr
       - name: loki
@@ -578,6 +585,7 @@ data:
       prometheus: http://prometheus-service
       database:
         type: sqlite3
+      loki: http://loki-service:3100
       diagnose: {}
 kind: ConfigMap
 metadata:
@@ -604,9 +612,6 @@ spec:
       - name: controller
         image: kubeskoop/controller:v1.0.0
         command: ["/bin/controller"]
-        env:
-          - name: LOKI_ENDPOINT
-            value: http://loki-service:3100
         volumeMounts:
           - name:  lib
             mountPath: /var/lib/kubeskoop
