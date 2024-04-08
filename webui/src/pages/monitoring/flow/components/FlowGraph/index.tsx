@@ -300,7 +300,6 @@ const nodeLabel = (n) => {
 
 const linkLabel = (l) => {
   const label = [
-    `Connection(s): ${l.edges.length}`,
     `Send Packets: ${l.edges.reduce((a, b) => a + b.packets, 0)}`,
     `Send Byte(s): ${l.edges.reduce((a, b) => a + b.bytes, 0)}`,
     `Dropped Packet(s): ${l.edges.reduce((a, b) => a + b.dropped, 0)}`,
