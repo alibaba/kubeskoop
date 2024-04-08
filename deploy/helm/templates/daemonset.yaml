@@ -1,34 +1,34 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: {{ .Values.name }}
+  name: agent
   namespace: {{ .Release.Namespace }}
   labels:
-    app: {{ .Values.appName }}
+    app: kubeskoop-agent
+{{- with .Values.agent }}
 spec:
   selector:
     matchLabels:
-      app: {{ .Values.appName }}
+      app: kubeskoop-agent
   template:
     metadata:
       labels:
-        app: {{ .Values.appName }}
+        app: kubeskoop-agent
       annotations:
         prometheus.io/path: /metrics
-        prometheus.io/port: "9102"
+        prometheus.io/port: "{{ .config.port }}"
         prometheus.io/scheme: http
         prometheus.io/scrape: "true"
-      name: {{ .Values.appName }}
     spec:
       hostNetwork: true
       hostPID: true
       hostIPC: true
       dnsPolicy: ClusterFirstWithHostNet
-      {{- if .Values.initContainer.enabled }}
+      {{- if .btfhack.enabled }}
       initContainers:
-        - name: preparels
-          image: {{ .Values.initContainer.repository }}:{{ .Values.initContainer.tag }}
-          imagePullPolicy: {{ .Values.initContainer.imagePullPolicy }}
+        - name: btfhack
+          image: "{{ .btfhack.repository }}:{{ .btfhack.tag }}"
+          imagePullPolicy: {{ .btfhack.imagePullPolicy }}
           volumeMounts:
             - name: bpfdir
               mountPath: /etc/net-exporter/btf
@@ -42,8 +42,8 @@ spec:
       {{- end }}
       containers:
         - name: inspector
-          image:  {{ .Values.image.repository }}:{{ .Values.image.tag }}
-          imagePullPolicy: {{ .Values.image.imagePullPolicy }}
+          image:  "{{ .image.repository }}:{{ .image.tag }}"
+          imagePullPolicy: {{ .image.imagePullPolicy }}
           env:
           - name: INSPECTOR_NODENAME
             valueFrom:
@@ -74,12 +74,12 @@ spec:
           securityContext:
             privileged: true
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
-      {{- with .Values.nodeSelector }}
+            {{- toYaml .resources | nindent 12 }}
+      {{- with .nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.tolerations }}
+      {{- with .tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
@@ -89,7 +89,7 @@ spec:
             path: /proc
         - name: runtimeendpoint
           hostPath:
-            path: {{ .Values.runtimeEndpoint }}
+            path: {{ .config.runtimeEndpoint }}
         - name: boot
           hostPath:
             path: /boot/
@@ -112,3 +112,4 @@ spec:
             name: kubeskoop-config
         - name: bpfdir
           emptyDir: {}
+{{- end }}

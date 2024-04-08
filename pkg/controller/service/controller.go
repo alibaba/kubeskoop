@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"io"
-	"os"
 	"sync"
 	"time"
 
@@ -45,17 +44,23 @@ type ControllerService interface {
 }
 
 type Config struct {
-	KubeConfig string
+	Namespace  string          `yaml:"namespace"`
+	KubeConfig string          `yaml:"kubeConfig"`
 	Prometheus string          `yaml:"prometheus"`
+	Loki       string          `yaml:"loki"`
 	DB         db.Config       `yaml:"database"`
 	Diagnose   diagnose.Config `yaml:"diagnose"`
 }
 
 func NewControllerService(k8sClient *kubernetes.Clientset, config *Config) (ControllerService, error) {
+	if config.Namespace == "" {
+		config.Namespace = Namespace
+	}
+
 	ctrl := &controller{
 		taskWatcher:    sync.Map{},
 		resultWatchers: sync.Map{},
-		Namespace:      Namespace,
+		Namespace:      config.Namespace,
 		ConfigMapName:  ExporterConfigMap,
 	}
 
@@ -76,8 +81,8 @@ func NewControllerService(k8sClient *kubernetes.Clientset, config *Config) (Cont
 		ctrl.promClient = promClient
 	}
 
-	if lokiEndpoint, ok := os.LookupEnv("LOKI_ENDPOINT"); ok {
-		lokiClient, err := lokiwrapper.NewClient(lokiEndpoint)
+	if config.Loki != "" {
+		lokiClient, err := lokiwrapper.NewClient(config.Loki)
 		if err != nil {
 			return nil, err
 		}

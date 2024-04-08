@@ -1,49 +1,100 @@
-name: kubeskoop-exporter
-debugMode: false
-runtimeEndpoint: /run/containerd/containerd.sock
-appName: kubeskoop-exporter
-
-image:
-  repository: kubeskoop/agent
-  # Overrides the image tag whose default is the chart appVersion.
-  tag: v1.0.0
-  imagePullPolicy: IfNotPresent
-
-initContainer:
-  enabled: true
-  repository: kubeskoop/agent
-  tag: v1.0.0
-  imagePullPolicy: IfNotPresent
-
-resources:
-  limits:
-    cpu: 500m
-    memory: 1024Mi
-  requests:
-    cpu: 500m
-    memory: 1024Mi
-
 config:
-  serverPort: 9102
-  metricsProbes:
+  metricProbes:
+    - name: conntrack
+    - name: qdisc
     - name: netdev
     - name: io
-    - name: socketlatency
-    - name: packetloss
-    - name: softirq
-    - name: tcpext
+    - name: sock
     - name: tcpsummary
     - name: tcp
-    - name: sock
-    - name: softnet
+    - name: tcpext
     - name: udp
-    - name: virtcmdlatency
     - name: kernellatency
-  eventProbes:
-    - name: tcpreset
     - name: packetloss
+    - name: flow
+      args:
+        enablePortInLabel: false
+    - name: tcpretrans
+  eventProbes:
+    - name: biolatency
+    - name: kernellatency
+    - name: packetloss
+      args:
+        enableStack: false
+    - name: tcpreset
+    - name: tcpretrans
   eventSinks:
     - name: stderr
 
-nodeSelector: { }
-tolerations: { }
+agent:
+  config:
+    debug: false
+    port: 9102
+    runtimeEndpoint: /run/containerd/containerd.sock
+  image:
+    repository: kubeskoop/agent
+    tag: v1.0.0
+    imagePullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 500m
+      memory: 1024Mi
+    requests:
+      cpu: 500m
+      memory: 1024Mi
+  btfhack:
+    enabled: true
+    repository: kubeskoop/agent
+    tag: v1.0.0
+    imagePullPolicy: IfNotPresent
+  nodeSelector: {}
+  tolerations: {}
+
+controller:
+  enabled: true
+  config:
+    logLevel: info
+    prometheusEndpoint: http://prometheus-service
+    lokiEndpoint: http://loki-service:3100
+  image:
+    repository: kubeskoop/controller
+    tag: v1.0.0
+    imagePullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 500m
+      memory: 200Mi
+    requests:
+      cpu: 50m
+      memory: 20Mi
+  nodeSelector: {}
+  tolerations: {}
+
+webconsole:
+  enabled: true
+  service:
+    type: NodePort
+    port: 80
+    annotations: {}
+  auth:
+    username: admin
+    password: kubeskoop
+  grafana:
+    endpoint: http://grafana/grafana
+    proxy: true
+    # used for proxy mode
+    username: admin
+    password: kubeskoop
+  image:
+    repository: kubeskoop/controller
+    tag: v1.0.0
+    imagePullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 500m
+      memory: 200Mi
+    requests:
+      cpu: 50m
+      memory: 20Mi
+  nodeSelector: { }
+  tolerations: { }

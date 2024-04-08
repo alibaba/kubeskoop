@@ -1,0 +1,47 @@
+{{- if .Values.controller.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controller
+  namespace: {{ .Release.Namespace }}
+{{- with .Values.controller }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: controller
+  template:
+    metadata:
+      name: controller
+      labels:
+        app: controller
+    spec:
+      containers:
+        - name: controller
+          image: "{{ .image.repository }}:{{ .image.tag }}"
+          imagePullPolicy: {{ .image.imagePullPolicy }}
+          command:
+            - "/bin/controller"
+          volumeMounts:
+            - name: lib
+              mountPath: /var/lib/kubeskoop
+            - name: config
+              mountPath: /etc/kubeskoop
+          resources:
+            {{ toYaml .resources | nindent 12 }}
+      {{- with .nodeSelector }}
+      nodeSelector:
+        {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .tolerations }}
+      tolerations:
+        {{ toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: lib
+          emptyDir: { }
+        - name: config
+          configMap:
+            name: controller-config
+{{- end }}
+{{- end }}

@@ -1,0 +1,20 @@
+{{- if .Values.controller.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: controller-config
+  namespace: {{ .Release.Namespace }}
+data:
+  controller.yaml: |-
+    logLevel: debug
+    server:
+      httpPort: 10264
+      agentPort: 10263
+    controller:
+      namespace: {{ .Release.Namespace }}
+      prometheus: "{{ .Values.controller.config.prometheusEndpoint }}"
+      loki: "{{ .Values.controller.config.lokiEndpoint }}"
+      database:
+        type: sqlite3
+      diagnose: {}
+    {{- end }}

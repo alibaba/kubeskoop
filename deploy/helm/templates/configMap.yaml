@@ -1,17 +1,17 @@
 apiVersion: v1
-data:
-  config.yaml: |-
-    debugMode: {{ .Values.debugMode }}
-    port: {{ .Values.config.serverPort }}
-    metrics:
-      probes:{{- range .Values.config.metricsProbes }}
-      - {{ . }}{{- end }}
-    events:
-      probes: {{- range .Values.config.eventProbes }}
-      - {{ . }}{{- end }}
-      sinks: {{- range .Values.config.eventSinks }}
-      - {{ . }}{{- end }}
 kind: ConfigMap
 metadata:
   name: kubeskoop-config
   namespace: {{ .Release.Namespace }}
+data:
+  config.yaml: |-
+    debugmode: {{ .Values.agent.debug }}
+    port: {{ .Values.agent.port }}
+    metrics:
+      probes:
+      {{- toYaml .Values.config.metricProbes | nindent 6 }}
+    event:
+      probes:
+      {{- toYaml .Values.config.eventProbes | nindent 6 }}
+      sinks:
+      {{- toYaml .Values.config.eventSinks | nindent 6 }}

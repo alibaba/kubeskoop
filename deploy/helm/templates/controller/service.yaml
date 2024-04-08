@@ -1,0 +1,17 @@
+{{- if .Values.controller.enabled}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: controller
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: controller
+  ports:
+    - name: grpc
+      port: 10263
+      targetPort: 10263
+    - name: http
+      port: 10264
+      targetPort: 10264
+{{- end }}
