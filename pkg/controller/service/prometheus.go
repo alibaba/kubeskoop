@@ -5,6 +5,8 @@ import (
 	"errors"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
 	promv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
 )
@@ -13,6 +15,7 @@ func (c *controller) QueryPrometheus(ctx context.Context, query string, ts time.
 	if c.promClient == nil {
 		return nil, nil, errors.New("prometheus client is not initialized")
 	}
+	log.Infof("Querying prometheus %s", query)
 	a := promv1.NewAPI(c.promClient)
 
 	return a.Query(ctx, query, ts)
