@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
+
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -76,10 +78,13 @@ type packetlossArgs struct {
 func metricsProbeCreator() (probe.MetricsProbe, error) {
 	p := &metricsProbe{}
 
+	labels := probe.TupleMetricsLabels
+	labels = append(labels, "k8s_node")
+
 	opts := probe.BatchMetricsOpts{
 		Namespace:      probe.MetricsNamespace,
 		Subsystem:      probeName,
-		VariableLabels: probe.TupleMetricsLabels,
+		VariableLabels: labels,
 		SingleMetricsOpts: []probe.SingleMetricsOpts{
 			{Name: packetLossTotal, ValueType: prometheus.CounterValue},
 			{Name: packetLossNetfilter, ValueType: prometheus.CounterValue},
@@ -118,6 +123,7 @@ func (p *metricsProbe) collectOnce(emit probe.Emit) error {
 		}
 
 		labels := probe.BuildTupleMetricsLabels(&tuple)
+		labels = append(labels, nettop.GetNodeName())
 		emit(packetLossTotal, labels, float64(counter.Total))
 		emit(packetLossNetfilter, labels, float64(counter.Netfilter))
 	}
