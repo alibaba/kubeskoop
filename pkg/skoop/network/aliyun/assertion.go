@@ -707,7 +707,7 @@ func (a *slbAssertion) assertServerGroup(sgID string, backends []network.LoadBal
 
 func ruleMatchPacket(pkt *model.Packet, rule *ecs.DescribeSecurityGroupAttributeResponseBodyPermissionsPermission) (bool, error) {
 	if rule.DestCidrIp != nil && *rule.DestCidrIp != "" {
-		_, dstCidrIP, err := net.ParseCIDR(*rule.DestCidrIp)
+		_, dstCidrIP, err := parseIPOrCIDR(*rule.DestCidrIp)
 		if err != nil {
 			return false, err
 		}
@@ -741,7 +741,7 @@ func ruleMatchPacket(pkt *model.Packet, rule *ecs.DescribeSecurityGroupAttribute
 	}
 
 	if rule.SourceCidrIp != nil && *rule.SourceCidrIp != "" {
-		_, srcCidrIP, err := net.ParseCIDR(*rule.SourceCidrIp)
+		_, srcCidrIP, err := parseIPOrCIDR(*rule.SourceCidrIp)
 		if err != nil {
 			return false, err
 		}
@@ -806,10 +806,10 @@ func sortSecurityGroupRules(sgs []*ecs.DescribeSecurityGroupAttributeResponseBod
 				return a.SourceCidrIp != nil && *a.SourceCidrIp != ""
 			}
 
-			_, netA, _ := net.ParseCIDR(*a.SourceCidrIp)
+			_, netA, _ := parseIPOrCIDR(*a.SourceCidrIp)
 			onesA, _ := netA.Mask.Size()
 
-			_, netB, _ := net.ParseCIDR(*a.SourceCidrIp)
+			_, netB, _ := parseIPOrCIDR(*a.SourceCidrIp)
 			onesB, _ := netB.Mask.Size()
 
 			if onesA != onesB {
@@ -822,10 +822,10 @@ func sortSecurityGroupRules(sgs []*ecs.DescribeSecurityGroupAttributeResponseBod
 				return a.DestCidrIp != nil && *a.DestCidrIp != ""
 			}
 
-			_, netA, _ := net.ParseCIDR(*a.DestCidrIp)
+			_, netA, _ := parseIPOrCIDR(*a.DestCidrIp)
 			onesA, _ := netA.Mask.Size()
 
-			_, netB, _ := net.ParseCIDR(*a.DestCidrIp)
+			_, netB, _ := parseIPOrCIDR(*a.DestCidrIp)
 			onesB, _ := netB.Mask.Size()
 
 			if onesA != onesB {
@@ -847,9 +847,9 @@ func routeMatchPacket(ip string, routes []*vpc.DescribeRouteEntryListResponseBod
 
 	netIP := net.ParseIP(ip)
 	for _, r := range routes {
-		_, cidr, err := net.ParseCIDR(*r.DestinationCidrBlock)
+		_, cidr, err := parseIPOrCIDR(*r.DestinationCidrBlock)
 		if err != nil {
-			return nil, fmt.Errorf("parse route table %q dstination cidr error: %s", *r.RouteTableId, err)
+			return nil, fmt.Errorf("parse route table %q destination cidr error: %s", *r.RouteTableId, err)
 		}
 
 		if cidr.Contains(netIP) {
