@@ -122,7 +122,7 @@ func (h *dynamicLinkFlowHelper) start() error {
 		return fmt.Errorf("%s error list link, err: %w", probeName, err)
 	}
 	for _, link := range links {
-		if !strings.HasSuffix(link.Attrs().Name, h.pattern) {
+		if !strings.HasPrefix(link.Attrs().Name, h.pattern) {
 			continue
 		}
 		h.tryStartLinkFlow(link)
