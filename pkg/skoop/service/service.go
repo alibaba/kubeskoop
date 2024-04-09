@@ -142,7 +142,7 @@ func (k *KubeProxyServiceProcessor) shouldMasquerade(packet model.Packet, svc *v
 	if targetPort != 0 && slices.Contains(serviceLBIPs(svc), dst) {
 		masquerade = !isTrafficLocalService(svc)
 	} else if targetPort != 0 && dst == svc.Spec.ClusterIP && k.clusterCIDR != nil {
-		masquerade = !k.clusterCIDR.Contains(packet.Dst)
+		masquerade = !k.clusterCIDR.Contains(packet.Src)
 	} else {
 		targetPortByNodePort := serviceTargetPortByNodePort(svc, packet.Dport, packet.Protocol)
 		if targetPortByNodePort != 0 {
