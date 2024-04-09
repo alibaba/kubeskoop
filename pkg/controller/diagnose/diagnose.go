@@ -6,17 +6,17 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
-	"strings"
 
 	skoopContext "github.com/alibaba/kubeskoop/pkg/skoop/context"
 )
 
 type Config struct {
-	KubeConfig    string `yaml:"kubeConfig"`
-	CloudProvider string `yaml:"cloudProvider"`
-	NetworkPlugin string `yaml:"networkPlugin"`
-	ProxyModel    string `yaml:"proxyModel"`
-	ClusterCidr   string `yaml:"clusterCidr"`
+	KubeConfig    string   `yaml:"kubeConfig"`
+	CloudProvider string   `yaml:"cloudProvider"`
+	NetworkPlugin string   `yaml:"networkPlugin"`
+	ProxyModel    string   `yaml:"proxyModel"`
+	ClusterCidr   string   `yaml:"clusterCidr"`
+	ExtraArgs     []string `yaml:"extraArgs"`
 }
 
 type Controller interface {
@@ -52,7 +52,7 @@ func (d *Diagnostor) Diagnose(ctx context.Context, taskConfig *skoopContext.Task
 		"--collector-namespace", d.namespace,
 	}
 	if d.config != nil {
-		args = append(args, buildArgsFromConfig(d.config))
+		args = append(args, buildArgsFromConfig(d.config)...)
 	}
 	cmd := exec.CommandContext(ctx, "skoop", args...)
 	output, err := cmd.CombinedOutput()
@@ -66,7 +66,7 @@ func (d *Diagnostor) Diagnose(ctx context.Context, taskConfig *skoopContext.Task
 	return string(diagnoseResult), nil
 }
 
-func buildArgsFromConfig(config *Config) string {
+func buildArgsFromConfig(config *Config) []string {
 	var args []string
 	m := map[string]string{
 		"--cloud-provider": config.CloudProvider,
@@ -80,6 +80,5 @@ func buildArgsFromConfig(config *Config) string {
 			args = append(args, k, v)
 		}
 	}
-
-	return strings.Join(args, " ")
+	return append(args, config.ExtraArgs...)
 }
