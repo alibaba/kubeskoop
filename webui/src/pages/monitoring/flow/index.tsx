@@ -13,7 +13,7 @@ import { definePageConfig } from "ice";
 const getNamespaces = (data: any) => {
   return data.nodes.map((node: any) => {
     return node.namespace || 'default'
-  })
+  }).filter((v, i, a) => a.indexOf(v) === i).sort()
 }
 
 const filterFlowData = (data: FlowData, namespaces: string[], nodes: string[], showSeparate: boolean) => {
