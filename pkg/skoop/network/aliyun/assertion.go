@@ -797,10 +797,6 @@ func sortSecurityGroupRules(sgs []*ecs.DescribeSecurityGroupAttributeResponseBod
 			return *a.Priority < *b.Priority
 		}
 
-		if *a.Policy != *b.Policy {
-			return *a.Policy == string(securityPolicyVerdictAccept)
-		}
-
 		if (a.SourceCidrIp != nil && *a.SourceCidrIp != "") || (b.SourceCidrIp != nil && *b.SourceCidrIp != "") {
 			if (a.SourceCidrIp == nil || *a.SourceCidrIp == "") || (b.SourceCidrIp == nil || *b.SourceCidrIp == "") {
 				return a.SourceCidrIp != nil && *a.SourceCidrIp != ""
@@ -831,6 +827,10 @@ func sortSecurityGroupRules(sgs []*ecs.DescribeSecurityGroupAttributeResponseBod
 			if onesA != onesB {
 				return onesA > onesB
 			}
+		}
+
+		if *a.Policy != *b.Policy {
+			return *a.Policy == string(securityPolicyVerdictDrop)
 		}
 
 		return (pEndA - pStartA) < (pEndB - pStartB)
