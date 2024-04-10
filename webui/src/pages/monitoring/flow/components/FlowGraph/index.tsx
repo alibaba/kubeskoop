@@ -6,6 +6,7 @@ import { forceManyBody, forceLink } from 'd3-force';
 import styles from './index.module.css'
 import { clamp } from "@/utils";
 import exp from "constants";
+import ipaddr from "ipaddr.js";
 
 interface Node {
   id: string
@@ -36,6 +37,21 @@ interface GroupInfo {
   position: [number, number]
 }
 
+const subnets = {
+  'Intranet': [
+    ipaddr.parseCIDR('10.0.0.0/8'),
+    ipaddr.parseCIDR('172.16.0.0/12'),
+    ipaddr.parseCIDR('192.168.0.0/16'),
+    ipaddr.parseCIDR('fd80::/8')
+  ],
+  'Shared Address Space': [
+    ipaddr.parseCIDR('100.64.0.0/10')
+  ],
+  'Link Local Address': [
+    ipaddr.parseCIDR('169.254.0.0/16')
+  ]
+}
+
 const parsePodName = (n: any): {
   group: string
   groupType: string
@@ -45,19 +61,30 @@ const parsePodName = (n: any): {
   if (/^.+-([a-z0-9]{5,10})-[a-z0-9]{5,10}$/.test(n.name)) {
     return {
       group: `${n.namespace}/${parts.slice(0, parts.length - 2).join('-')}`,
-      groupType: 'deployment',
+      groupType: 'Deployment',
     }
   }
   if (/^.+-[a-z0-9]{5,10}$/.test(n.name)) {
     return {
       group: `${n.namespace}/${parts.slice(0, parts.length - 1).join('-')}`,
-      groupType: 'daemonset',
+      groupType: 'DaemonSet',
     }
   }
 
   return {
     group: `${n.namespace}/${n.name}`,
     groupType: 'pod',
+  }
+}
+
+const toExternalGroupData = (n: any): any => {
+  const ip = ipaddr.parse(n.id);
+  const group = ipaddr.subnetMatch(ip, subnets, 'Internet')
+
+  return {
+    group: group,
+    type: 'Endpoint',
+    groupType: 'Endpoint',
   }
 }
 
@@ -74,13 +101,12 @@ const getGroupData = (n: any): any => {
       }
     case 'external':
       return {
-        group: 'External',
-        groupType: 'endpoint',
+        ...toExternalGroupData(n)
       }
     default:
       return {
         group: 'Unknown',
-        groupType: 'endpoint',
+        groupType: 'Endpoint',
       }
   }
 }
@@ -147,7 +173,7 @@ const toGroupedGraphData = (data: any, expandedGroups: GroupInfo[]): GraphData =
       type: 'group',
       groupType: withGroup.find(n => n.group === g).groupType,
       links: [],
-      // nodes: withGroup.filter(n => n.group === g),
+      nodes: withGroup.filter(n => n.group === g),
     }
   });
 
@@ -249,7 +275,7 @@ const drawNode = (node, ctx: CanvasRenderingContext2D, globalScale, highlight, h
 }
 
 const drawLink = (link, ctx, globalScale) => {
-  const SPEED = link.edges.length * 0.2;
+  const SPEED = link.edges.reduce((a, b) => a + b.packets, 0);
   const PARTICLE_SIZE = 2 / globalScale;
   const start = link.source;
   const end = link.target;
@@ -259,7 +285,7 @@ const drawLink = (link, ctx, globalScale) => {
   diff.x /= length;
   diff.y /= length;
 
-  const mod = clamp(1000 * 1 / SPEED, 500, 5000);
+  const mod = clamp(5000 * SPEED, 500, 5000);
 
   // add random offsets to particles
   if (!link.offset) {
@@ -293,17 +319,23 @@ const drawLink = (link, ctx, globalScale) => {
 const nodeLabel = (n) => {
   const label = [
     `Name: ${n.name}`,
-    `Type: ${n.type === 'group' ? n.groupType : n.type}`
+    `Type: ${n.type === 'group' ? n.groupType : n.type}`,
   ]
+
+  if (n.type === 'group') {
+    label.push(`Endpoint count: ${n.nodes.length}`)
+  }
+
+  label.push(`(Click to ${n.type === 'group' ? "expand" : "collapse"} nodes)`)
   return label.join("</br>")
 }
 
 const linkLabel = (l) => {
   const label = [
-    `Send Packets: ${l.edges.reduce((a, b) => a + b.packets, 0)}`,
-    `Send Byte(s): ${l.edges.reduce((a, b) => a + b.bytes, 0)}`,
-    `Dropped Packet(s): ${l.edges.reduce((a, b) => a + b.dropped, 0)}`,
-    `Retransmitted Packet(s): ${l.edges.reduce((a, b) => a + b.retrans, 0)}`
+    `Packet(s) Sent: ${l.edges.reduce((a, b) => a + b.packets, 0)}`,
+    `Byte(s) Sent: ${l.edges.reduce((a, b) => a + b.bytes, 0)}`,
+    `Packet(s) Dropped: ${l.edges.reduce((a, b) => a + b.dropped, 0)}`,
+    `Packet(s) Retransmitted: ${l.edges.reduce((a, b) => a + b.retrans, 0)}`
   ]
   return label.join("</br>")
 }
@@ -319,7 +351,7 @@ const FlowGraphD3: React.FC<FlowGraphProps> = (props: FlowGraphProps): JSX.Eleme
 
       fg.d3Force('charge', forceManyBody()
         .strength(node => {
-          return node.type === 'virtual' ? 0 : -15;
+          return node.type === 'virtual' ? 0 : -30;
         }));
 
       fg.d3Force('link', forceLink().id(d => d.id)
@@ -406,7 +438,7 @@ const FlowGraphD3: React.FC<FlowGraphProps> = (props: FlowGraphProps): JSX.Eleme
       onNodeClick={(n) => setExpanded(n.type === 'group' ? [{ name: n.group, position: [n.x, n.y] }, ...expanded] : expanded.filter(g => g.name !== n.group))}
       nodeLabel={nodeLabel}
       linkLabel={linkLabel}
-      onEngineStop={() => {fgRef.current.zoomToFit(1000)}}
+      onEngineStop={() => { fgRef.current.zoomToFit(1000) }}
       cooldownTime={3000}
       nodeAutoColorBy={'group'}
     >
