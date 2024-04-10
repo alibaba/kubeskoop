@@ -63,7 +63,7 @@ var (
 
 func init() {
 	var err error
-	_packetLossProbe.cache, err = lru.New[probe.Tuple, *Counter](102400)
+	_packetLossProbe.cache, err = lru.New[probe.Tuple, *Counter](10240)
 	if err != nil {
 		panic(fmt.Sprintf("cannot create lru cache for packetloss probe:%v", err))
 	}
@@ -122,10 +122,17 @@ func (p *metricsProbe) collectOnce(emit probe.Emit) error {
 			continue
 		}
 
+		if time.Now().UnixNano()-counter.lastUpdate > 60*time.Second.Nanoseconds() && counter.snatched {
+			_packetLossProbe.cache.Remove(tuple)
+			counter.Total = 0
+			counter.Netfilter = 0
+		}
+
 		labels := probe.BuildTupleMetricsLabels(&tuple)
 		labels = append(labels, nettop.GetNodeName())
 		emit(packetLossTotal, labels, float64(counter.Total))
 		emit(packetLossNetfilter, labels, float64(counter.Netfilter))
+		counter.snatched = true
 	}
 	return nil
 }
@@ -153,8 +160,10 @@ func (e *eventProbe) Stop(_ context.Context) error {
 }
 
 type Counter struct {
-	Total     uint32
-	Netfilter uint32
+	lastUpdate int64
+	snatched   bool
+	Total      uint32
+	Netfilter  uint32
 }
 
 type probeConfig struct {
@@ -389,8 +398,12 @@ func (p *packetLossProbe) perfLoop() {
 		v.Total++
 		p.countByLocation(event.Location, v)
 
+		now := time.Now().UnixNano()
+		v.lastUpdate = now
+		v.snatched = false
+
 		evt := &probe.Event{
-			Timestamp: time.Now().UnixNano(),
+			Timestamp: now,
 			Type:      PacketLoss,
 			Labels:    probe.BuildTupleEventLabels(tuple),
 		}
