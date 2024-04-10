@@ -3,10 +3,9 @@
 #include <bpf_tracing.h>
 #include <bpf_core_read.h>
 #include <inspector.h>
+#include <feature-switch.h>
 
 #define TC_ACT_OK 0
-
-volatile const bool enable_flow_port = 0;
 
 //todo aggregate all flow based metrics in one map to save memory.
 struct flow_metrics {
@@ -17,15 +16,19 @@ struct flow_metrics {
 };
 
 struct {
-  __uint(type, BPF_MAP_TYPE_PERCPU_HASH);
+  __uint(type, BPF_MAP_TYPE_LRU_PERCPU_HASH);
   __type(key, struct flow_tuple_4);
   __type(value, struct flow_metrics);
-  __uint(max_entries, 4096);
+  __uint(max_entries, 65535);
 } insp_flow4_metrics SEC(".maps");
 
+FEATURE_SWITCH(flow)
 
 static inline int __do_flow(struct __sk_buff *skb){
     struct flow_tuple_4 tuple = {0};
+    int flow_port_key = 0;
+    bool enable_flow_port = is_enable(flow_port_key);
+
     if(set_flow_tuple4(skb, &tuple, enable_flow_port) < 0){
         goto out;
     }

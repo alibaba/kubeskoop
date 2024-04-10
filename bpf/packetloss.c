@@ -6,6 +6,7 @@
 #include <bpf_tracing.h>
 #include <bpf_core_read.h>
 #include <inspector.h>
+#include <feature-switch.h>
 
 struct kfree_skb_args {
   /* The first 8 bytes is not allowed to read */
@@ -23,7 +24,6 @@ struct insp_pl_event_t {
 };
 
 const struct insp_pl_event_t *unused_insp_pl_event_t __attribute__((unused));
-const volatile bool enable_packetloss_stack = 0;
 
 struct {
 	__uint(type, BPF_MAP_TYPE_STACK_TRACE);
@@ -36,6 +36,8 @@ struct {
   __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
 } insp_pl_event SEC(".maps");
 
+FEATURE_SWITCH(packetloss)
+
 SEC("tracepoint/skb/kfree_skb")
 int kfree_skb(struct kfree_skb_args *args) {
   struct sk_buff *skb = (struct sk_buff *)args->skb;
@@ -46,6 +48,9 @@ int kfree_skb(struct kfree_skb_args *args) {
     goto out;
   }
   event.location = (u64)args->location;
+
+  int packetloss_stack_key = 0;
+  bool enable_packetloss_stack = is_enable(packetloss_stack_key);
 
   if (enable_packetloss_stack){
       event.stack_id = bpf_get_stackid(args, &insp_pl_stack,

@@ -78,7 +78,8 @@ type bpfProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type bpfMapSpecs struct {
-	InspFlow4Metrics *ebpf.MapSpec `ebpf:"insp_flow4_metrics"`
+	InspFlow4Metrics      *ebpf.MapSpec `ebpf:"insp_flow4_metrics"`
+	InspFlowFeatureSwitch *ebpf.MapSpec `ebpf:"insp_flow_feature_switch"`
 }
 
 // bpfObjects contains all objects after they have been loaded into the kernel.
@@ -100,12 +101,14 @@ func (o *bpfObjects) Close() error {
 //
 // It can be passed to loadBpfObjects or ebpf.CollectionSpec.LoadAndAssign.
 type bpfMaps struct {
-	InspFlow4Metrics *ebpf.Map `ebpf:"insp_flow4_metrics"`
+	InspFlow4Metrics      *ebpf.Map `ebpf:"insp_flow4_metrics"`
+	InspFlowFeatureSwitch *ebpf.Map `ebpf:"insp_flow_feature_switch"`
 }
 
 func (m *bpfMaps) Close() error {
 	return _BpfClose(
 		m.InspFlow4Metrics,
+		m.InspFlowFeatureSwitch,
 	)
 }
 
