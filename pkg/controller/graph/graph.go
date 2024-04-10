@@ -94,9 +94,14 @@ func FromVector(m model.Vector) (*FlowGraph, error) {
 	g := NewFlowGraph()
 	for _, v := range m {
 		g.AddNodesFromSample(v)
-		g.AddEdge(createEdge(v))
 	}
 	return g, nil
+}
+
+func (g *FlowGraph) AddNodesFromVector(v model.Vector) {
+	for _, s := range v {
+		g.AddNodesFromSample(s)
+	}
 }
 
 func (g *FlowGraph) AddNodesFromSample(v *model.Sample) {
@@ -130,36 +135,40 @@ func (g *FlowGraph) AddEdge(e Edge) {
 func (g *FlowGraph) SetEdgeBytesFromVector(m model.Vector) {
 	for _, v := range m {
 		id := getEdgeID(v)
-		if _, ok := g.Edges[id]; ok {
-			g.Edges[id].Bytes = int(v.Value)
+		if _, ok := g.Edges[id]; !ok {
+			g.AddEdge(createEdge(v))
 		}
+		g.Edges[id].Bytes = int(v.Value)
 	}
 }
 
 func (g *FlowGraph) SetEdgePacketsFromVector(m model.Vector) {
 	for _, v := range m {
 		id := getEdgeID(v)
-		if _, ok := g.Edges[id]; ok {
-			g.Edges[id].Packets = int(v.Value)
+		if _, ok := g.Edges[id]; !ok {
+			g.AddEdge(createEdge(v))
 		}
+		g.Edges[id].Packets = int(v.Value)
 	}
 }
 
 func (g *FlowGraph) SetEdgeDroppedFromVector(m model.Vector) {
 	for _, v := range m {
 		id := getEdgeID(v)
-		if _, ok := g.Edges[id]; ok {
-			g.Edges[id].Dropped = int(v.Value)
+		if _, ok := g.Edges[id]; !ok {
+			g.AddEdge(createEdge(v))
 		}
+		g.Edges[id].Dropped = int(v.Value)
 	}
 }
 
 func (g *FlowGraph) SetEdgeRetransFromVector(m model.Vector) {
 	for _, v := range m {
 		id := getEdgeID(v)
-		if _, ok := g.Edges[id]; ok {
-			g.Edges[id].Retrans = int(v.Value)
+		if _, ok := g.Edges[id]; !ok {
+			g.AddEdge(createEdge(v))
 		}
+		g.Edges[id].Retrans = int(v.Value)
 	}
 }
 

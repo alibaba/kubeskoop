@@ -29,8 +29,8 @@ const filterFlowData = (data: FlowData, namespaces: string[], nodes: string[], s
     nodeSet.add(i.id);
   });
 
-  const filteredEdge = data.edges.filter((edge: any) => {
-    return nodeSet.has(edge.src) && nodeSet.has(edge.dst)
+  let filteredEdge = data.edges.filter((edge: any) => {
+    return edge.src !== edge.dst && nodeSet.has(edge.src) && nodeSet.has(edge.dst)
   });
 
   if (!showSeparate) {
@@ -43,6 +43,7 @@ const filterFlowData = (data: FlowData, namespaces: string[], nodes: string[], s
     filteredNode = filteredNode.filter(n => {
       return s.has(n.id)
     })
+    console.log(filteredNode)
   }
 
   filteredNode.sort((a, b) => {
@@ -63,7 +64,7 @@ export default function FlowDashboard() {
   const [data, setData] = useState({ nodes: [], edges: [] });
   const [selectedNamespaces, setSelectedNamespaces] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  const [time, setTime] = useState<Dayjs[] | null>(null);
+  const [time, setTime] = useState<Dayjs[]>([dayjs().subtract(15, 'minute'), dayjs()]);
 
   const getFlowData = () => {
     const [from, to] = time || [dayjs().subtract(15, 'minute'), dayjs()];
@@ -108,7 +109,7 @@ export default function FlowDashboard() {
         <Card.Content style={{ paddingLeft: 0 }}>
           <Box direction="row" className={styles.contentBox}>
             <span className={styles.optionLabel}>Time Range</span>
-            <DatePicker2.RangePicker placeholder={['Start Time', 'End Time']} showTime onChange={v => setTime(v)} />
+            <DatePicker2.RangePicker placeholder={['Start Time', 'End Time']} showTime value={time} onChange={v => setTime(v)} />
           </Box>
           <Box className={styles.contentBox} direction='row'>
             <span className={styles.optionLabel}>Namespaces</span>
