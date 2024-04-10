@@ -32,6 +32,8 @@ const (
 	metricsPackets = "packets"
 
 	ClsactQdisc = "clsact"
+
+	featureSwitchEnableFlowPort = 0
 )
 
 var (
@@ -301,28 +303,20 @@ func (p *metricsProbe) loadBPF() error {
 		return fmt.Errorf("remove limit failed: %s", err.Error())
 	}
 
-	spec, err := loadBpf()
-	if err != nil {
-		return fmt.Errorf("failed loading bpf: %w", err)
-	}
-
-	if p.enablePort {
-		m := map[string]interface{}{
-			"enable_flow_port": uint8(1),
-		}
-		if err := spec.RewriteConstants(m); err != nil {
-			return fmt.Errorf("failed rewrite constants: %w", err)
-		}
-	}
-
 	opts := ebpf.CollectionOptions{
 		Programs: ebpf.ProgramOptions{
 			KernelTypes: bpfutil.LoadBTFSpecOrNil(),
 		},
 	}
 
-	if err := spec.LoadAndAssign(&p.bpfObjs, &opts); err != nil {
+	if err := loadBpfObjects(&p.bpfObjs, &opts); err != nil {
 		return fmt.Errorf("loading objects: %s", err.Error())
+	}
+
+	if p.enablePort {
+		if err := bpfutil.UpdateFeatureSwitch(p.bpfObjs.InspFlowFeatureSwitch, featureSwitchEnableFlowPort, 1); err != nil {
+			return fmt.Errorf("failed set flow feature switch: %w", err)
+		}
 	}
 
 	return nil

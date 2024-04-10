@@ -40,6 +40,8 @@ const (
 	//PACKETLOSS_TCPHANDLE = "tcphandle"
 
 	PacketLoss = "PacketLoss"
+
+	featureSwitchEnablePacketLossStackKey = 0
 )
 
 var (
@@ -284,27 +286,19 @@ func (p *packetLossProbe) loadAndAttachBPF() error {
 		return fmt.Errorf("remove limit failed: %s", err.Error())
 	}
 
-	spec, err := loadBpf()
-	if err != nil {
-		return fmt.Errorf("failed loading bpf: %w", err)
-	}
-
-	if p.enableStack() {
-		m := map[string]interface{}{
-			"enable_packetloss_stack": uint8(1),
-		}
-		if err := spec.RewriteConstants(m); err != nil {
-			return fmt.Errorf("failed rewrite constants: %w", err)
-		}
-	}
-
 	opts := ebpf.CollectionOptions{
 		Programs: ebpf.ProgramOptions{
 			KernelTypes: bpfutil.LoadBTFSpecOrNil(),
 		},
 	}
-	if err := spec.LoadAndAssign(&p.objs, &opts); err != nil {
+	if err := loadBpfObjects(&p.objs, &opts); err != nil {
 		return fmt.Errorf("loading objects: %s", err.Error())
+	}
+
+	if p.enableStack() {
+		if err := bpfutil.UpdateFeatureSwitch(p.objs.InspPacketlossFeatureSwitch, featureSwitchEnablePacketLossStackKey, 1); err != nil {
+			return fmt.Errorf("failed update packetloss feature switch: %w", err)
+		}
 	}
 
 	pl, err := link.Tracepoint("skb", "kfree_skb", p.objs.KfreeSkb, &link.TracepointOptions{})
