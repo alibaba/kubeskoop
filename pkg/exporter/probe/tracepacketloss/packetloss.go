@@ -65,7 +65,7 @@ var (
 
 func init() {
 	var err error
-	_packetLossProbe.cache, err = lru.New[probe.Tuple, *Counter](10240)
+	_packetLossProbe.cache, err = lru.New[cacheKey, *Counter](10240)
 	if err != nil {
 		panic(fmt.Sprintf("cannot create lru cache for packetloss probe:%v", err))
 	}
@@ -118,19 +118,25 @@ func (p *metricsProbe) Stop(_ context.Context) error {
 
 func (p *metricsProbe) collectOnce(emit probe.Emit) error {
 	keys := _packetLossProbe.cache.Keys()
-	for _, tuple := range keys {
-		counter, ok := _packetLossProbe.cache.Get(tuple)
+	for _, key := range keys {
+		counter, ok := _packetLossProbe.cache.Get(key)
 		if !ok || counter == nil {
 			continue
 		}
 
-		if time.Now().UnixNano()-counter.lastUpdate > 60*time.Second.Nanoseconds() && counter.snatched {
-			_packetLossProbe.cache.Remove(tuple)
+		if time.Now().UnixNano()-counter.lastUpdate > 30*time.Second.Nanoseconds() && counter.snatched {
+			_packetLossProbe.cache.Remove(key)
 			counter.Total = 0
 			counter.Netfilter = 0
 		}
 
-		labels := probe.BuildTupleMetricsLabels(&tuple)
+		tuple := &probe.Tuple{
+			Protocol: key.protocol,
+			Src:      key.src,
+			Dst:      key.dst,
+		}
+
+		labels := probe.BuildTupleMetricsLabels(tuple)
 		labels = append(labels, nettop.GetNodeName())
 		emit(packetLossTotal, labels, float64(counter.Total))
 		emit(packetLossNetfilter, labels, float64(counter.Netfilter))
@@ -172,6 +178,12 @@ type probeConfig struct {
 	enableStack bool
 }
 
+type cacheKey struct {
+	protocol uint8
+	src      string
+	dst      string
+}
+
 type packetLossProbe struct {
 	objs        bpfObjects
 	links       []link.Link
@@ -180,7 +192,7 @@ type packetLossProbe struct {
 	lock        sync.Mutex
 	perfReader  *perf.Reader
 
-	cache *lru.Cache[probe.Tuple, *Counter]
+	cache *lru.Cache[cacheKey, *Counter]
 }
 
 func (p *packetLossProbe) probeCount() int {
@@ -354,6 +366,25 @@ func (p *packetLossProbe) countByLocation(loc uint64, counter *Counter) {
 
 }
 
+func (p *packetLossProbe) add2Cache(loc uint64, tuple *probe.Tuple) {
+	key := cacheKey{
+		protocol: tuple.Protocol,
+		src:      tuple.Src,
+		dst:      tuple.Dst,
+	}
+
+	v, ok := p.cache.Get(key)
+	if !ok {
+		v = &Counter{}
+		p.cache.Add(key, v)
+	}
+	v.Total++
+	p.countByLocation(loc, v)
+
+	v.lastUpdate = time.Now().UnixNano()
+	v.snatched = false
+}
+
 func (p *packetLossProbe) perfLoop() {
 	for {
 	anotherLoop:
@@ -384,20 +415,10 @@ func (p *packetLossProbe) perfLoop() {
 
 		tuple := toProbeTuple(&event.Tuple)
 
-		v, ok := p.cache.Get(*tuple)
-		if !ok {
-			v = &Counter{}
-			p.cache.Add(*tuple, v)
-		}
-		v.Total++
-		p.countByLocation(event.Location, v)
-
-		now := time.Now().UnixNano()
-		v.lastUpdate = now
-		v.snatched = false
+		p.add2Cache(event.Location, tuple)
 
 		evt := &probe.Event{
-			Timestamp: now,
+			Timestamp: time.Now().UnixNano(),
 			Type:      PacketLoss,
 			Labels:    probe.BuildTupleEventLabels(tuple),
 		}
