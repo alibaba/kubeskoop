@@ -214,10 +214,6 @@ func (p *packetLossProbe) stop(probeType probe.Type) error {
 
 	p.probeConfig[probeType] = nil
 
-	if probeType == probe.ProbeTypeEvent {
-		p.closePerfReader()
-	}
-
 	if p.probeCount() == 0 {
 		p.cleanup()
 	}
@@ -225,14 +221,13 @@ func (p *packetLossProbe) stop(probeType probe.Type) error {
 	return nil
 }
 
-func (p *packetLossProbe) closePerfReader() {
+func (p *packetLossProbe) cleanup() {
+
 	if p.perfReader != nil {
 		p.perfReader.Close()
 		p.perfReader = nil
 	}
-}
 
-func (p *packetLossProbe) cleanup() {
 	for _, link := range p.links {
 		link.Close()
 	}
@@ -257,41 +252,28 @@ func (p *packetLossProbe) start(probeType probe.Type, cfg *probeConfig) error {
 		return fmt.Errorf("%s failed install ebpf: %w", probeName, err)
 	}
 
-	var err error
-
-	if probeType == probe.ProbeTypeEvent {
-		p.perfReader, err = perf.NewReader(p.objs.bpfMaps.InspPlEvent, int(unsafe.Sizeof(bpfInspPlEventT{})))
-		if err != nil {
-			log.Errorf("%s error create perf reader, err: %v", probeName, err)
-			return err
-		}
-
-		go p.perfLoop()
-	}
-
 	return nil
 }
 
-func (p *packetLossProbe) reinstallBPFLocked() error {
-	p.closePerfReader()
+func (p *packetLossProbe) reinstallBPFLocked() (err error) {
 	p.cleanup()
 
-	if err := p.loadAndAttachBPF(); err != nil {
-		log.Errorf("%s failed load and attach bpf, err: %v", probeName, err)
-		p.cleanup()
-		return err
-	}
-
-	if p.probeConfig[probe.ProbeTypeEvent] != nil {
-		var err error
-		p.perfReader, err = perf.NewReader(p.objs.bpfMaps.InspPlEvent, int(unsafe.Sizeof(bpfInspPlEventT{})))
+	defer func() {
 		if err != nil {
-			log.Errorf("%s error create perf reader, err: %v", probeName, err)
-			return err
+			p.cleanup()
 		}
+	}()
 
-		go p.perfLoop()
+	if err = p.loadAndAttachBPF(); err != nil {
+		return fmt.Errorf("%s failed load and attach bpf, err: %w", probeName, err)
 	}
+
+	p.perfReader, err = perf.NewReader(p.objs.bpfMaps.InspPlEvent, int(unsafe.Sizeof(bpfInspPlEventT{})))
+	if err != nil {
+		return fmt.Errorf("%s error create perf reader, err: %w", probeName, err)
+	}
+
+	go p.perfLoop()
 
 	return nil
 }
