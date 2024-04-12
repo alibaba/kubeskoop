@@ -285,10 +285,6 @@ func (p *metricsProbe) collectOnce(emit probe.Emit) error {
 		}
 
 		tuple := toProbeTuple(&key)
-		if !p.enablePort {
-			tuple.Dport = 0
-			tuple.Sport = 0
-		}
 
 		labels := probe.BuildTupleMetricsLabels(tuple)
 
