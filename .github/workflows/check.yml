@@ -72,3 +72,16 @@ jobs:
           VALIDATE_MD: true
           DEFAULT_BRANCH: main
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  check-btf:
+    runs-on: ubuntu-latest
+    steps:
+      - name: build-btf
+        run: |
+          cd ${{ github.workspace }} && make generate-btf-in-container
+      - name: check-btf-update
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Please run 'make generate-btf-in-container' and submit your changes"
+            exit 1
+          fi

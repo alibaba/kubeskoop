@@ -49,3 +49,7 @@ build-webconsole:
 .PHONY: generate-btf
 generate-btf:
 	go generate ./pkg/exporter/probe/...
+
+.PHONY: generate-btf-in-container
+generate-btf-in-container:
+	docker run -v $(PWD):/go/src/github.com/alibaba/kubeskoop --workdir /go/src/github.com/alibaba/kubeskoop kubeskoop/bpf-build:go121-clang17 go generate ./pkg/exporter/probe/...
