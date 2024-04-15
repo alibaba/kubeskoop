@@ -17,14 +17,8 @@ type bpfInspTcpresetEventT struct {
 	Type  uint32
 	State uint8
 	Tuple struct {
-		Saddr struct {
-			V4addr uint32
-			_      [12]byte
-		}
-		Daddr struct {
-			V4addr uint32
-			_      [12]byte
-		}
+		Saddr   struct{ V6addr [16]uint8 }
+		Daddr   struct{ V6addr [16]uint8 }
 		Sport   uint16
 		Dport   uint16
 		L3Proto uint16

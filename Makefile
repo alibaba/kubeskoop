@@ -46,6 +46,10 @@ build-btfhack:
 build-webconsole:
 	cd webui && CGO_ENABLED=0 go build -o ../bin/webconsole -ldflags $(ldflags) .
 
-.PHONY: generate-btf
-generate-btf:
+.PHONY: generate-bpf
+generate-bpf:
 	go generate ./pkg/exporter/probe/...
+
+.PHONY: generate-bpf-in-container
+generate-bpf-in-container:
+	docker run -v $(PWD):/go/src/github.com/alibaba/kubeskoop --workdir /go/src/github.com/alibaba/kubeskoop kubeskoop/bpf-build:go121-clang17 go generate ./pkg/exporter/probe/...
