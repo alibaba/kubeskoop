@@ -21,7 +21,7 @@ require (
 	github.com/google/gops v0.3.26
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.1
-	github.com/hashicorp/golang-lru/v2 v2.0.6
+	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/json-iterator/go v1.1.12
 	github.com/mattn/go-sqlite3 v1.14.22
