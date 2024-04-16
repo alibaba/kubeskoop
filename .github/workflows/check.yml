@@ -72,3 +72,33 @@ jobs:
           VALIDATE_MD: true
           DEFAULT_BRANCH: main
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  check-bpf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "17.0"
+          directory: ${{ runner.temp }}/llvm
+      - name: build-bpf
+        run: |
+          make generate-bpf-in-container
+      - name: check-bpf-update
+        run: |
+          for bpfobjfile in `git status --porcelain | awk '{print $2}'`; do
+            echo "check $bpfobjfile prog sections changes by remove .BTF debug section"
+            git show HEAD:$bpfobjfile > ${bpfobjfile}.old
+            if llvm-objdump --headers $bpfobjfile &>/dev/null; then
+              llvm-objcopy --remove-section '.BTF' ${bpfobjfile}.old
+              llvm-objcopy --remove-section '.BTF' $bpfobjfile
+              if ! diff ${bpfobjfile}.old $bpfobjfile; then
+                echo "$bpfobjfile changed; Please run 'make generate-bpf-in-container' and submit your changes"
+                exit 1
+              fi
+            fi
+            rm -f ${bpfobjfile}.old
+          done
