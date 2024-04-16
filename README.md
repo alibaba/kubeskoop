@@ -125,3 +125,7 @@ Feel free to open issues and pull requests. Any feedback is much appreciated!
 
 Most source code in KubeSkoop which running on userspace are licensed under the [Apache License, Version 2.0](LICENSE.md).  
 The BPF code in `/bpf` directory are licensed under the [GPL v2.0](bpf/COPYING) to compat with Linux kernel helper functions.  
+
+## Security
+
+Please report vulnerabilities by email to [kubernetes-security@service.aliyun.com](kubernetes-security@service.aliyun.com). Also see our [SECURITY.md](SECURITY.md) file for details.
