@@ -9,7 +9,7 @@
 
 ## Reporting a Vulnerability
 
-DO NOT CREATE AN ISSUE to report a security problem. Instead, please send an email to [kubernetes-security@service.aliyun.com](kubernetes-security@service.aliyun.com)
+DO NOT CREATE AN ISSUE to report a security problem. Instead, please send an email to [kubernetes-security@service.aliyun.com](mailto:kubernetes-security@service.aliyun.com)
 
 ## Vulnerability Management Plans
 

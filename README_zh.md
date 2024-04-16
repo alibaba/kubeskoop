@@ -126,4 +126,4 @@ KubeSkoop的多数用户态代码使用[Apache License, Version 2.0](LICENSE.md)
 
 ## 安全
 
-如果您发现了代码中的安全漏洞，请联系[kubernetes-security@service.aliyun.com](kubernetes-security@service.aliyun.com)。详见 [SECURITY.md](SECURITY.md)
+如果您发现了代码中的安全漏洞，请联系[kubernetes-security@service.aliyun.com](mailto:kubernetes-security@service.aliyun.com)。详见 [SECURITY.md](SECURITY.md)
