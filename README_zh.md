@@ -122,5 +122,8 @@ kubectl get svc -n kubeskoop webconsole
 
 ## License
 
-Most source code in KubeSkoop which running on userspace are licensed under the [Apache License, Version 2.0](LICENSE.md).  
-The BPF code in `/bpf` directory are licensed under the [GPL v2.0](bpf/COPYING) to compat with Linux kernel helper functions.  
+KubeSkoop的多数用户态代码使用[Apache License, Version 2.0](LICENSE.md)。 `/bpf`目录下的BPF代码使用[GPL v2.0](bpf/COPYING)。
+
+## 安全
+
+如果您发现了代码中的安全漏洞，请联系[kubernetes-security@service.aliyun.com](kubernetes-security@service.aliyun.com)。详见 [SECURITY.md](SECURITY.md)
