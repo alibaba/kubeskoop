@@ -21,7 +21,10 @@ const (
 	ModuleName = "proctcpsummary"
 
 	TCPEstablishedConn = "tcpestablishedconn"
-	TCPTimewaitConn    = "tcptimewaitconn"
+	TCPTimeWaitConn    = "tcptimewaitconn"
+	TCPCloseWaitConn   = "tcpclosewaitconn"
+	TCPSynSentConn     = "tcpsynsentconn"
+	TCPSynRecvConn     = "tcpsynrecvconn"
 	TCPTXQueue         = "tcptxqueue"
 	TCPRXQueue         = "tcprxqueue"
 	TCPListenBacklog   = "tcplistenbacklog"
@@ -33,9 +36,13 @@ const (
 	TCP_CLOSE:7         TCP_CLOSE_WAIT:8
 	TCP_LAST_ACL:9      TCPListen:10
 	TCP_CLOSING:11*/
-	TCPEstablished = uint64(1)
-	TCPTimewait    = uint64(6)
-	TCPListen      = uint64(10)
+
+	TCPEstablished = 1
+	TCPSynSent     = 2
+	TCPSynRecv     = 3
+	TCPTimewait    = 6
+	TCPCloseWait   = 8
+	TCPListen      = 10
 
 	readLimit = 4294967296 // Byte -> 4 GiB
 )
@@ -68,7 +75,7 @@ type (
 )
 
 var (
-	TCPSummaryMetrics = []string{TCPEstablishedConn, TCPTimewaitConn, TCPTXQueue, TCPRXQueue}
+	TCPSummaryMetrics = []string{TCPEstablishedConn, TCPTimeWaitConn, TCPCloseWaitConn, TCPSynSentConn, TCPSynRecvConn, TCPTXQueue, TCPRXQueue}
 	probeName         = "tcpsummary"
 )
 
@@ -122,13 +129,16 @@ func collect(pidlist []*nettop.Entity) map[string]map[uint32]uint64 {
 			log.Warnf("failed collect tcp6, path %s, err: %v", path, err)
 			continue
 		}
-		est, tw := summary.getEstTwCount()
-		est6, tw6 := summary6.getEstTwCount()
+		est, tw, cw, ss, sr := summary.getEstTwCount()
+		est6, tw6, cw6, ss6, sr6 := summary6.getEstTwCount()
 		tx, rx := summary.getTxRxQueueLength()
 		tx6, rx6 := summary6.getTxRxQueueLength()
 		nsinum := uint32(pidlist[idx].GetNetns())
 		resMap[TCPEstablishedConn][nsinum] = est + est6
-		resMap[TCPTimewaitConn][nsinum] = tw + tw6
+		resMap[TCPTimeWaitConn][nsinum] = tw + tw6
+		resMap[TCPCloseWaitConn][nsinum] = cw + cw6
+		resMap[TCPSynSentConn][nsinum] = ss + ss6
+		resMap[TCPSynRecvConn][nsinum] = sr + sr6
 		resMap[TCPTXQueue][nsinum] = tx + tx6
 		resMap[TCPRXQueue][nsinum] = rx + rx6
 	}
@@ -136,15 +146,22 @@ func collect(pidlist []*nettop.Entity) map[string]map[uint32]uint64 {
 	return resMap
 }
 
-func (n NetTCP) getEstTwCount() (est uint64, tw uint64) {
+func (n NetTCP) getEstTwCount() (est, tw, cw, ss, sr uint64) {
 	for idx := range n {
-		if n[idx].St == TCPEstablished {
+		switch n[idx].St {
+		case TCPEstablished:
 			est++
-		} else if n[idx].St == TCPTimewait {
+		case TCPTimewait:
 			tw++
+		case TCPCloseWait:
+			cw++
+		case TCPSynSent:
+			ss++
+		case TCPSynRecv:
+			sr++
 		}
 	}
-	return est, tw
+	return est, tw, cw, ss, sr
 }
 
 func (n NetTCP) getTxRxQueueLength() (tx uint64, rx uint64) {
