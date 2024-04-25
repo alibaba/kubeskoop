@@ -14,6 +14,7 @@ import (
 	_ "github.com/alibaba/kubeskoop/pkg/exporter/probe/procsock"
 	_ "github.com/alibaba/kubeskoop/pkg/exporter/probe/procsoftnet"
 	_ "github.com/alibaba/kubeskoop/pkg/exporter/probe/proctcpsummary"
+	_ "github.com/alibaba/kubeskoop/pkg/exporter/probe/rdma"
 	_ "github.com/alibaba/kubeskoop/pkg/exporter/probe/tracebiolatency"
 	_ "github.com/alibaba/kubeskoop/pkg/exporter/probe/tracekernel"
 	_ "github.com/alibaba/kubeskoop/pkg/exporter/probe/tracenetiftxlatency"

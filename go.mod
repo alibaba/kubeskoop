@@ -47,7 +47,7 @@ require (
 	github.com/vishvananda/netns v0.0.4
 	golang.org/x/exp v0.0.0-20221204150635-6dcec336b2bb
 	golang.org/x/sync v0.1.0
-	golang.org/x/sys v0.8.0
+	golang.org/x/sys v0.10.0
 	google.golang.org/grpc v1.56.2
 	google.golang.org/protobuf v1.33.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -203,3 +203,5 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
+
+replace github.com/vishvananda/netlink v1.2.1-beta.2 => github.com/bswang/netlink v1.0.1-0.20240423021740-86cd4b5bb65d
