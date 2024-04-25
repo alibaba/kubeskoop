@@ -309,7 +309,8 @@ func (i *inspServer) start(cfg *InspServerConfig) error {
 		sinks, err := createSink(cfg.EventConfig.EventSinks)
 		if err != nil {
 			log.Errorf("failed create sinks, err: %v", err)
-			return
+		} else if len(sinks) != len(cfg.EventConfig.EventSinks) {
+			log.Warnf("expected to create %d sinks , but %d were created", len(cfg.EventConfig.EventSinks), len(sinks))
 		}
 
 		log.Infof("start event server")
@@ -366,7 +367,8 @@ func createSink(sinkConfigs []EventSinkConfig) ([]sink.Sink, error) {
 	for _, config := range sinkConfigs {
 		s, err := sink.CreateSink(config.Name, config.Args)
 		if err != nil {
-			return nil, fmt.Errorf("failed create sink %s, err: %w", config.Name, err)
+			log.Errorf("failed create sink %s, err: %v", config.Name, err)
+			continue
 		}
 		ret = append(ret, s)
 	}
