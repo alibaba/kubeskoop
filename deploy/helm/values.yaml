@@ -16,12 +16,10 @@ config:
         enablePortInLabel: false
     - name: tcpretrans
   eventProbes:
-    - name: biolatency
-    - name: kernellatency
+    - name: tcpreset
     - name: packetloss
       args:
         enableStack: false
-    - name: tcpreset
     - name: tcpretrans
   eventSinks:
     - name: stderr
