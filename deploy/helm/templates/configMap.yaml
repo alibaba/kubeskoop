@@ -5,8 +5,8 @@ metadata:
   namespace: {{ .Release.Namespace }}
 data:
   config.yaml: |-
-    debugmode: {{ .Values.agent.debug }}
-    port: {{ .Values.agent.port }}
+    debugmode: {{ .Values.agent.config.debug }}
+    port: {{ .Values.agent.config.port }}
     metrics:
       probes:
       {{- toYaml .Values.config.metricProbes | nindent 6 }}
