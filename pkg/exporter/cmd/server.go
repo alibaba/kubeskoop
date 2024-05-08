@@ -287,6 +287,12 @@ func (i *inspServer) start(cfg *InspServerConfig) error {
 
 	go func() {
 		var err error
+		err = probe.InitAdditionalLabels(cfg.MetricsConfig.AdditionalLabels)
+		if err != nil {
+			log.Errorf("failed init additional labels: %v", err)
+			return
+		}
+
 		ctx := context.TODO()
 
 		log.Infof("start metrics server")

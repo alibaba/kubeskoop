@@ -163,6 +163,7 @@ type Entity struct {
 	podMeta
 	initPid int
 	pids    []int
+	labels  map[string]string
 }
 
 func (e *Entity) String() string {
@@ -175,6 +176,10 @@ func (e *Entity) GetPodName() string {
 
 func (e *Entity) GetPodNamespace() string {
 	return e.podMeta.namespace
+}
+
+func (e *Entity) GetLabels() map[string]string {
+	return e.labels
 }
 
 func (e *Entity) IsHostNetwork() bool {
@@ -353,6 +358,7 @@ func cacheNetTopology(ctx context.Context) error {
 
 		namespace := sandbox.Metadata.Namespace
 		name := sandbox.Metadata.Name
+		labels := sandbox.Labels
 
 		sandboxStatus, err := criClient.PodSandboxStatus(sandbox.Id, true)
 		if err != nil {
@@ -410,6 +416,7 @@ func cacheNetTopology(ctx context.Context) error {
 				name:      name,
 				namespace: namespace,
 			},
+			labels:  labels,
 			initPid: info.Pid,
 			pids:    pids,
 		}
