@@ -6,7 +6,8 @@ metadata:
 data:
   config.yaml: |-
     debugmode: {{ .Values.agent.debug }}
-    port: {{ .Values.agent.port }}
+    port: {{ .Values.agent.config.port }}
+    enableController: {{ .Values.controller.enabled }}
     metrics:
       probes:
       {{- toYaml .Values.config.metricProbes | nindent 6 }}
