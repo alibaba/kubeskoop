@@ -30,7 +30,7 @@ spec:
           image: "{{ .btfhack.repository }}:{{ .btfhack.tag }}"
           imagePullPolicy: {{ .btfhack.imagePullPolicy }}
           volumeMounts:
-            - name: bpfdir
+            - name: btf-rawdata
               mountPath: /etc/net-exporter/btf
             - mountPath: /boot/
               name: boot
@@ -41,40 +41,44 @@ spec:
             - /etc/net-exporter/btf/
       {{- end }}
       containers:
-        - name: inspector
-          image:  "{{ .image.repository }}:{{ .image.tag }}"
-          imagePullPolicy: {{ .image.imagePullPolicy }}
-          env:
-          - name: INSPECTOR_NODENAME
-            valueFrom:
-              fieldRef:
-                fieldPath: spec.nodeName
-          volumeMounts:
-            - name: configvolume
-              mountPath: /etc/config/
-            - name: bpfdir
-              mountPath: /etc/net-exporter/btf
-            - name: procfs
-              mountPath: /proc
-            - mountPath: /run/containerd/containerd.sock
-              name: runtimeendpoint
-            - mountPath: /var/run/
-              name: rundir
-            - mountPath: /sys/fs/bpf
-              name: bpfmap
-              mountPropagation: HostToContainer
-            - mountPath: /sys/kernel/debug
-              name: bpfdebugfs
-              mountPropagation: HostToContainer
-            - mountPath: /etc/node-hostname
-              name: hostname
-          command:
-            - /bin/inspector
-            - server
-          securityContext:
-            privileged: true
-          resources:
-            {{- toYaml .resources | nindent 12 }}
+      - name: inspector
+        image:  "{{ .image.repository }}:{{ .image.tag }}"
+        imagePullPolicy: {{ .image.imagePullPolicy }}
+        env:
+        - name: INSPECTOR_NODENAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        volumeMounts:
+          - name: config-volume
+            mountPath: /etc/config/
+          - name: btf-rawdata
+            mountPath: /etc/net-exporter/btf
+          - name: proc
+            mountPath: /proc
+          - mountPath: /run/containerd/
+            name: containerd
+          - mountPath: /var/run/
+            name: dockershim
+          - mountPath: /sys/fs/bpf
+            name: bpf-maps
+            mountPropagation: HostToContainer
+          - mountPath: /sys/fs/cgroup
+            name: cgroup
+            mountPropagation: HostToContainer
+          - mountPath: /sys/kernel/debug
+            name: bpf-events
+            mountPropagation: HostToContainer
+          - mountPath: /etc/node-hostname
+            name: hostname
+        command:
+          - /bin/inspector
+          - server
+          - -d
+        securityContext:
+          privileged: true
+        resources:
+          {{- toYaml .resources | nindent 12 }}
       {{- with .nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -84,32 +88,37 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       volumes:
-        - name: procfs
+        - name: proc
           hostPath:
             path: /proc
-        - name: runtimeendpoint
+        - name: containerd
           hostPath:
-            path: {{ .config.runtimeEndpoint }}
-        - name: boot
-          hostPath:
-            path: /boot/
-        - name: rundir
+            path: /run/containerd/
+        - name: dockershim
           hostPath:
             path: /var/run/
         - hostPath:
             path: /sys/fs/bpf
             type: DirectoryOrCreate
-          name: bpfmap
+          name: bpf-maps
+        - name: boot
+          hostPath:
+            path: /boot
+            type: DirectoryOrCreate
+        - hostPath:
+            path: /sys/fs/cgroup
+            type: DirectoryOrCreate
+          name: cgroup
         - hostPath:
             path: /sys/kernel/debug
-          name: bpfdebugfs
+          name: bpf-events
         - name: hostname
           hostPath:
             path: /etc/hostname
             type: FileOrCreate
-        - name: configvolume
+        - name: config-volume
           configMap:
             name: kubeskoop-config
-        - name: bpfdir
+        - name: btf-rawdata
           emptyDir: {}
 {{- end }}

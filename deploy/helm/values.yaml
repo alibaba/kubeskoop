@@ -9,7 +9,6 @@ config:
     - name: tcp
     - name: tcpext
     - name: udp
-    - name: kernellatency
     - name: packetloss
     - name: flow
       args:
@@ -28,10 +27,9 @@ agent:
   config:
     debug: false
     port: 9102
-    runtimeEndpoint: /run/containerd/containerd.sock
   image:
     repository: kubeskoop/agent
-    tag: v1.0.0
+    tag: v1.0.0-rc.1
     imagePullPolicy: IfNotPresent
   resources:
     limits:
@@ -43,7 +41,7 @@ agent:
   btfhack:
     enabled: true
     repository: kubeskoop/agent
-    tag: v1.0.0
+    tag: v1.0.0-rc.1
     imagePullPolicy: IfNotPresent
   nodeSelector: {}
   tolerations: {}
@@ -56,7 +54,7 @@ controller:
     lokiEndpoint: http://loki-service:3100
   image:
     repository: kubeskoop/controller
-    tag: v1.0.0
+    tag: v1.0.0-rc.1
     imagePullPolicy: IfNotPresent
   resources:
     limits:
@@ -85,7 +83,7 @@ webconsole:
     password: kubeskoop
   image:
     repository: kubeskoop/controller
-    tag: v1.0.0
+    tag: v1.0.0-rc.1
     imagePullPolicy: IfNotPresent
   resources:
     limits:
