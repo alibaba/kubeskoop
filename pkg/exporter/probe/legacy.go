@@ -2,6 +2,7 @@ package probe
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
 	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
@@ -12,9 +13,62 @@ import (
 var legacyMetricsLabels = []string{"target_node", "target_namespace", "target_pod", "node", "namespace", "pod"}
 var StandardMetricsLabels = []string{"k8s_node", "k8s_namespace", "k8s_pod"}
 var TupleMetricsLabels = []string{"protocol", "src", "src_type", "src_node", "src_namespace", "src_pod", "dst", "dst_type", "dst_node", "dst_namespace", "dst_pod", "sport", "dport"}
+var AdditionalLabelValueExpr []string
 
 func BuildStandardMetricsLabelValues(entity *nettop.Entity) []string {
-	return []string{nettop.GetNodeName(), entity.GetPodNamespace(), entity.GetPodName()}
+	metaPodLabels := []string{nettop.GetNodeName(), entity.GetPodNamespace(), entity.GetPodName()}
+	return append(metaPodLabels, BuildAdditionalLabelsValues(entity)...)
+}
+
+func InitAdditionalLabels(additionalLabels string) error {
+	if len(additionalLabels) == 0 {
+		return nil
+	}
+
+	//split use space as separator
+	additionalLabelsArray := strings.Split(additionalLabels, " ")
+	//append to StandardMetricsLabels and AdditionalLabelValueExpr
+	for additionalKV := range additionalLabelsArray {
+		labelKVPair := strings.Split(additionalLabelsArray[additionalKV], "=")
+		StandardMetricsLabels = append(StandardMetricsLabels, strings.TrimSpace(labelKVPair[0]))
+		AdditionalLabelValueExpr = append(AdditionalLabelValueExpr, strings.TrimSpace(labelKVPair[1]))
+	}
+
+	return nil
+}
+
+func BuildAdditionalLabelsValues(entity *nettop.Entity) []string {
+	if len(AdditionalLabelValueExpr) == 0 {
+		return []string{}
+	}
+
+	var values []string
+	podLabels := entity.GetLabels()
+	for _, labelValue := range AdditionalLabelValueExpr {
+		if strings.Contains(labelValue, "${") && strings.Contains(labelValue, "}") {
+
+			//get the first ${ and last } string in labelValue
+			s := labelValue[strings.Index(labelValue, "${")+2 : strings.LastIndex(labelValue, "}")]
+			// get the key in ${key:value}
+			key := s[strings.Index(s, ":")+1:]
+			// get the value from podLabels
+			value, ok := podLabels[key]
+
+			if !ok {
+				values = append(values, "")
+			} else {
+				// get the prefix and suffix of labelValue
+				prefix := labelValue[:strings.Index(labelValue, "${")]
+				suffix := labelValue[strings.LastIndex(labelValue, "}")+1:]
+				values = append(values, prefix+value+suffix)
+			}
+
+		} else {
+			values = append(values, labelValue)
+		}
+	}
+
+	return values
 }
 
 type legacyBatchMetrics struct {
@@ -89,11 +143,12 @@ func (l *legacyBatchMetrics) Collect(metrics chan<- prometheus.Metric) {
 			if err != nil || et == nil {
 				continue
 			}
-			labelValues := []string{nettop.GetNodeName(), et.GetPodNamespace(), et.GetPodName()}
+			labelValues := BuildStandardMetricsLabelValues(et)
 			// for legacy pod labels
 			emit(newMetricsName(l.module, key), labelValues, float64(value))
 
-			labelValues = append(labelValues, labelValues...)
+			var metaPodData = []string{nettop.GetNodeName(), et.GetPodNamespace(), et.GetPodName()}
+			labelValues = append(metaPodData, metaPodData...)
 			emit(legacyMetricsName(l.module, key, l.underscore), labelValues, float64(value))
 		}
 	}
