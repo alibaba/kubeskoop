@@ -34,7 +34,9 @@ const (
 var (
 	metrics              = []string{TXLAT_QDISC_SLOW, TXLAT_NETDEV_SLOW}
 	probeName            = "netiftxlat"
-	_netifTxlatencyProbe = &netifTxlatencyProbe{}
+	_netifTxlatencyProbe = &netifTxlatencyProbe{
+		metricsMap: make(map[string]map[uint32]uint64),
+	}
 )
 
 func init() {
