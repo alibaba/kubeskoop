@@ -16,7 +16,8 @@ type InspServerConfig struct {
 }
 
 type MetricsConfig struct {
-	Probes []ProbeConfig `yaml:"probes" mapstructure:"probes" json:"probes"`
+	Probes           []ProbeConfig `yaml:"probes" mapstructure:"probes" json:"probes"`
+	AdditionalLabels []string      `yaml:"additionalLabels" mapstructure:"additionalLabels" json:"additionalLabels"`
 }
 
 type EventConfig struct {

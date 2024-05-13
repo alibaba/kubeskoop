@@ -2,6 +2,8 @@ package probe
 
 import (
 	"fmt"
+	"regexp"
+	"strings"
 
 	"github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
 	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
@@ -12,9 +14,63 @@ import (
 var legacyMetricsLabels = []string{"target_node", "target_namespace", "target_pod", "node", "namespace", "pod"}
 var StandardMetricsLabels = []string{"k8s_node", "k8s_namespace", "k8s_pod"}
 var TupleMetricsLabels = []string{"protocol", "src", "src_type", "src_node", "src_namespace", "src_pod", "dst", "dst_type", "dst_node", "dst_namespace", "dst_pod", "sport", "dport"}
+var AdditionalLabelValueExpr []string
 
 func BuildStandardMetricsLabelValues(entity *nettop.Entity) []string {
-	return []string{nettop.GetNodeName(), entity.GetPodNamespace(), entity.GetPodName()}
+	metaPodLabels := []string{nettop.GetNodeName(), entity.GetPodNamespace(), entity.GetPodName()}
+	return append(metaPodLabels, BuildAdditionalLabelsValues(entity.GetLabels())...)
+}
+
+func InitAdditionalLabels(additionalLabels []string) error {
+	if len(additionalLabels) == 0 {
+		return nil
+	}
+
+	//append to StandardMetricsLabels and AdditionalLabelValueExpr
+	for additionalKV := range additionalLabels {
+		labelKVPair := strings.Split(additionalLabels[additionalKV], "=")
+		StandardMetricsLabels = append(StandardMetricsLabels, strings.TrimSpace(labelKVPair[0]))
+		AdditionalLabelValueExpr = append(AdditionalLabelValueExpr, strings.TrimSpace(labelKVPair[1]))
+	}
+
+	return nil
+}
+
+func BuildAdditionalLabelsValues(podLabels map[string]string) []string {
+	if len(AdditionalLabelValueExpr) == 0 {
+		return []string{}
+	}
+
+	var values []string
+
+	var replaceAllStringSubmatchFunc = func(re *regexp.Regexp, str string, repl func([]string) string) string {
+		result := ""
+		lastIndex := 0
+
+		for _, v := range re.FindAllSubmatchIndex([]byte(str), -1) {
+			groups := []string{}
+			for i := 0; i < len(v); i += 2 {
+				groups = append(groups, str[v[i]:v[i+1]])
+			}
+
+			result += str[lastIndex:v[0]] + repl(groups)
+			lastIndex = v[1]
+		}
+
+		return result + str[lastIndex:]
+	}
+
+	for _, labelValueExpr := range AdditionalLabelValueExpr {
+		podLabelValue := replaceAllStringSubmatchFunc(regexp.MustCompile(`\${labels:(.*?)}`), labelValueExpr, func(groups []string) string {
+			if podLabelValue, ok := podLabels[groups[1]]; ok {
+				return podLabelValue
+			}
+			return ""
+		})
+		values = append(values, podLabelValue)
+	}
+
+	return values
 }
 
 type legacyBatchMetrics struct {
@@ -89,11 +145,12 @@ func (l *legacyBatchMetrics) Collect(metrics chan<- prometheus.Metric) {
 			if err != nil || et == nil {
 				continue
 			}
-			labelValues := []string{nettop.GetNodeName(), et.GetPodNamespace(), et.GetPodName()}
+			labelValues := BuildStandardMetricsLabelValues(et)
 			// for legacy pod labels
 			emit(newMetricsName(l.module, key), labelValues, float64(value))
 
-			labelValues = append(labelValues, labelValues...)
+			var metaPodData = []string{nettop.GetNodeName(), et.GetPodNamespace(), et.GetPodName()}
+			labelValues = append(metaPodData, metaPodData...)
 			emit(legacyMetricsName(l.module, key, l.underscore), labelValues, float64(value))
 		}
 	}
