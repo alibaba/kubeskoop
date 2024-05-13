@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
 
 	"github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
@@ -14,7 +16,6 @@ import (
 	"github.com/mdlayher/netlink"
 	"github.com/ti-mo/conntrack"
 	"github.com/ti-mo/netfilter"
-	"golang.org/x/exp/slog"
 )
 
 const (
@@ -48,33 +49,33 @@ func (p *conntrackEventProbe) Start(ctx context.Context) error {
 		ticker := time.NewTicker(10 * time.Second)
 		select {
 		case <-ticker.C:
-			slog.Ctx(ctx).Info("start update netns list", "module", probeName)
+			log.Infof("%s: start update netns list", probeName)
 			ets := nettop.GetAllUniqueNetnsEntity()
 			for _, et := range ets {
 				if et == nil {
-					slog.Ctx(ctx).Info("skip empty entity", "module", probeName)
+					log.Infof("%s: skip empty entity", probeName)
 					continue
 				}
 				nsfd, err := et.GetNetNsFd()
 				if err != nil {
-					slog.Ctx(ctx).Info("skip netns fd", "err", err, "module", probeName)
+					log.Infof("%s: failed get netns fd, skip netns fd, err: %v", probeName, err)
 					continue
 				}
 				if nsfd == 0 {
-					slog.Ctx(ctx).Info("skip empty netns fd", "module", probeName)
+					log.Infof("%s: invalid nsfd(0), skip empty netns fd", probeName)
 					continue
 				}
 				if _, ok := p.conns[et.GetNetns()]; !ok {
 					ctrch := make(chan struct{})
 					go func() {
-						err := p.startCtListen(ctx, ctrch, nsfd, et.GetNetns())
+						err = p.startCtListen(ctx, ctrch, nsfd, et.GetNetns())
 						if err != nil {
-							slog.Ctx(ctx).Warn("start worker", "err", err, "netns", et.GetNetns(), "nsfd", nsfd, "module", probeName)
+							log.Infof("%s: failed start worker, err: %v", probeName, err)
 							return
 						}
 					}()
 					p.conns[et.GetNetns()] = ctrch
-					slog.Ctx(ctx).Info("start worker finished", "netns", et.GetNetns(), "nsfd", nsfd, "module", probeName)
+					log.Infof("%s: start worker finished", probeName)
 				}
 			}
 		case <-p.done:
@@ -93,35 +94,35 @@ func (p *conntrackEventProbe) Stop(_ context.Context) error {
 	return nil
 }
 
-func (p *conntrackEventProbe) startCtListen(ctx context.Context, ctrch <-chan struct{}, nsfd int, nsinum int) error {
+func (p *conntrackEventProbe) startCtListen(_ context.Context, ctrch <-chan struct{}, nsfd int, nsinum int) error {
 	c, err := conntrack.Dial(&netlink.Config{
 		NetNS: nsfd,
 	})
 
 	if err != nil {
-		slog.Ctx(ctx).Info("start conntrack dial", "err", err, "module", probeName)
+		log.Infof("%s: failed start conntrack dial, err: %v", probeName, err)
 		return err
 	}
 
-	slog.Ctx(ctx).Info("start conntrack listen", "netns", nsfd, "module", probeName)
+	log.Infof("%s: start conntrack listen in netns %d", probeName, nsfd)
 	evCh := make(chan conntrack.Event, 1024)
 	errCh, err := c.Listen(evCh, 4, append(netfilter.GroupsCT, netfilter.GroupsCTExp...))
 	if err != nil {
-		slog.Ctx(ctx).Info("start conntrack listen", "err", err, "module", probeName)
+		log.Infof("%s: failed start conntrack listen, err: %v", probeName, err)
 		return err
 	}
 
 	for {
 		select {
 		case <-ctrch:
-			slog.Ctx(ctx).Info("conntrack event listen stop", "module", probeName)
+			log.Infof("%s: conntrack event listen stop", probeName)
 			return nil
 		case err = <-errCh:
-			slog.Ctx(ctx).Info("conntrack event listen stop", "err", err, "module", probeName)
+			log.Infof("%s: conntrack event listen stop, err: %v", probeName, err)
 			return err
 		case event := <-evCh:
 			p.sink <- vanishEvent(event, nsinum)
-			slog.Ctx(ctx).Info("conntrack event listen", "event", event.String(), "module", probeName)
+			log.Infof("%s: conntrack event listen got event: %s", probeName, event.String())
 		}
 	}
 }
