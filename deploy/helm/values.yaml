@@ -1,4 +1,9 @@
 config:
+#  additionalLabels:
+#    - application=${labels:application}
+#      businessline=${labels:businessline}
+#      department=${labels:department}
+#      environment=environment
   metricProbes:
     - name: conntrack
     - name: qdisc

@@ -9,6 +9,8 @@ data:
     port: {{ .Values.agent.config.port }}
     enableController: {{ .Values.controller.enabled }}
     metrics:
+      additionalLabels:
+      {{- toYaml .Values.config.additionalLabels | nindent 8 }}
       probes:
       {{- toYaml .Values.config.metricProbes | nindent 6 }}
     event:
