@@ -109,13 +109,18 @@ func (m *EventProbeManager) CreateProbe(config ProbeConfig) (probe.EventProbe, e
 	return probe.CreateEventProbe(config.Name, m.sinkChan, config.Args)
 }
 
-func (m *EventProbeManager) StartProbe(ctx context.Context, probe probe.EventProbe) error {
-	log.Infof("start event probe %s", probe.Name())
-	return probe.Start(ctx)
+func (m *EventProbeManager) StartProbe(ctx context.Context, p probe.EventProbe) error {
+	log.Infof("start event probe %s", p.Name())
+	return p.Start(ctx)
 }
 
-func (m *EventProbeManager) StopProbe(ctx context.Context, probe probe.EventProbe) error {
-	return probe.Stop(ctx)
+func (m *EventProbeManager) StopProbe(ctx context.Context, p probe.EventProbe) error {
+	log.Infof("stop event probe %s", p.Name())
+	state := p.State()
+	if state == probe.ProbeStateStopped || state == probe.ProbeStateStopping || state == probe.ProbeStateFailed {
+		return nil
+	}
+	return p.Stop(ctx)
 }
 
 var _ ProbeManager[probe.MetricsProbe] = &MetricsProbeManager{}

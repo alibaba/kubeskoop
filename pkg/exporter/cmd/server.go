@@ -320,7 +320,6 @@ func (i *inspServer) start(cfg *InspServerConfig) error {
 		}
 
 		log.Infof("start event server")
-		//TODO create sinks from config
 		i.eventServer, err = NewEventServer(sinks)
 		if err != nil {
 			log.Errorf("failed create event server: %v", err)

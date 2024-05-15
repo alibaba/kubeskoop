@@ -37,21 +37,27 @@ func (m *MetricsProbeManager) CreateProbe(config ProbeConfig) (probe.MetricsProb
 	return probe.CreateMetricsProbe(config.Name, config.Args)
 }
 
-func (m *MetricsProbeManager) StartProbe(ctx context.Context, probe probe.MetricsProbe) error {
-	log.Infof("start metrics probe %s", probe.Name())
-	if err := probe.Start(ctx); err != nil {
+func (m *MetricsProbeManager) StartProbe(ctx context.Context, p probe.MetricsProbe) error {
+	log.Infof("start metrics probe %s", p.Name())
+	if err := p.Start(ctx); err != nil {
 		return err
 	}
-	m.prometheusRegistry.MustRegister(probe)
+	m.prometheusRegistry.MustRegister(p)
 	return nil
 }
 
-func (m *MetricsProbeManager) StopProbe(ctx context.Context, probe probe.MetricsProbe) error {
-	log.Infof("stop metrics probe %s", probe.Name())
-	if err := probe.Stop(ctx); err != nil {
+func (m *MetricsProbeManager) StopProbe(ctx context.Context, p probe.MetricsProbe) error {
+	log.Infof("stop metrics probe %s", p.Name())
+
+	state := p.State()
+	if state == probe.ProbeStateStopped || state == probe.ProbeStateStopping || state == probe.ProbeStateFailed {
+		return nil
+	}
+
+	if err := p.Stop(ctx); err != nil {
 		return err
 	}
-	m.prometheusRegistry.Unregister(probe)
+	m.prometheusRegistry.Unregister(p)
 	return nil
 }
 
