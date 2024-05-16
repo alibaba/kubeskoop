@@ -12,7 +12,7 @@ type EventServer struct {
 	*DynamicProbeServer[probe.EventProbe]
 }
 
-func NewEventServer(sinks []sink.Sink) (*EventServer, error) {
+func newEventServer(sinks []sink.Sink) (*EventServer, error) {
 	var sinkWrappers []*sinkWrapper
 
 	done := make(chan struct{})

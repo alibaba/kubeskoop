@@ -240,7 +240,7 @@ func StartCache(ctx context.Context, sidecarMode bool) error {
 }
 
 func StopCache() {
-	control <- struct{}{}
+	close(control)
 }
 
 func cacheDaemonLoop(_ context.Context, control chan struct{}) {
@@ -249,10 +249,12 @@ func cacheDaemonLoop(_ context.Context, control chan struct{}) {
 	t := time.NewTicker(cacheUpdateInterval)
 	defer t.Stop()
 
+loop:
 	for {
 		select {
 		case <-control:
 			log.Info("cache daemon loop exit of control signal")
+			break loop
 		case <-t.C:
 			if err := cachePodsWithTimeout(cacheUpdateInterval); err != nil {
 				log.Errorf("failed cache pods: %v", err)

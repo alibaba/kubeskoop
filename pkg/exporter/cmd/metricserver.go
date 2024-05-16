@@ -11,7 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func NewMetricsServer() (*MetricsServer, error) {
+func newMetricsServer() (*MetricsServer, error) {
 
 	r := prometheus.NewRegistry()
 	handler := promhttp.HandlerFor(prometheus.Gatherers{
