@@ -11,7 +11,7 @@ import (
 
 const mapKey uint32 = 0
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang-16 bpf ../../../bpf/kprobe.c -- -I../../../bpf/headers
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -target=${TARGET} -cc clang-16 bpf ../../../bpf/kprobe.c -- -I../../../bpf/headers
 
 func btfTest(btf *btf.Spec) error {
 	fn := "sys_execve"

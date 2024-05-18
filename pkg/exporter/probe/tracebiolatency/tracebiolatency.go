@@ -20,7 +20,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -cflags $BPF_CFLAGS  -type insp_biolat_event_t bpf ../../../../bpf/tracebiolatency.c -- -I../../../../bpf/headers -D__TARGET_ARCH_x86
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -target=${TARGET} -cc clang -cflags $BPF_CFLAGS  -type insp_biolat_event_t bpf ../../../../bpf/tracebiolatency.c -- -I../../../../bpf/headers -I../../../../bpf/headers/${TARGET} -D__TARGET_ARCH_${TARGET}
 var (
 	probeName = "biolatency"
 )
