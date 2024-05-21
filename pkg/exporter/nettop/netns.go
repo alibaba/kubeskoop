@@ -26,12 +26,12 @@ func getNsInumByPid(pid int) (int, error) {
 	}
 
 	if fields[0] == "net" {
-		inode, err := strconv.ParseUint(strings.Trim(fields[1], "[]"), 10, 32)
+		inode, err := strconv.Atoi(strings.Trim(fields[1], "[]"))
 		if err != nil {
 			return 0, fmt.Errorf("failed to parse inode from %q: %w", fields[1], err)
 		}
 
-		return int(inode), nil
+		return inode, nil
 	}
 
 	return 0, fmt.Errorf("net namespace of %d not found", pid)
