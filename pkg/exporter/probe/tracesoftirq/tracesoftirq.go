@@ -26,7 +26,7 @@ import (
 	"github.com/cilium/ebpf/rlimit"
 )
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -target=${TARGET} -cc clang -cflags $BPF_CFLAGS -type insp_softirq_event_t bpf ../../../../bpf/softirq.c -- -I../../../../bpf/headers -I../../../../bpf/headers/${TARGET} -D__TARGET_ARCH_${TARGET}
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -target=${GOARCH} -cc clang -cflags $BPF_CFLAGS -type insp_softirq_event_t bpf ../../../../bpf/softirq.c -- -I../../../../bpf/headers -D__TARGET_ARCH_${GOARCH}
 const (
 	SOFTIRQ_SCHED_SLOW   = "schedslow"       //nolint
 	SOFTIRQ_SCHED_100MS  = "schedslow100ms"  //nolint

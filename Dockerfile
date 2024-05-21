@@ -1,10 +1,4 @@
-FROM docker.io/library/golang:1.22.1-alpine AS build
-
-ARG ALPINE_MIRROR
-ENV ALPINE_MIRROR=$ALPINE_MIRROR
-
-RUN if [ ! -z "$ALPINE_MIRROR" ]; then sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories; fi && \
-    apk add gcc g++ linux-headers git make bash 
+FROM kubeskoop/ci-builder:latest AS build
 
 WORKDIR /go/src/github.com/alibaba/kubeskoop/
 RUN go env -w GOMODCACHE=/root/.cache/go-build
@@ -12,7 +6,7 @@ COPY go.mod go.sum /go/src/github.com/alibaba/kubeskoop/
 RUN --mount=type=cache,target=/root/.cache/go-build go mod download
 
 ADD . /go/src/github.com/alibaba/kubeskoop/
-RUN --mount=type=cache,target=/root/.cache/go-build mkdir -p bin && make all
+RUN --mount=type=cache,target=/root/.cache/go-build mkdir -p bin && make generate-bpf && make all
 
 FROM --platform=linux/amd64 docker.io/library/node:20.9.0-alpine as build-ui
 WORKDIR /webconsole
