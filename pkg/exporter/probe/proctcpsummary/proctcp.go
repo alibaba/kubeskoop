@@ -134,13 +134,13 @@ func collect(pidlist []*nettop.Entity) map[string]map[uint32]uint64 {
 		tx, rx := summary.getTxRxQueueLength()
 		tx6, rx6 := summary6.getTxRxQueueLength()
 		nsinum := uint32(pidlist[idx].GetNetns())
-		resMap[TCPEstablishedConn][nsinum] = est + est6
-		resMap[TCPTimeWaitConn][nsinum] = tw + tw6
-		resMap[TCPCloseWaitConn][nsinum] = cw + cw6
-		resMap[TCPSynSentConn][nsinum] = ss + ss6
-		resMap[TCPSynRecvConn][nsinum] = sr + sr6
-		resMap[TCPTXQueue][nsinum] = tx + tx6
-		resMap[TCPRXQueue][nsinum] = rx + rx6
+		resMap[TCPEstablishedConn][nsinum] += est + est6
+		resMap[TCPTimeWaitConn][nsinum] += tw + tw6
+		resMap[TCPCloseWaitConn][nsinum] += cw + cw6
+		resMap[TCPSynSentConn][nsinum] += ss + ss6
+		resMap[TCPSynRecvConn][nsinum] += sr + sr6
+		resMap[TCPTXQueue][nsinum] += tx + tx6
+		resMap[TCPRXQueue][nsinum] += rx + rx6
 	}
 
 	return resMap
