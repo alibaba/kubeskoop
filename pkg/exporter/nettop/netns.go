@@ -14,31 +14,24 @@ func getNsInumByPid(pid int) (int, error) {
 	}
 	defer d.Close()
 
-	names, err := d.Readdirnames(-1)
+	target, err := os.Readlink(fmt.Sprintf("/proc/%d/ns/net", pid))
 	if err != nil {
-		return 0, fmt.Errorf("failed to read contents of ns dir: %w", err)
+		return 0, err
 	}
 
-	for _, name := range names {
-		target, err := os.Readlink(fmt.Sprintf("/proc/%d/ns/%s", pid, name))
+	fields := strings.SplitN(target, ":", 2)
+
+	if len(fields) != 2 {
+		return 0, fmt.Errorf("failed to parse namespace type and inode from %q", target)
+	}
+
+	if fields[0] == "net" {
+		inode, err := strconv.Atoi(strings.Trim(fields[1], "[]"))
 		if err != nil {
-			return 0, err
+			return 0, fmt.Errorf("failed to parse inode from %q: %w", fields[1], err)
 		}
 
-		fields := strings.SplitN(target, ":", 2)
-		if len(fields) != 2 {
-			return 0, fmt.Errorf("failed to parse namespace type and inode from %q", target)
-		}
-
-		if fields[0] == "net" {
-			inode, err := strconv.ParseUint(strings.Trim(fields[1], "[]"), 10, 32)
-			if err != nil {
-				return 0, fmt.Errorf("failed to parse inode from %q: %w", fields[1], err)
-			}
-
-			return int(inode), nil
-		}
-
+		return inode, nil
 	}
 
 	return 0, fmt.Errorf("net namespace of %d not found", pid)
