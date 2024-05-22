@@ -48,9 +48,8 @@ build-webconsole:
 
 .PHONY: generate-bpf
 generate-bpf:
-	TARGET=amd64 go generate ./pkg/exporter/probe/...
-	TARGET=arm64 go generate ./pkg/exporter/probe/...
+	go generate ./pkg/exporter/probe/...
 
 .PHONY: generate-bpf-in-container
 generate-bpf-in-container:
-	docker run -v $(PWD):/go/src/github.com/alibaba/kubeskoop --workdir /go/src/github.com/alibaba/kubeskoop kubeskoop/bpf-build:go121-clang17 make generate-bpf
+	docker run --rm -v $(PWD):/go/src/github.com/alibaba/kubeskoop --workdir /go/src/github.com/alibaba/kubeskoop kubeskoop/bpf-build:go121-clang17 make generate-bpf
