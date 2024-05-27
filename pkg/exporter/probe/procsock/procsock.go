@@ -178,10 +178,6 @@ func getHostTCPSockstat() (tcpsockstat, error) {
 	for idx := range stat6.Protocols {
 		if strings.Compare(stat6.Protocols[idx].Protocol, "TCP6") == 0 {
 			res.InUse += stat6.Protocols[idx].InUse
-			res.Orphan += *stat6.Protocols[idx].Orphan
-			res.Alloc += *stat6.Protocols[idx].Alloc
-			res.TW += *stat6.Protocols[idx].TW
-			res.Mem += *stat6.Protocols[idx].Mem
 		}
 	}
 
