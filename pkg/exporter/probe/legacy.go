@@ -11,7 +11,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var legacyMetricsLabels = []string{"target_node", "target_namespace", "target_pod", "node", "namespace", "pod"}
 var StandardMetricsLabels = []string{"k8s_node", "k8s_namespace", "k8s_pod"}
 var TupleMetricsLabels = []string{"protocol", "src", "src_type", "src_node", "src_namespace", "src_pod", "dst", "dst_type", "dst_node", "dst_namespace", "dst_pod", "sport", "dport"}
 var AdditionalLabelValueExpr []string
@@ -48,7 +47,7 @@ func BuildAdditionalLabelsValues(podLabels map[string]string) []string {
 		lastIndex := 0
 
 		for _, v := range re.FindAllSubmatchIndex([]byte(str), -1) {
-			groups := []string{}
+			var groups []string
 			for i := 0; i < len(v); i += 2 {
 				groups = append(groups, str[v[i]:v[i+1]])
 			}
@@ -74,18 +73,11 @@ func BuildAdditionalLabelsValues(podLabels map[string]string) []string {
 }
 
 type legacyBatchMetrics struct {
-	module     string
-	collector  LegacyCollector
-	descs      map[string]*prometheus.Desc
-	underscore bool
+	module    string
+	collector LegacyCollector
+	descs     map[string]*prometheus.Desc
 }
 
-func legacyMetricsName(module string, name string, underscore bool) string {
-	if underscore {
-		return fmt.Sprintf("%s_pod_%s_%s", LegacyMetricsNamespace, module, name)
-	}
-	return fmt.Sprintf("%s_pod_%s%s", LegacyMetricsNamespace, module, name)
-}
 func newMetricsName(module, name string) string {
 	return prometheus.BuildFQName(MetricsNamespace, module, name)
 }
@@ -93,27 +85,20 @@ func newMetricsName(module, name string) string {
 type LegacyCollector func() (map[string]map[uint32]uint64, error)
 
 func NewLegacyBatchMetrics(module string, metrics []string, collector LegacyCollector) prometheus.Collector {
-	return newLegacyBatchMetrics(module, false, metrics, collector)
+	return newLegacyBatchMetrics(module, metrics, collector)
 }
 
-func newLegacyBatchMetrics(module string, underscore bool, metrics []string, collector LegacyCollector) prometheus.Collector {
+func newLegacyBatchMetrics(module string, metrics []string, collector LegacyCollector) prometheus.Collector {
 	descs := make(map[string]*prometheus.Desc)
 	for _, m := range metrics {
-		legacyName := legacyMetricsName(module, m, underscore)
 		newName := newMetricsName(module, m)
-		descs[legacyName] = prometheus.NewDesc(legacyName, "", legacyMetricsLabels, nil)
 		descs[newName] = prometheus.NewDesc(newName, "", StandardMetricsLabels, nil)
 	}
 	return &legacyBatchMetrics{
-		module:     module,
-		collector:  collector,
-		descs:      descs,
-		underscore: underscore,
+		module:    module,
+		collector: collector,
+		descs:     descs,
 	}
-}
-
-func NewLegacyBatchMetricsWithUnderscore(module string, metrics []string, collector LegacyCollector) prometheus.Collector {
-	return newLegacyBatchMetrics(module, true, metrics, collector)
 }
 
 func (l *legacyBatchMetrics) Describe(descs chan<- *prometheus.Desc) {
@@ -146,17 +131,12 @@ func (l *legacyBatchMetrics) Collect(metrics chan<- prometheus.Metric) {
 				continue
 			}
 			labelValues := BuildStandardMetricsLabelValues(et)
-			// for legacy pod labels
 			emit(newMetricsName(l.module, key), labelValues, float64(value))
-
-			var metaPodData = []string{nettop.GetNodeName(), et.GetPodNamespace(), et.GetPodName()}
-			labelValues = append(metaPodData, metaPodData...)
-			emit(legacyMetricsName(l.module, key, l.underscore), labelValues, float64(value))
 		}
 	}
 }
 
-func LagacyEventLabels(netns uint32) []Label {
+func LegacyEventLabels(netns uint32) []Label {
 	et, err := nettop.GetEntityByNetns(int(netns))
 	if err != nil || et == nil {
 		log.Infof("nettop get entity failed, netns: %d, err: %v", netns, err)

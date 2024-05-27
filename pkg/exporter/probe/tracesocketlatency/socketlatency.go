@@ -211,7 +211,7 @@ func (p *socketLatencyProbe) perfLoop() {
 		}
 		evt := &probe.Event{
 			Timestamp: time.Now().UnixNano(),
-			Labels:    probe.LagacyEventLabels(event.SkbMeta.Netns),
+			Labels:    probe.LegacyEventLabels(event.SkbMeta.Netns),
 		}
 		/*
 			#define ACTION_READ	    1

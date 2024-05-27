@@ -243,7 +243,7 @@ func (p *kernelLatencyProbe) perfLoop() {
 		netns := event.SkbMeta.Netns
 		evt := &probe.Event{
 			Timestamp: time.Now().UnixNano(),
-			Labels:    probe.LagacyEventLabels(netns),
+			Labels:    probe.LegacyEventLabels(netns),
 		}
 		/*
 		   #define RX_KLATENCY 1
