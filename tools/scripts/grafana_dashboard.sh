@@ -10,8 +10,7 @@ GRAFANA_PASSWORD=${GRAFANA_PASSWORD:-kubeskoop}
 register_dashboard() {
     local dashboard='{}'
     local datasource_id=0
-    #dashboard=$(curl -sSL https://raw.githubusercontent.com/alibaba/kubeskoop/main/deploy/resource/kubeskoop-exporter-dashboard.json)
-    dashboard=$(cat /etc/kubeskoop-exporter-dashboard.json)
+    dashboard=$(cat "$1")
     datasource_id=$(curl "http://admin:$GRAFANA_PASSWORD@$GRAFANA_HOST/api/datasources/name/prometheus" | jq .uid)
     tmp_dashboard_file=$(mktemp)
     cat <<EOF > "${tmp_dashboard_file}"
@@ -50,5 +49,6 @@ grafana_ready() {
 }
 
 grafana_ready
-register_dashboard
+register_dashboard /etc/kubeskoop-exporter-pods-dashboard.json
+register_dashboard /etc/kubeskoop-exporter-nodes-dashboard.json
 sleep infinity
