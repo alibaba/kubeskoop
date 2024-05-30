@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
+	"golang.org/x/sys/unix"
 
 	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
 
@@ -117,6 +118,7 @@ func getQdiscStats(entity *nettop.Entity) ([]QdiscInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer unix.Close(fd)
 	defer c.Close()
 
 	req := netlink.Message{
