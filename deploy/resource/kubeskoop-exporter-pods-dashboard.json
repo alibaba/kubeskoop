@@ -2168,9 +2168,9 @@
         "list": [
             {
                 "current": {
-                    "selected": true,
-                    "text": "kube-system",
-                    "value": "kube-system"
+                    "selected": false,
+                    "text": "",
+                    "value": ""
                 },
                 "datasource": {
                     "type": "prometheus",
@@ -2196,9 +2196,9 @@
             },
             {
                 "current": {
-                    "selected": true,
-                    "text": "coredns-75947d8479-jrkqs",
-                    "value": "coredns-75947d8479-jrkqs"
+                    "selected": false,
+                    "text": "",
+                    "value": ""
                 },
                 "datasource": {
                     "type": "prometheus",
