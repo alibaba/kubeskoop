@@ -44,4 +44,4 @@ COPY --from=build /go/src/github.com/alibaba/kubeskoop/bin/webconsole /bin/webco
 COPY --from=build-ui /webconsole/build /var/www
 
 COPY tools/scripts/* /bin/
-COPY deploy/resource/kubeskoop-exporter-dashboard.json /etc/
+COPY deploy/resource/kubeskoop-exporter-pods-dashboard.json deploy/resource/kubeskoop-exporter-nodes-dashboard.json /etc/
