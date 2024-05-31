@@ -208,7 +208,7 @@ func (p *netifTxlatencyProbe) perfLoop() {
 
 		evt := &probe.Event{
 			Timestamp: time.Now().UnixNano(),
-			Labels:    probe.LagacyEventLabels(event.SkbMeta.Netns),
+			Labels:    probe.LegacyEventLabels(event.SkbMeta.Netns),
 		}
 		tuple := fmt.Sprintf("protocol=%s saddr=%s sport=%d daddr=%s dport=%d ", bpfutil.GetProtoStr(event.Tuple.L4Proto), bpfutil.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Saddr))), bits.ReverseBytes16(event.Tuple.Sport), bpfutil.GetAddrStr(event.Tuple.L3Proto, *(*[16]byte)(unsafe.Pointer(&event.Tuple.Daddr))), bits.ReverseBytes16(event.Tuple.Dport))
 		evt.Message = fmt.Sprintf("%s latency:%s", tuple, bpfutil.GetHumanTimes(event.Latency))
