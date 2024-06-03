@@ -7,8 +7,12 @@ const asideMenuConfig = [
     name: 'Monitoring',
     children: [
       {
-        name: "Dashboard",
-        path: "/monitoring/dashboard"
+        name: "Node Dashboard",
+        path: "/monitoring/dashboard/node"
+      },
+      {
+        name: "Pod Dashboard",
+        path: "/monitoring/dashboard/pod"
       },
       {
         name: "Events",

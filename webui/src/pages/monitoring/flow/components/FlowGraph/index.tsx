@@ -416,8 +416,8 @@ const FlowGraphD3: React.FC<FlowGraphProps> = (props: FlowGraphProps): JSX.Eleme
 
   return <div className={styles.flowGraph}>
     <ForceGraph2D
-      width={window.innerWidth * 0.8}
-      height={window.innerHeight * 0.75}
+      width={Math.max(window.innerWidth-200, 1400) }
+      height={Math.max(window.innerHeight-112, 500)}
       ref={fgRef}
       graphData={data}
       linkWidth={(l) => clamp(l.edges.length * 0.01, highlightLinks.has(l.id) ? 2 : 1, 5)}
@@ -438,12 +438,12 @@ const FlowGraphD3: React.FC<FlowGraphProps> = (props: FlowGraphProps): JSX.Eleme
       onNodeClick={(n) => setExpanded(n.type === 'group' ? [{ name: n.group, position: [n.x, n.y] }, ...expanded] : expanded.filter(g => g.name !== n.group))}
       nodeLabel={nodeLabel}
       linkLabel={linkLabel}
-      onEngineStop={() => { fgRef.current.zoomToFit(1000) }}
+      onEngineStop={() => { fgRef.current.zoomToFit(1000, 20) }}
       cooldownTime={3000}
       nodeAutoColorBy={'group'}
     >
     </ForceGraph2D>
-    <div>Hover to show node/link detail, and click to expand the node.</div>
+    <div className={styles.toolTip}>Hover to show node/link detail, click to expand the node.</div>
   </div >
 }
 

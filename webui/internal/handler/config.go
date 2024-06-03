@@ -15,10 +15,9 @@ func RegisterConfigHandler(g *gin.RouterGroup, auth *jwt.GinJWTMiddleware) {
 	g.PUT("/dashboard", setDashboardConfig)
 }
 
-type configParam struct {
-	MetricsURL string `json:"metrics_url"`
-	EventURL   string `json:"event_url"`
-	FlowURL    string `json:"flow_url"`
+type dashboardConfig struct {
+	PodDashboardURL  string `json:"pod_dashboard_url"`
+	NodeDashboardURL string `json:"node_dashboard_url"`
 }
 
 func getDashboardConfig(ctx *gin.Context) {
@@ -31,15 +30,14 @@ func getDashboardConfig(ctx *gin.Context) {
 		ctx.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
-	ctx.JSON(200, gin.H{
-		"metrics_url": cfg.MetricsURL,
-		"event_url":   cfg.EventURL,
-		"flow_url":    cfg.FlowURL,
+	ctx.JSON(200, dashboardConfig{
+		PodDashboardURL:  cfg.PodDashboardURL,
+		NodeDashboardURL: cfg.NodeDashboardURL,
 	})
 }
 
 func setDashboardConfig(ctx *gin.Context) {
-	var c configParam
+	var c dashboardConfig
 	err := ctx.ShouldBindJSON(&c)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -47,7 +45,8 @@ func setDashboardConfig(ctx *gin.Context) {
 	}
 
 	cfg := config.DashboardConfig{
-		MetricsURL: c.MetricsURL,
+		PodDashboardURL:  c.PodDashboardURL,
+		NodeDashboardURL: c.NodeDashboardURL,
 	}
 	if err := config.Service.SetDashboardConfig(cfg); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

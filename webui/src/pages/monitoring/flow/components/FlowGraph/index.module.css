@@ -1,3 +1,10 @@
 .flowGraph {
-    height: '80vh';
+    position: relative;
+    height: auto;
+}
+
+.toolTip {
+    position: absolute;
+    left: 5px;
+    bottom: 0;
 }

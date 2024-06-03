@@ -1,9 +1,8 @@
 import configService from '@/services/config'
 
 interface DashboardConfig {
-  metrics_url?: string
-  event_url?: string
-  flow_url?: string
+  node_dashboard_url?: string
+  pod_dashboard_url?: string
 }
 
 export default {
