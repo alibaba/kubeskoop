@@ -8,6 +8,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/vishvananda/netns"
 
 	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
 
@@ -56,19 +57,19 @@ func (p *conntrackEventProbe) Start(ctx context.Context) error {
 					log.Infof("%s: skip empty entity", probeName)
 					continue
 				}
-				nsfd, err := et.GetNetNsFd()
+				nsHandle, err := et.OpenNsHandle()
 				if err != nil {
 					log.Infof("%s: failed get netns fd, skip netns fd, err: %v", probeName, err)
 					continue
 				}
-				if nsfd == 0 {
+				if nsHandle == 0 {
 					log.Infof("%s: invalid nsfd(0), skip empty netns fd", probeName)
 					continue
 				}
 				if _, ok := p.conns[et.GetNetns()]; !ok {
 					ctrch := make(chan struct{})
 					go func() {
-						err = p.startCtListen(ctx, ctrch, nsfd, et.GetNetns())
+						err = p.startCtListen(ctx, ctrch, nsHandle, et.GetNetns())
 						if err != nil {
 							log.Infof("%s: failed start worker, err: %v", probeName, err)
 							return
@@ -94,17 +95,18 @@ func (p *conntrackEventProbe) Stop(_ context.Context) error {
 	return nil
 }
 
-func (p *conntrackEventProbe) startCtListen(_ context.Context, ctrch <-chan struct{}, nsfd int, nsinum int) error {
+func (p *conntrackEventProbe) startCtListen(_ context.Context, ctrch <-chan struct{}, nsHandle netns.NsHandle, nsinum int) error {
 	c, err := conntrack.Dial(&netlink.Config{
-		NetNS: nsfd,
+		NetNS: int(nsHandle),
 	})
+	defer nsHandle.Close()
 
 	if err != nil {
 		log.Infof("%s: failed start conntrack dial, err: %v", probeName, err)
 		return err
 	}
 
-	log.Infof("%s: start conntrack listen in netns %d", probeName, nsfd)
+	log.Infof("%s: start conntrack listen in netns %d", probeName, nsHandle)
 	evCh := make(chan conntrack.Event, 1024)
 	errCh, err := c.Listen(evCh, 4, append(netfilter.GroupsCT, netfilter.GroupsCTExp...))
 	if err != nil {

@@ -108,12 +108,13 @@ func (p *Probe) CollectOnce() (map[string]map[uint32]uint64, error) {
 }
 
 func getQdiscStats(entity *nettop.Entity) ([]QdiscInfo, error) {
-	fd, err := entity.GetNetNsFd()
+	nsHandle, err := entity.OpenNsHandle()
 	if err != nil {
 		return nil, err
 	}
+	defer nsHandle.Close()
 
-	c, err := getConn(fd)
+	c, err := getConn(int(nsHandle))
 	if err != nil {
 		return nil, err
 	}

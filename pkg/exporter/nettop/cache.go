@@ -194,18 +194,9 @@ func (e *Entity) GetNetnsMountPoint() string {
 	return e.netnsMeta.mountPath
 }
 
-func (e *Entity) GetNsHandle() (netns.NsHandle, error) {
+func (e *Entity) OpenNsHandle() (netns.NsHandle, error) {
 	//TODO check whether we should close the opened file
 	return netns.GetFromPath(e.netnsMeta.mountPath)
-}
-
-func (e *Entity) GetNetNsFd() (int, error) {
-	h, err := e.GetNsHandle()
-	if err != nil {
-		return InitNetns, err
-	}
-
-	return int(h), nil
 }
 
 // GetPid return a random initPid of entify, if no process in netns,return 0
