@@ -5,7 +5,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 data:
   config.yaml: |-
-    debugmode: {{ .Values.agent.debug }}
+    debugmode: {{ .Values.agent.config.debug }}
     port: {{ .Values.agent.config.port }}
     enableController: {{ .Values.controller.enabled }}
     metrics:
