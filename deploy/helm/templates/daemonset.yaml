@@ -43,6 +43,9 @@ spec:
       containers:
       - name: inspector
         image:  "{{ .image.repository }}:{{ .image.tag }}"
+        ports:
+        - name: http
+          containerPort: {{ .config.port }}
         imagePullPolicy: {{ .image.imagePullPolicy }}
         env:
         - name: INSPECTOR_NODENAME
