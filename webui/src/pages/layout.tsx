@@ -44,6 +44,13 @@ export default function Layout() {
     return <Outlet />;
   }
 
+  let contentStyle = {}
+  if (['/monitoring/dashboard/pod', '/monitoring/dashboard/node', '/monitoring/flow', '/'].includes(location.pathname)) {
+    contentStyle = {
+      padding: "0px"
+    }
+  }
+
   return (
     <ConfigProvider device={device} locale={enUS}>
       <Shell
@@ -66,7 +73,7 @@ export default function Layout() {
         <Shell.Navigation collapse={false} trigger={null}>
           <PageNav />
         </Shell.Navigation>
-        <Shell.Content>
+        <Shell.Content style={contentStyle}>
           <Outlet />
         </Shell.Content>
       </Shell>

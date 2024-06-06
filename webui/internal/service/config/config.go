@@ -8,14 +8,17 @@ import (
 )
 
 const (
-	dashboardUID        = "PtAs82D4k"
-	metricsDashboardURL = "/d/%s/skoop-exporter?orgId=1&theme=light&from=now-15m&to=now&refresh=10s"
+	metricsDashboardURL = "/d/%s/%s?orgId=1&theme=light&from=now-15m&to=now&refresh=10s"
+
+	podDashboardUID   = "ddn87hjw7bdhcd"
+	podDashboardName  = "skoop-exporter-pods"
+	nodeDashboardUID  = "bdn87gdt1emtcb"
+	nodeDashboardName = "skoop-exporter-nodes"
 )
 
 type DashboardConfig struct {
-	MetricsURL string
-	EventURL   string
-	FlowURL    string
+	PodDashboardURL  string
+	NodeDashboardURL string
 }
 
 var Service Svc
@@ -41,13 +44,20 @@ func newDefaultService() (*defaultService, error) {
 	cfg := DashboardConfig{}
 	if config.Global.Grafana.Endpoint != "" {
 		if config.Global.Grafana.Proxy {
-			cfg.MetricsURL = fmt.Sprintf("/grafana%s", fmt.Sprintf(metricsDashboardURL, dashboardUID))
+			cfg.PodDashboardURL = fmt.Sprintf("/grafana%s", fmt.Sprintf(metricsDashboardURL, podDashboardUID, podDashboardName))
+			cfg.NodeDashboardURL = fmt.Sprintf("/grafana%s", fmt.Sprintf(metricsDashboardURL, nodeDashboardUID, nodeDashboardName))
 		} else {
-			u, err := url.JoinPath(config.Global.Grafana.Endpoint, fmt.Sprintf(metricsDashboardURL, dashboardUID))
+			u, err := url.JoinPath(config.Global.Grafana.Endpoint, fmt.Sprintf(metricsDashboardURL, podDashboardUID, podDashboardName))
 			if err != nil {
 				return nil, err
 			}
-			cfg.MetricsURL = u
+			cfg.PodDashboardURL = u
+
+			u, err = url.JoinPath(config.Global.Grafana.Endpoint, fmt.Sprintf(metricsDashboardURL, nodeDashboardUID, nodeDashboardName))
+			if err != nil {
+				return nil, err
+			}
+			cfg.NodeDashboardURL = u
 		}
 	}
 

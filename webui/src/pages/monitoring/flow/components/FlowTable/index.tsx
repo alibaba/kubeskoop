@@ -123,7 +123,7 @@ const FlowTable: React.FC<FlowTableProps> = (props: FlowTableProps): JSX.Element
         isZebra
         hasBorder={false}
         fixedHeader
-        maxBodyHeight="70vh"
+        maxBodyHeight="calc(100vh - 205px)"
         onSort={onSort}
       />
       <Pagination
@@ -132,7 +132,7 @@ const FlowTable: React.FC<FlowTableProps> = (props: FlowTableProps): JSX.Element
         pageSize={pageSize}
         total={data.length}
         totalRender={total => `Total：${total}`}
-        style={{ marginTop: 16, textAlign: 'right' }}
+        style={{ height: 32, margin: 8, textAlign: 'right' }}
         onChange={onPageChange}
       />
     </div>

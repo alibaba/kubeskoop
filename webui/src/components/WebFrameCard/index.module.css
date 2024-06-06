@@ -1,17 +1,6 @@
 .webFrame {
   border: none;
   width: 100%;
-  height: 80vh;
+  height: calc(100vh - 52px);
   min-height: 860px;
-}
-
-.cardAction {
-  display: flex;
-  justify-content: flex-end;
-  padding: 0;
-}
-
-.cardContent {
-  padding: 0;
-  margin-top: 0;
 }

@@ -101,59 +101,59 @@ export default function FlowDashboard() {
 
   return (
     <div>
-      <PageHeader
-        title='Network Graph'
-        breadcrumbs={[{ name: 'Console' }, { name: 'Monitoring' }]}
-      />
-      <Card contentHeight="auto">
-        <Card.Content style={{ paddingLeft: 0 }}>
+      <Card contentHeight="auto" free>
+        <Card.Content style={{ marginTop: 0, padding: "15px 0", minWidth: 1400, height: 60 }}>
           <Box direction="row" className={styles.contentBox}>
-            <span className={styles.optionLabel}>Time Range</span>
-            <DatePicker2.RangePicker placeholder={['Start Time', 'End Time']} showTime value={time} onChange={v => setTime(v)} />
-          </Box>
-          <Box className={styles.contentBox} direction='row'>
-            <span className={styles.optionLabel}>Namespaces</span>
-            <Select
-              name="namespace"
-              dataSource={namespaces}
-              mode='multiple'
-              onChange={onNamespacesChange}
-              tagInline
-              hasSelectAll
-              showSearch
-              hasClear
-              useVirtual
-              style={{ width: '100%', maxWidth: 300 }}
-            />
-          </Box>
-          <Box direction='row'>
-            <span className={styles.optionLabel}>Show Endpoints Without Link</span>
-            <Switch id='showExternal' style={{ marginRight: '10px' }} onChange={onShowExternalChange} />
-            <span className={styles.optionLabel}>ViewMode</span>
-            <Radio.Group shape='button' defaultValue='graph' style={{ marginRight: '10px' }} onChange={onViewModeChange}>
-              <Radio id='graph' value='graph'>Graph</Radio>
-              <Radio id='table' value='table'>Table</Radio>
-            </Radio.Group>
-            <Button
-              type="secondary"
-              size="medium"
-              style={{ marginLeft: 'auto', padding: "0 13px" }}
-              onClick={() => getFlowData()}
-            >
-              <Icon type="refresh" />
-              <span>Refresh</span>
-            </Button>
-          </Box>
-        </Card.Content>
-        <Card.Divider />
-        <Card.Content style={{ padding: 0 }}>
-          <Loading visible={loading} inline={false}>
-            {viewMode === 'graph' && <FlowGraph data={filtered} />}
-            {viewMode === 'table' && <FlowTable data={filtered} />}
-          </Loading>
-        </Card.Content>
-      </Card>
-    </div>
+            <div className={styles.opt}>
+              <span className={styles.optionLabel}>Time Range</span>
+              <DatePicker2.RangePicker placeholder={['Start Time', 'End Time']} showTime value={time} onChange={v => setTime(v)} />
+            </div>
+            <div className={styles.opt}>
+              <span className={styles.optionLabel}>Namespaces</span>
+              <Select
+                name="namespace"
+                dataSource={namespaces}
+                mode='multiple'
+                onChange={onNamespacesChange}
+                tagInline
+                hasSelectAll
+                showSearch
+                hasClear
+                useVirtual
+                style={{ width: '100%', maxWidth: 300 }}
+              />
+            </div>
+            <div className={styles.opt}>
+              <span className={styles.optionLabel}>Show Endpoints Without Link</span>
+              <Switch id='showExternal' style={{ marginRight: '10px' }} onChange={onShowExternalChange} />
+            </div>
+            <div className={styles.opt}>
+              <span className={styles.optionLabel}>View Mode</span>
+              <Radio.Group shape='button' defaultValue='graph' style={{ marginRight: '10px' }} onChange={onViewModeChange}>
+                <Radio id='graph' value='graph'>Graph</Radio>
+                <Radio id='table' value='table'>Table</Radio>
+              </Radio.Group>
+            </div>
+              <Button
+                type="secondary"
+                size="medium"
+                style={{ marginLeft: 'auto', marginRight: 10, padding: "0 13px" }}
+                onClick={() => getFlowData()}
+              >
+            <Icon type="refresh" />
+            <span>Refresh</span>
+          </Button>
+        </Box>
+      </Card.Content>
+      <Card.Divider />
+      <Card.Content style={{ padding: 0, margin: 0, height: "100%"}}>
+        <Loading visible={loading} inline={false}>
+          {viewMode === 'graph' && <FlowGraph data={filtered} />}
+          {viewMode === 'table' && <FlowTable data={filtered} />}
+        </Loading>
+      </Card.Content>
+    </Card>
+    </div >
   );
 }
 
