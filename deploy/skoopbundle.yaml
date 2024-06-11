@@ -41,6 +41,9 @@ spec:
       containers:
       - image: kubeskoop/agent:v1.0.0
         name: inspector
+        ports:
+        - name: http
+          containerPort: 9102
         env:
         - name: INSPECTOR_NODENAME
           valueFrom:
