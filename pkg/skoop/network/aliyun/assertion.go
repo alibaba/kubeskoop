@@ -207,6 +207,13 @@ func (a *vpcAssertion) AssertRoute(srcECS, dstECS string, pkt *model.Packet, pri
 		if !slices.Contains(srcECSInfo.Network.IP, pkt.Src.String()) {
 			routeEntries = srcECSInfo.Network.VpcDefaultRouteTableEntries
 		}
+		lo.ForEach(srcECSInfo.Network.NetworkInterfaces, func(ni *aliyun.ENIInfo, _ int) {
+			lo.ForEach(ni.NetworkInterfaceSet.PrivateIpSets.PrivateIpSet, func(ip *ecs.DescribeNetworkInterfacesResponseBodyNetworkInterfaceSetsNetworkInterfaceSetPrivateIpSetsPrivateIpSet, _ int) {
+				if ip.PrivateIpAddress != nil && *ip.PrivateIpAddress == pkt.Src.String() {
+					routeEntries = ni.RouteTableEntries
+				}
+			})
+		})
 	}
 
 	if dstECS != "" {
@@ -251,8 +258,15 @@ func (a *vpcAssertion) AssertRoute(srcECS, dstECS string, pkt *model.Packet, pri
 		if dstECS != "" {
 			if !slices.Contains(dstECSInfo.Network.IP, pkt.Dst.String()) {
 				routeEntries = dstECSInfo.Network.VpcDefaultRouteTableEntries
+				lo.ForEach(dstECSInfo.Network.NetworkInterfaces, func(ni *aliyun.ENIInfo, _ int) {
+					lo.ForEach(ni.NetworkInterfaceSet.PrivateIpSets.PrivateIpSet, func(ip *ecs.DescribeNetworkInterfacesResponseBodyNetworkInterfaceSetsNetworkInterfaceSetPrivateIpSetsPrivateIpSet, _ int) {
+						if ip.PrivateIpAddress != nil && *ip.PrivateIpAddress == pkt.Dst.String() {
+							routeEntries = ni.RouteTableEntries
+						}
+					})
+				})
 			} else {
-				routeEntries = srcECSInfo.Network.RouteTableEntries
+				routeEntries = dstECSInfo.Network.RouteTableEntries
 			}
 		} else {
 			routeEntries = srcECSInfo.Network.VpcDefaultRouteTableEntries
@@ -441,6 +455,13 @@ func (a *vpcAssertion) findNextHop(pkt *model.Packet, srcECS string) (*vpc.Descr
 	if !slices.Contains(ecsInfo.Network.IP, pkt.Src.String()) {
 		routeEntries = ecsInfo.Network.VpcDefaultRouteTableEntries
 	}
+	lo.ForEach(ecsInfo.Network.NetworkInterfaces, func(ni *aliyun.ENIInfo, _ int) {
+		lo.ForEach(ni.NetworkInterfaceSet.PrivateIpSets.PrivateIpSet, func(ip *ecs.DescribeNetworkInterfacesResponseBodyNetworkInterfaceSetsNetworkInterfaceSetPrivateIpSetsPrivateIpSet, _ int) {
+			if ip.PrivateIpAddress != nil && *ip.PrivateIpAddress == pkt.Src.String() {
+				routeEntries = ni.RouteTableEntries
+			}
+		})
+	})
 
 	route, err := routeMatchPacket(pkt.Dst.String(), routeEntries)
 	if err != nil {

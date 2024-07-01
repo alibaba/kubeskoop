@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"sync"
 
 	openapi "github.com/alibabacloud-go/darabonba-openapi/client"
 	openapiv2 "github.com/alibabacloud-go/darabonba-openapi/v2/client"
@@ -59,6 +60,7 @@ type SecurityGroupRule struct {
 
 type ENIInfo struct {
 	NetworkInterfaceSet *ecs.DescribeNetworkInterfacesResponseBodyNetworkInterfaceSetsNetworkInterfaceSet
+	RouteTableEntries   []*vpc.DescribeRouteEntryListResponseBodyRouteEntrysRouteEntry
 	SecurityGroups      map[string]SecurityGroupRule
 }
 
@@ -187,6 +189,10 @@ func (m *CloudManager) GetENIInfoFromID(networkInterfaceID string) (*ENIInfo, er
 
 		info.SecurityGroups[sgInfo.ID] = sgInfo
 	}
+	info.RouteTableEntries, err = m.GetRouteEntryFromVswitch(*networkInterface.VSwitchId)
+	if err != nil {
+		return nil, err
+	}
 
 	return info, nil
 }
@@ -299,7 +305,12 @@ func (m *CloudManager) GetSecurityGroupRule(id string) (SecurityGroupRule, error
 	return securityGroup, nil
 }
 
+var cachedRouteTableEntries = sync.Map{}
+
 func (m *CloudManager) GetRouteTableEntries(routeTableID string) ([]*vpc.DescribeRouteEntryListResponseBodyRouteEntrysRouteEntry, error) {
+	if entries, ok := cachedRouteTableEntries.Load(routeTableID); ok {
+		return entries.([]*vpc.DescribeRouteEntryListResponseBodyRouteEntrysRouteEntry), nil
+	}
 	request := &vpc.DescribeRouteEntryListRequest{}
 	request.SetRegionId(m.region).SetRouteTableId(routeTableID).SetNextToken("").SetMaxResult(100)
 
@@ -318,6 +329,7 @@ func (m *CloudManager) GetRouteTableEntries(routeTableID string) ([]*vpc.Describ
 
 		request.SetNextToken(*response.Body.NextToken)
 	}
+	cachedRouteTableEntries.Store(routeTableID, entries)
 
 	return entries, nil
 }

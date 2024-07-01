@@ -61,9 +61,6 @@ func (s *aliyunInfraShim) NodeToNode(src *v1.Node, _ string, dst *v1.Node, packe
 	if err != nil {
 		return nil, err
 	}
-	if err != nil {
-		return nil, err
-	}
 
 	suspicions = append(suspicions, routeSuspicions...)
 
