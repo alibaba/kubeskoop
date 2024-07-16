@@ -117,6 +117,9 @@ func initDefaultEntity(sidecarMode bool) error {
 			namespace: namespace,
 			name:      name,
 		}
+		ent := []*Entity{defaultEntity}
+		entities.Store(&ent)
+		addEntityToCache(defaultEntity, false)
 	}
 
 	return nil
@@ -208,11 +211,13 @@ func (e *Entity) GetPids() []int {
 }
 
 func StartCache(ctx context.Context, sidecarMode bool) error {
-	if err := initCriClient(runtimeEndpoints); err != nil {
-		return err
-	}
-	if err := initCriInfo(); err != nil {
-		return err
+	if !sidecarMode {
+		if err := initCriClient(runtimeEndpoints); err != nil {
+			return err
+		}
+		if err := initCriInfo(); err != nil {
+			return err
+		}
 	}
 
 	if err := initDefaultEntity(sidecarMode); err != nil {
