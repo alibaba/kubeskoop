@@ -24,7 +24,7 @@ func GetEntityByNetns(nsinum int) (*Entity, error) {
 	if found {
 		return v.(*Entity), nil
 	}
-	return nil, fmt.Errorf("entify for netns %d not found", nsinum)
+	return nil, fmt.Errorf("entity for netns %d not found", nsinum)
 }
 
 func GetHostNetworkEntity() (*Entity, error) {

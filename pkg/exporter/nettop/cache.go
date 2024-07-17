@@ -119,8 +119,8 @@ func initDefaultEntity(sidecarMode bool) error {
 		}
 		ent := []*Entity{defaultEntity}
 		entities.Store(&ent)
-		addEntityToCache(defaultEntity, false)
 	}
+	addEntityToCache(defaultEntity, false, true)
 
 	return nil
 }
@@ -283,15 +283,19 @@ func cachePodsWithTimeout(timeout time.Duration) error {
 	}
 }
 
-func addEntityToCache(e *Entity, ignoreHostPod bool) {
+func addEntityToCache(e *Entity, ignoreHostPod, noExpiration bool) {
+	expirationTime := 3 * cacheUpdateInterval
+	if noExpiration {
+		expirationTime = cache.NoExpiration
+	}
 	if !(ignoreHostPod && e.IsHostNetwork()) {
-		nsCache.Set(fmt.Sprintf("%d", e.inum), e, 3*cacheUpdateInterval)
+		nsCache.Set(fmt.Sprintf("%d", e.inum), e, expirationTime)
 	}
 	for _, ip := range e.ipList {
-		ipCache.Set(ip, e, 3*cacheUpdateInterval)
+		ipCache.Set(ip, e, expirationTime)
 	}
 	for _, pid := range e.pids {
-		pidCache.Set(fmt.Sprintf("%d", pid), e, 3*cacheUpdateInterval)
+		pidCache.Set(fmt.Sprintf("%d", pid), e, expirationTime)
 	}
 }
 
@@ -333,7 +337,6 @@ func cacheNetTopology(ctx context.Context) error {
 
 	var newEntities []*Entity
 	newEntities = append(newEntities, defaultEntity)
-	addEntityToCache(defaultEntity, false)
 
 	sandboxList, err := criClient.ListPodSandbox(&v1.PodSandboxFilter{
 		State: &v1.PodSandboxStateValue{
@@ -420,7 +423,7 @@ func cacheNetTopology(ctx context.Context) error {
 		}
 
 		newEntities = append(newEntities, e)
-		addEntityToCache(e, true)
+		addEntityToCache(e, true, false)
 	}
 
 	entities.Store(&newEntities)
