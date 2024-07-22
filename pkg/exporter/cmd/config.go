@@ -8,8 +8,12 @@ import (
 )
 
 type InspServerConfig struct {
-	DebugMode        bool          `yaml:"debugMode" mapstructure:"debugMode" json:"debugMode"`
-	Port             uint16        `yaml:"port" mapstructure:"port" json:"port"`
+	DebugMode bool `yaml:"debugMode" mapstructure:"debugMode" json:"debugMode"`
+	// A better way to set listen port is a `address` field  that can be used for bind interface ip, or even unix domain socket
+	// Deprecated: use address instead
+	Port uint16 `yaml:"port" mapstructure:"port" json:"port"`
+
+	Address          string        `yaml:"address" mapstructure:"address" json:"address"`
 	EnableController bool          `yaml:"enableController" mapstructure:"enableController" json:"enableController"`
 	MetricsConfig    MetricsConfig `yaml:"metrics" mapstructure:"metrics" json:"metrics"`
 	EventConfig      EventConfig   `yaml:"event" mapstructure:"event" json:"event"`
