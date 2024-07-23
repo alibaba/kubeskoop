@@ -295,23 +295,20 @@ func (i *inspServer) createListener(cfg *InspServerConfig) (net.Listener, error)
 	}
 
 	rawAddr := cfg.Address
-	if !strings.Contains(rawAddr, "//") {
+	if !strings.Contains(rawAddr, "://") {
 		log.Infof("address contains no protocol part, use tcp:// by default")
 		rawAddr = "tcp://" + rawAddr
 	}
 
-	protocol := ""
-	addr := ""
-
 	u, err := url.Parse(rawAddr)
 	if err != nil {
-		return nil, fmt.Errorf("invalid address %s, valid format is [protocol://]addr[:port]", cfg.Address)
+		return nil, fmt.Errorf("invalid address %s, valid format is [protocol://]addr[:port]", rawAddr)
 	}
-	protocol = u.Scheme
+	protocol := u.Scheme
+	addr := ""
 	switch protocol {
 	case "unix":
-		// For Unix domain sockets, the path is in the opaque part
-		addr = strings.TrimPrefix(cfg.Address, "unix://")
+		addr = u.Path
 		if _, err = os.Stat(addr); err != nil {
 			if !errors.Is(err, os.ErrNotExist) {
 				return nil, fmt.Errorf("failed stat sock file %s: %w", addr, err)
@@ -325,8 +322,7 @@ func (i *inspServer) createListener(cfg *InspServerConfig) (net.Listener, error)
 			_ = os.Remove(addr)
 		}
 	case "tcp":
-		host, port, _ := net.SplitHostPort(cfg.Address)
-		addr = fmt.Sprintf("%s:%s", host, port)
+		addr = u.Host
 	default:
 		return nil, fmt.Errorf("unsupported protocol %s, only `tcp` and 'unix' are supported", protocol)
 	}
