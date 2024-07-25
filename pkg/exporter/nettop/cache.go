@@ -64,24 +64,36 @@ func podNameFromServiceAccountToken() (string, error) {
 }
 
 func currentPodInfo() (string, string, error) {
-	namespace, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
-	if err != nil {
-		return "", "", fmt.Errorf("failed get namespace in sidecar mode, err: %v", err)
-	}
+	var err error
+	namespace := os.Getenv("KUBESKOOP_POD_NAMESPACE")
+	name := os.Getenv("KUBESKOOP_POD_NAME")
 
-	name, err := podNameFromServiceAccountToken()
-	if err != nil {
-		log.Warnf("failed get pod name from /var/run/secrets/kubernetes.io/serviceaccount/token, fallback to hostname")
-
-		name, err := os.ReadFile("/etc/hostname")
+	if namespace == "" {
+		log.Infof("failed get pod namespace for sidecar mode from env KUBESKOOP_POD_NAMESPACE, try from k8s serviceaccount")
+		namespaceBytes, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
 		if err != nil {
 			return "", "", fmt.Errorf("failed get namespace in sidecar mode, err: %v", err)
 		}
 
-		return string(namespace), string(name), nil
+		namespace = string(namespaceBytes)
 	}
 
-	return string(namespace), name, nil
+	if name == "" {
+		log.Infof("failed get pod namespace for sidecar mode from env KUBESKOOP_POD_NAME, try from k8s serviceaccount")
+		name, err = podNameFromServiceAccountToken()
+		if err != nil {
+			log.Warnf("failed get pod name from /var/run/secrets/kubernetes.io/serviceaccount/token, fallback to hostname")
+
+			nameBytes, err := os.ReadFile("/etc/hostname")
+			if err != nil {
+				return "", "", fmt.Errorf("failed get namespace in sidecar mode, err: %v", err)
+			}
+
+			return namespace, string(nameBytes), nil
+		}
+	}
+
+	return namespace, name, nil
 }
 
 func initDefaultEntity(sidecarMode bool) error {
