@@ -322,7 +322,7 @@ func (p *softirqProbe) loadAndAttachBPF() error {
 
 	err = spec.LoadAndAssign(&p.objs, &opts)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	prograise, err := link.Tracepoint("irq", "softirq_raise", p.objs.TraceSoftirqRaise, &link.TracepointOptions{})
