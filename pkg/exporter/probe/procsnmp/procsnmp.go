@@ -56,8 +56,25 @@ const (
 	UDPIgnoredMulti = "ignoredmulti"
 
 	//metrics of ip
-	IPInNoRoutes      = "innoroutes"
-	IPInTruncatedPkts = "intruncatedpkts"
+	IPForwarding      = "forwarding"
+	IPDefaultTTL      = "defaultttl"
+	IPInReceives      = "inreceives"
+	IPInHdrErrors     = "inhdrerrors"
+	IPInAddrErrors    = "inaddrerrors"
+	IPForwDatagrams   = "forwdatagrams"
+	IPInUnknownProtos = "inunknownprotos"
+	IPInDiscards      = "indiscards"
+	IPInDelivers      = "indelivers"
+	IPOutRequests     = "outrequests"
+	IPOutDiscards     = "outdiscards"
+	IPOutNoRoutes     = "outnoroutes"
+	IPReasmTimeout    = "reasmtimeout"
+	IPReasmReqds      = "reasmreqds"
+	IPReasmOKs        = "reasmoks"
+	IPReasmFails      = "reasmfails"
+	IPFragOKs         = "fragoks"
+	IPFragFails       = "fragfails"
+	IPFragCreates     = "fragcreates"
 
 	TCP = "tcp"
 	UDP = "udp"
@@ -67,7 +84,7 @@ const (
 var (
 	TCPStatMetrcis = []string{TCPActiveOpens, TCPPassiveOpens, TCPRetransSegs, TCPAttemptFails, TCPEstabResets, TCPCurrEstab, TCPInSegs, TCPOutSegs, TCPInErrs, TCPOutRsts}
 	UDPStatMetrics = []string{UDPInDatagrams, UDPNoPorts, UDPInErrors, UDPOutDatagrams, UDPRcvbufErrors, UDPSndbufErrors, UDPInCsumErrors, UDPIgnoredMulti}
-	IPMetrics      = []string{IPInNoRoutes, IPInTruncatedPkts}
+	IPMetrics      = []string{IPForwarding, IPDefaultTTL, IPInReceives, IPInHdrErrors, IPInAddrErrors, IPForwDatagrams, IPInUnknownProtos, IPInDiscards, IPInDelivers, IPOutRequests, IPOutDiscards, IPOutNoRoutes, IPReasmTimeout, IPReasmReqds, IPReasmOKs, IPReasmFails, IPFragOKs, IPFragFails, IPFragCreates}
 
 	metricsMap = map[string][]string{
 		TCP: TCPStatMetrcis,
