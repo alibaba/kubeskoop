@@ -75,8 +75,17 @@ type (
 )
 
 var (
-	TCPSummaryMetrics = []string{TCPEstablishedConn, TCPTimeWaitConn, TCPCloseWaitConn, TCPSynSentConn, TCPSynRecvConn, TCPTXQueue, TCPRXQueue}
-	probeName         = "tcpsummary"
+	TCPSummaryMetrics = []probe.LegacyMetric{
+		{Name: TCPEstablishedConn, Help: "The total number of established TCP connections."},
+		{Name: TCPTimeWaitConn, Help: "The total number of TCP connections in the TIME_WAIT state."},
+		{Name: TCPCloseWaitConn, Help: "The total number of TCP connections in the CLOSE_WAIT state."},
+		{Name: TCPSynSentConn, Help: "The total number of TCP connections in the SYN_SENT state."},
+		{Name: TCPSynRecvConn, Help: "The total number of TCP connections in the SYN_RECV state."},
+		{Name: TCPTXQueue, Help: "The total size of the TCP transmit queue."},
+		{Name: TCPRXQueue, Help: "The total size of the TCP receive queue."},
+	}
+
+	probeName = "tcpsummary"
 )
 
 func init() {
@@ -114,7 +123,7 @@ func collect(pidlist []*nettop.Entity) map[string]map[uint32]uint64 {
 	resMap := make(map[string]map[uint32]uint64)
 
 	for idx := range TCPSummaryMetrics {
-		resMap[TCPSummaryMetrics[idx]] = map[uint32]uint64{}
+		resMap[TCPSummaryMetrics[idx].Name] = map[uint32]uint64{}
 	}
 
 	for idx := range pidlist {

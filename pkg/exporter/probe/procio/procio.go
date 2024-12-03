@@ -36,10 +36,10 @@ func ioProbeCreator() (probe.MetricsProbe, error) {
 		Subsystem:      probeName,
 		VariableLabels: probe.StandardMetricsLabels,
 		SingleMetricsOpts: []probe.SingleMetricsOpts{
-			{Name: IOReadSyscall, ValueType: prometheus.CounterValue},
-			{Name: IOWriteSyscall, ValueType: prometheus.CounterValue},
-			{Name: IOReadBytes, ValueType: prometheus.CounterValue},
-			{Name: IOWriteBytes, ValueType: prometheus.CounterValue},
+			{Name: IOReadSyscall, Help: "The total number of read system calls made by the process", ValueType: prometheus.CounterValue},
+			{Name: IOWriteSyscall, Help: "The total number of write system calls made by the process", ValueType: prometheus.CounterValue},
+			{Name: IOReadBytes, Help: "The total number of bytes read by the process", ValueType: prometheus.CounterValue},
+			{Name: IOWriteBytes, Help: "The total number of bytes written by the process", ValueType: prometheus.CounterValue},
 		},
 	}
 	metrics := probe.NewBatchMetrics(opts, p.collectOnce)

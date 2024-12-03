@@ -23,7 +23,16 @@ const (
 )
 
 var (
-	NetdevMetrics = []string{RxBytes, RxErrors, TxBytes, TxErrors, RxPackets, RxDropped, TxPackets, TxDropped}
+	NetdevMetrics = []probe.LegacyMetric{
+		{Name: RxBytes, Help: "The total number of bytes received on the network interface."},
+		{Name: RxErrors, Help: "The total number of errors encountered while receiving on the network interface."},
+		{Name: TxBytes, Help: "The total number of bytes transmitted on the network interface."},
+		{Name: TxErrors, Help: "The total number of errors encountered while transmitting on the network interface."},
+		{Name: RxPackets, Help: "The total number of packets received on the network interface."},
+		{Name: RxDropped, Help: "The total number of received packets that were dropped on the network interface."},
+		{Name: TxPackets, Help: "The total number of packets transmitted on the network interface."},
+		{Name: TxDropped, Help: "The total number of transmitted packets that were dropped on the network interface."},
+	}
 )
 
 func init() {
@@ -60,7 +69,7 @@ func (s *ProcNetdev) CollectOnce() (map[string]map[uint32]uint64, error) {
 func collect(nslist []*nettop.Entity) (map[string]map[uint32]uint64, error) {
 	resMap := make(map[string]map[uint32]uint64)
 	for _, m := range NetdevMetrics {
-		resMap[m] = make(map[uint32]uint64)
+		resMap[m.Name] = make(map[uint32]uint64)
 	}
 
 	netdev := getAllNetdev(nslist)
