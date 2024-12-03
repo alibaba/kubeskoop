@@ -60,38 +60,40 @@ const (
 )
 
 var (
-	TCPExtMetrics = []string{TCPListenDrops,
-		TCPListenOverflows,
-		TCPSynRetrans,
-		TCPFastRetrans,
-		TCPRetransFail,
-		TCPTimeouts,
-		TCPAbortOnClose,
-		TCPAbortOnMemory,
-		TCPAbortOnTimeout,
-		TCPAbortOnLinger,
-		TCPAbortOnData,
-		TCPAbortFailed,
-		TCPACKSkippedSynRecv,
-		TCPACKSkippedPAWS,
-		TCPACKSkippedSeq,
-		TCPACKSkippedFinWait2,
-		TCPACKSkippedTimeWait,
-		TCPACKSkippedChallenge,
-		TCPRcvQDrop,
-		TCPMemoryPressures,
-		TCPMemoryPressuresChrono,
-		PAWSActive,
-		PAWSEstab,
-		EmbryonicRsts,
-		TCPWinProbe,
-		TCPKeepAlive,
-		TCPMTUPFail,
-		TCPMTUPSuccess,
-		TCPZeroWindowDrop,
-		TCPBacklogDrop,
-		PFMemallocDrop,
-		TCPWqueueTooBig}
+	TCPExtMetrics = []probe.LegacyMetric{
+		{Name: TCPListenDrops, Help: "The total number of TCP connection requests that were dropped because the listen queue was full."},
+		{Name: TCPListenOverflows, Help: "The total number of times the TCP listen queue has overflown."},
+		{Name: TCPSynRetrans, Help: "The total number of SYN packets that were retransmitted."},
+		{Name: TCPFastRetrans, Help: "The total number of fast retransmissions made by TCP."},
+		{Name: TCPRetransFail, Help: "The total number of failed retransmissions in TCP."},
+		{Name: TCPTimeouts, Help: "The total number of TCP timeouts."},
+		{Name: TCPAbortOnClose, Help: "The number of TCP connections that were aborted on close."},
+		{Name: TCPAbortOnMemory, Help: "The number of TCP connections that were aborted due to memory allocation failures."},
+		{Name: TCPAbortOnTimeout, Help: "The number of TCP connections that were aborted due to timeouts."},
+		{Name: TCPAbortOnLinger, Help: "The number of TCP connections that were aborted due to linger timeouts."},
+		{Name: TCPAbortOnData, Help: "The number of TCP connections that were aborted due to data-related issues."},
+		{Name: TCPAbortFailed, Help: "The number of attempts to abort TCP connections that failed."},
+		{Name: TCPACKSkippedSynRecv, Help: "The number of ACKs skipped while in SYN_RECV state."},
+		{Name: TCPACKSkippedPAWS, Help: "The number of ACKs skipped due to PAWS (Protection Against Wrapped Sequence numbers)."},
+		{Name: TCPACKSkippedSeq, Help: "The number of ACKs skipped due to sequence number issues."},
+		{Name: TCPACKSkippedFinWait2, Help: "The number of ACKs skipped while in FIN_WAIT_2 state."},
+		{Name: TCPACKSkippedTimeWait, Help: "The number of ACKs skipped while in TIME_WAIT state."},
+		{Name: TCPACKSkippedChallenge, Help: "The number of ACKs skipped due to challenges in the communication."},
+		{Name: TCPRcvQDrop, Help: "The total number of received packets that were dropped due to queue overflow."},
+		{Name: TCPMemoryPressures, Help: "The total number of occasions where the TCP stack experienced memory pressure."},
+		{Name: TCPMemoryPressuresChrono, Help: "Chronological count of TCP memory pressure events."},
+		{Name: PAWSActive, Help: "Indicates whether the PAWS mechanism is active."},
+		{Name: PAWSEstab, Help: "The number of established connections utilizing PAWS."},
+		{Name: EmbryonicRsts, Help: "The number of embryonic (half-open) connections that were reset."},
+		{Name: TCPWinProbe, Help: "The total number of window probes sent to check for window size."},
+		{Name: TCPKeepAlive, Help: "The total number of TCP keepalive packets sent."},
+		{Name: TCPMTUPFail, Help: "The total number of MTU (Maximum Transmission Unit) probe failures."},
+		{Name: TCPMTUPSuccess, Help: "The total number of successful MTU (Maximum Transmission Unit) discoveries."},
+		{Name: TCPZeroWindowDrop, Help: "The total number of packets dropped due to a zero window condition."},
+		{Name: TCPBacklogDrop, Help: "The total number of packets dropped from the TCP backlog queue."},
+		{Name: PFMemallocDrop, Help: "The total number of packets dropped due to PF_MEMALLOC allocations failing."},
+		{Name: TCPWqueueTooBig, Help: "The total number of TCP send queue drops due to the queue being too large."},
+	}
 )
 
 func init() {
@@ -129,7 +131,7 @@ func collect(nslist []*nettop.Entity) (map[string]map[uint32]uint64, error) {
 	resMap := make(map[string]map[uint32]uint64)
 
 	for _, stat := range TCPExtMetrics {
-		resMap[stat] = make(map[uint32]uint64)
+		resMap[stat.Name] = make(map[uint32]uint64)
 	}
 
 	for _, et := range nslist {
@@ -141,13 +143,13 @@ func collect(nslist []*nettop.Entity) (map[string]map[uint32]uint64, error) {
 
 		extstats := stats[ProtocolTCPExt]
 		for _, stat := range TCPExtMetrics {
-			if _, ok := extstats[stat]; ok {
-				data, err := strconv.ParseUint(extstats[stat], 10, 64)
+			if _, ok := extstats[stat.Name]; ok {
+				data, err := strconv.ParseUint(extstats[stat.Name], 10, 64)
 				if err != nil {
 					log.Errorf("%s failed parse stat %s, pid: %d err: %v", probeName, stat, et.GetPid(), err)
 					continue
 				}
-				resMap[stat][uint32(et.GetNetns())] += data
+				resMap[stat.Name][uint32(et.GetNetns())] += data
 			}
 		}
 	}

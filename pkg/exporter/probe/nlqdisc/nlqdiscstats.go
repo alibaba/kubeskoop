@@ -52,7 +52,14 @@ var (
 	Backlog    = "backlog"
 	Overlimits = "overlimits"
 
-	qdiscMetrics = []string{Bytes, Packets, Drops, Qlen, Backlog, Overlimits}
+	qdiscMetrics = []probe.LegacyMetric{
+		{Name: Bytes, Help: "The total number of bytes transmitted through the queuing discipline."},
+		{Name: Packets, Help: "The total number of packets transmitted through the queuing discipline."},
+		{Name: Drops, Help: "The total number of packets dropped by the queuing discipline."},
+		{Name: Qlen, Help: "The current length of the queue (the number of packets queued)."},
+		{Name: Backlog, Help: "The total amount of data currently in the queue (in bytes)."},
+		{Name: Overlimits, Help: "The total number of packets that exceeded the configured limits."},
+	}
 )
 
 func init() {
@@ -80,7 +87,7 @@ func (p *Probe) Stop(_ context.Context) error {
 func (p *Probe) CollectOnce() (map[string]map[uint32]uint64, error) {
 	resMap := make(map[string]map[uint32]uint64)
 	for _, metric := range qdiscMetrics {
-		resMap[metric] = make(map[uint32]uint64)
+		resMap[metric.Name] = make(map[uint32]uint64)
 	}
 
 	ets := nettop.GetAllUniqueNetnsEntity()

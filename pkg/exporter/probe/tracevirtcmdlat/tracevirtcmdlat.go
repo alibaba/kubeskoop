@@ -34,7 +34,10 @@ const (
 )
 
 var (
-	metrics              = []string{VIRTCMD100MS, VIRTCMD}
+	metrics = []probe.LegacyMetric{
+		{Name: VIRTCMD100MS, Help: ""},
+		{Name: VIRTCMD, Help: ""},
+	}
 	_virtcmdLatencyProbe = &virtcmdLatencyProbe{
 		metricsMap: map[string]map[uint32]uint64{
 			VIRTCMD:      {0: 0},
