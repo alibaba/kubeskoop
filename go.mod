@@ -1,6 +1,6 @@
 module github.com/alibaba/kubeskoop
 
-go 1.19
+go 1.22
 
 require (
 	github.com/alibabacloud-go/darabonba-openapi v0.2.1

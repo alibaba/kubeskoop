@@ -22,7 +22,7 @@ func NewSkoopCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:  "skoop",
 		Long: "Skoop is an one-shot kubernetes network diagnose tool.",
-		PreRunE: func(cmd *cobra.Command, args []string) error {
+		PreRunE: func(_ *cobra.Command, _ []string) error {
 			if context.SkoopContext.MiscConfig().Version {
 				version.PrintVersion()
 				os.Exit(0)
@@ -35,7 +35,7 @@ func NewSkoopCmd() *cobra.Command {
 			}
 			return context.SkoopContext.BuildTask()
 		},
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			prvd, err := provider.GetProvider(context.SkoopContext.ClusterConfig().CloudProvider)
 			if err != nil {
 				klog.Fatalf("error get service provider: %v", err)

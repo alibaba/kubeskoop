@@ -56,7 +56,7 @@ func podListWithInformer() ([]*Pod, error) {
 	if err != nil {
 		return nil, fmt.Errorf("list pods failed: %v", err)
 	}
-	return lo.Map[*corev1.Pod, *Pod](pods, func(pod *corev1.Pod, idx int) *Pod {
+	return lo.Map[*corev1.Pod, *Pod](pods, func(pod *corev1.Pod, _ int) *Pod {
 		return &Pod{
 			Name:      pod.Name,
 			Namespace: pod.Namespace,
@@ -76,7 +76,7 @@ func (c *controller) PodList(ctx context.Context) ([]*Pod, error) {
 	if err != nil {
 		return nil, fmt.Errorf("list pods failed: %v", err)
 	}
-	return lo.Map[corev1.Pod, *Pod](pods.Items, func(pod corev1.Pod, idx int) *Pod {
+	return lo.Map[corev1.Pod, *Pod](pods.Items, func(pod corev1.Pod, _ int) *Pod {
 		return &Pod{
 			Name:      pod.Name,
 			Namespace: pod.Namespace,
@@ -91,7 +91,7 @@ func (c *controller) NodeList(ctx context.Context) ([]*Node, error) {
 	if err != nil {
 		return nil, fmt.Errorf("list pods failed: %v", err)
 	}
-	return lo.Map[corev1.Node, *Node](nodes.Items, func(node corev1.Node, idx int) *Node {
+	return lo.Map[corev1.Node, *Node](nodes.Items, func(node corev1.Node, _ int) *Node {
 		return &Node{
 			Name:   node.Name,
 			Labels: node.Labels,
@@ -104,7 +104,7 @@ func (c *controller) NamespaceList(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("list pods failed: %v", err)
 	}
-	return lo.Map[corev1.Namespace, string](namespaces.Items, func(namespace corev1.Namespace, idx int) string {
+	return lo.Map[corev1.Namespace, string](namespaces.Items, func(namespace corev1.Namespace, _ int) string {
 		return namespace.Name
 	}), nil
 }

@@ -8,12 +8,12 @@ func TestGetLatency(t *testing.T) {
 --- 8.8.8.8 ping statistics ---
 100 packets transmitted, 100 packets received, 0% packet loss
 round-trip min/avg/max = 43.689/43.720/43.809 ms`
-	min, avg, max, err := getLatency(pingStr)
+	lMin, lAvg, lMax, err := getLatency(pingStr)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
-	if min != 43.689 || avg != 43.720 || max != 43.809 {
-		t.Fatalf("min/avg/max is not correct")
+	if lMin != 43.689 || lAvg != 43.720 || lMax != 43.809 {
+		t.Fatal("min/avg/max is not correct")
 	}
-	t.Logf("min/avg/max is %v, %v, %v", min, avg, max)
+	t.Logf("min/avg/max is %v, %v, %v", lMin, lAvg, lMax)
 }

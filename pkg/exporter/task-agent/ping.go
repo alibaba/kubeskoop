@@ -65,13 +65,13 @@ func (a *Agent) ping(task *rpc.PingInfo) (string, error) {
 
 func (a *Agent) ProcessPing(task *rpc.ServerTask) error {
 	var (
-		min, avg, max float64
-		output        string
-		err           error
+		lMin, lAvg, lMax float64
+		output           string
+		err              error
 	)
 	output, err = a.ping(task.GetTask().GetPing())
 	if err == nil {
-		min, avg, max, err = getLatency(output)
+		lMin, lAvg, lMax, err = getLatency(output)
 	}
 
 	if err != nil {
@@ -94,9 +94,9 @@ func (a *Agent) ProcessPing(task *rpc.ServerTask) error {
 		Success: true,
 		Message: "success",
 		TaskResultInfo: &rpc.TaskResult_Ping{Ping: &rpc.PingResult{
-			Max:     float32(max),
-			Avg:     float32(avg),
-			Min:     float32(min),
+			Max:     float32(lMax),
+			Avg:     float32(lAvg),
+			Min:     float32(lMin),
 			Message: nil,
 		}},
 	})

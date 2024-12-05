@@ -15,7 +15,7 @@ var (
 	testCmd = &cobra.Command{
 		Use:   "test",
 		Short: "test btf support locally",
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			if btfSrcPath == "" {
 				btfSrcPath = defaultBTFPath
 			}

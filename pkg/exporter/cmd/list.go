@@ -9,8 +9,8 @@ var (
 	listCmd = &cobra.Command{
 		Use:   "list",
 		Short: "list available options",
-		Run: func(cmd *cobra.Command, args []string) {
-			cmd.Help() // nolint
+		Run: func(cmd *cobra.Command, _ []string) {
+			_ = cmd.Help() // nolint
 		},
 	}
 )

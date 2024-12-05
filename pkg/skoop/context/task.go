@@ -34,7 +34,7 @@ func (tc *TaskConfig) Validate() error {
 		return fmt.Errorf("source or destination address cannot be empty")
 	}
 
-	if tc.Destination.Port <= 0 || tc.Destination.Port > 65535 {
+	if tc.Destination.Port == 0 {
 		return fmt.Errorf("a valid destination port should be provided")
 	}
 
