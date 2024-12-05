@@ -99,7 +99,7 @@ func (na *NetstackAssertion) AssertNoPolicyRoute() {
 }
 
 func (na *NetstackAssertion) AssertListen(localIP net.IP, localPort uint16, protocol model.Protocol) {
-	socks := lo.Filter(na.netns.NetNSInfo.ConnStats, func(stat netstack.ConnStat, index int) bool {
+	socks := lo.Filter(na.netns.NetNSInfo.ConnStats, func(stat netstack.ConnStat, _ int) bool {
 		if stat.State == netstack.SockStatListen && strings.EqualFold(string(stat.Protocol), string(protocol)) && localPort == stat.LocalPort {
 			if localIP.String() == stat.LocalIP {
 				return true

@@ -13,11 +13,10 @@ import (
 // rootCmd represents the base command when called without any subcommands
 var (
 	rootCmd = &cobra.Command{
-		Use:   "skoop-controller",
-		Short: "skoop centralized controller",
-		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		},
-		RunE: func(cmd *cobra.Command, args []string) error {
+		Use:              "skoop-controller",
+		Short:            "skoop centralized controller",
+		PersistentPreRun: func(_ *cobra.Command, _ []string) {},
+		RunE: func(_ *cobra.Command, _ []string) error {
 			config := &Config{}
 			var err error
 			if configPath != "" {

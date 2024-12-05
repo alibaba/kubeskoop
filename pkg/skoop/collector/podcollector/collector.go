@@ -62,7 +62,7 @@ func (a *podCollector) DumpNodeInfos() (*k8s.NodeNetworkStackDump, error) {
 		dump.Pods = nil
 	}
 	if a.podNamespace != "" && a.podName != "" {
-		dump.Pods = lo.Filter(dump.Pods, func(item k8s.PodNetInfo, index int) bool {
+		dump.Pods = lo.Filter(dump.Pods, func(item k8s.PodNetInfo, _ int) bool {
 			return item.PodNamespace == a.podNamespace && item.PodName == a.podName
 		})
 		collectHost = false

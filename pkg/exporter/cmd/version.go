@@ -9,7 +9,7 @@ var (
 	versionCmd = &cobra.Command{
 		Use:   "version",
 		Short: "show version",
-		Run: func(_ *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			version.PrintVersion()
 		},
 	}

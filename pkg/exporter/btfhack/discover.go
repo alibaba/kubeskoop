@@ -19,7 +19,7 @@ var (
 	cpCmd = &cobra.Command{
 		Use:   "discover",
 		Short: "copy or download appropriate btf file to dst path",
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			if btfSrcPath == "" {
 				btfSrcPath = defaultBTFPath
 			}

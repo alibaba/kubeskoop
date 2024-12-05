@@ -15,7 +15,7 @@ var (
 	probeCmd = &cobra.Command{
 		Use:   "probe",
 		Short: "list supported probe with metric exporting",
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			res := make(map[string][]string)
 			res["metrics"] = probe.ListMetricsProbes()
 			res["event"] = probe.ListEventProbes()

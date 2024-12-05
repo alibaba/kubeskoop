@@ -13,7 +13,7 @@ var (
 	rootCmd = &cobra.Command{
 		Use:   "inspector",
 		Short: "network inspection tool",
-		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		PersistentPreRun: func(_ *cobra.Command, _ []string) {
 			if debug {
 				log.SetLevel(log.DebugLevel)
 			} else {
