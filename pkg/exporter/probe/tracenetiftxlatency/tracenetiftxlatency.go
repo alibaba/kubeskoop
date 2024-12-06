@@ -32,7 +32,11 @@ const (
 )
 
 var (
-	metrics              = []string{TXLAT_QDISC_SLOW, TXLAT_NETDEV_SLOW}
+	metrics = []probe.LegacyMetric{
+		{Name: TXLAT_QDISC_SLOW, Help: "The total count of packets that experienced transmission delays greater than 100 milliseconds in the Qdisc layer."},
+		{Name: TXLAT_NETDEV_SLOW, Help: "The total count of packets that experienced transmission delays greater than 100 milliseconds in the Netdev layer."},
+	}
+
 	probeName            = "netiftxlat"
 	_netifTxlatencyProbe = &netifTxlatencyProbe{
 		metricsMap: make(map[string]map[uint32]uint64),

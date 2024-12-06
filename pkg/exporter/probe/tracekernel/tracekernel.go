@@ -50,7 +50,13 @@ const (
 )
 
 var (
-	metrics      = []string{RXKERNEL_SLOW_METRIC, RXKERNEL_SLOW100MS_METRIC, TXKERNEL_SLOW_METRIC, TXKERNEL_SLOW100MS_METRIC}
+	metrics = []probe.LegacyMetric{
+		{Name: RXKERNEL_SLOW_METRIC, Help: "The total count of incoming packets that experienced slow processing in the RX kernel path."},
+		{Name: RXKERNEL_SLOW100MS_METRIC, Help: "The total count of incoming packets that took longer than 100 milliseconds to process in the RX kernel path."},
+		{Name: TXKERNEL_SLOW_METRIC, Help: "The total count of outgoing packets that experienced slow processing in the TX kernel path."},
+		{Name: TXKERNEL_SLOW100MS_METRIC, Help: "The total count of outgoing packets that took longer than 100 milliseconds to process in the TX kernel path."},
+	}
+
 	probeName    = "kernellatency"
 	latencyProbe = &kernelLatencyProbe{
 		metricsMap: make(map[string]map[uint32]uint64),

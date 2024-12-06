@@ -25,7 +25,13 @@ var (
 	IncomingBytes   = "incomingbytes"
 	OutgoingBytes   = "outgoingbytes"
 
-	IPVSMetrics = []string{Connections, IncomingPackets, OutgoingBytes, IncomingBytes, OutgoingPackets}
+	IPVSMetrics = []probe.LegacyMetric{
+		{Name: Connections, Help: "The total number of connections handled by the IPVS (IP Virtual Server)"},
+		{Name: IncomingPackets, Help: "The total number of incoming packets processed by the IPVS"},
+		{Name: OutgoingBytes, Help: "The total number of bytes sent out by the IPVS"},
+		{Name: IncomingBytes, Help: "The total number of bytes received by the IPVS"},
+		{Name: OutgoingPackets, Help: "The total number of outgoing packets processed by the IPVS"},
+	}
 )
 
 func init() {

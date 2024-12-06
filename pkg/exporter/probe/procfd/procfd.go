@@ -35,8 +35,8 @@ func fdProbeCreator() (probe.MetricsProbe, error) {
 		Subsystem:      probeName,
 		VariableLabels: probe.StandardMetricsLabels,
 		SingleMetricsOpts: []probe.SingleMetricsOpts{
-			{Name: OpenFD, ValueType: prometheus.GaugeValue},
-			{Name: OpenSocket, ValueType: prometheus.GaugeValue},
+			{Name: OpenFD, Help: "The total number of open file descriptors for the process", ValueType: prometheus.GaugeValue},
+			{Name: OpenSocket, Help: "The total number of open sockets for the process", ValueType: prometheus.GaugeValue},
 		},
 	}
 	metrics := probe.NewBatchMetrics(opts, p.collectOnce)

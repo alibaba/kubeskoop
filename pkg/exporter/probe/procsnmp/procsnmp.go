@@ -82,11 +82,53 @@ const (
 )
 
 var (
-	TCPStatMetrcis = []string{TCPActiveOpens, TCPPassiveOpens, TCPRetransSegs, TCPAttemptFails, TCPEstabResets, TCPCurrEstab, TCPInSegs, TCPOutSegs, TCPInErrs, TCPOutRsts}
-	UDPStatMetrics = []string{UDPInDatagrams, UDPNoPorts, UDPInErrors, UDPOutDatagrams, UDPRcvbufErrors, UDPSndbufErrors, UDPInCsumErrors, UDPIgnoredMulti}
-	IPMetrics      = []string{IPForwarding, IPDefaultTTL, IPInReceives, IPInHdrErrors, IPInAddrErrors, IPForwDatagrams, IPInUnknownProtos, IPInDiscards, IPInDelivers, IPOutRequests, IPOutDiscards, IPOutNoRoutes, IPReasmTimeout, IPReasmReqds, IPReasmOKs, IPReasmFails, IPFragOKs, IPFragFails, IPFragCreates}
+	TCPStatMetrcis = []probe.LegacyMetric{
+		{Name: TCPActiveOpens, Help: "The number of active TCP connections opened."},
+		{Name: TCPPassiveOpens, Help: "The number of passive TCP connections opened (i.e., connections established by accepting incoming connections)."},
+		{Name: TCPRetransSegs, Help: "The total number of segments that have been retransmitted."},
+		{Name: TCPAttemptFails, Help: "The number of failed attempts to establish a TCP connection."},
+		{Name: TCPEstabResets, Help: "The number of established TCP connections that were reset."},
+		{Name: TCPCurrEstab, Help: "The current number of established TCP connections."},
+		{Name: TCPInSegs, Help: "The total number of TCP segments received."},
+		{Name: TCPOutSegs, Help: "The total number of TCP segments sent."},
+		{Name: TCPInErrs, Help: "The total number of erroneous packets received on TCP."},
+		{Name: TCPOutRsts, Help: "The total number of TCP segments sent with the RST flag set."},
+	}
 
-	metricsMap = map[string][]string{
+	UDPStatMetrics = []probe.LegacyMetric{
+		{Name: UDPInDatagrams, Help: "The total number of UDP datagrams received."},
+		{Name: UDPNoPorts, Help: "The total number of UDP datagrams received for which there was no port at the destination."},
+		{Name: UDPInErrors, Help: "The total number of erroneous received UDP packets."},
+		{Name: UDPOutDatagrams, Help: "The total number of UDP datagrams sent."},
+		{Name: UDPRcvbufErrors, Help: "The total number of UDP datagrams dropped due to socket receive buffer errors."},
+		{Name: UDPSndbufErrors, Help: "The total number of UDP datagrams dropped due to socket send buffer errors."},
+		{Name: UDPInCsumErrors, Help: "The total number of UDP datagrams received with a checksum error."},
+		{Name: UDPIgnoredMulti, Help: "The total number of received UDP multicast packets that were ignored."},
+	}
+
+	IPMetrics = []probe.LegacyMetric{
+		{Name: IPForwarding, Help: "Indicates whether IP forwarding is enabled (1 for enabled, 0 for disabled)."},
+		{Name: IPDefaultTTL, Help: "The default time-to-live (TTL) value for IP packets."},
+		{Name: IPInReceives, Help: "The total number of IP packets received."},
+		{Name: IPInHdrErrors, Help: "The total number of received IP packets that had a header error."},
+		{Name: IPInAddrErrors, Help: "The total number of received IP packets that were discarded due to address errors."},
+		{Name: IPForwDatagrams, Help: "The total number of IP packets forwarded by this machine."},
+		{Name: IPInUnknownProtos, Help: "The total number of received IP packets for which the protocol is not known."},
+		{Name: IPInDiscards, Help: "The total number of received IP packets that were discarded."},
+		{Name: IPInDelivers, Help: "The total number of delivered IP packets."},
+		{Name: IPOutRequests, Help: "The total number of IP packets sent out."},
+		{Name: IPOutDiscards, Help: "The total number of outgoing IP packets that were discarded."},
+		{Name: IPOutNoRoutes, Help: "The total number of outgoing IP packets for which no route could be found."},
+		{Name: IPReasmTimeout, Help: "The total number of times that IP reassembly timed out."},
+		{Name: IPReasmReqds, Help: "The total number of IP reassembly requests made."},
+		{Name: IPReasmOKs, Help: "The total number of successful IP reassembly operations."},
+		{Name: IPReasmFails, Help: "The total number of failed IP reassembly operations."},
+		{Name: IPFragOKs, Help: "The total number of IP packets that were fragmented successfully."},
+		{Name: IPFragFails, Help: "The total number of IP packets that failed to fragment."},
+		{Name: IPFragCreates, Help: "The total number of IP fragments created."},
+	}
+
+	metricsMap = map[string][]probe.LegacyMetric{
 		TCP: TCPStatMetrcis,
 		UDP: UDPStatMetrics,
 		IP:  IPMetrics,
@@ -165,7 +207,7 @@ func collect() (map[string]map[string]map[uint32]uint64, error) {
 	for proto, metricsList := range metricsMap {
 		res[proto] = make(map[string]map[uint32]uint64)
 		for _, metrics := range metricsList {
-			res[proto][metrics] = make(map[uint32]uint64)
+			res[proto][metrics.Name] = make(map[uint32]uint64)
 		}
 	}
 

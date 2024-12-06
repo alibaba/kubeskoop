@@ -20,6 +20,11 @@ func BuildStandardMetricsLabelValues(entity *nettop.Entity) []string {
 	return append(metaPodLabels, BuildAdditionalLabelsValues(entity.GetLabels())...)
 }
 
+type LegacyMetric struct {
+	Name string
+	Help string
+}
+
 func InitAdditionalLabels(additionalLabels []string) error {
 	if len(additionalLabels) == 0 {
 		return nil
@@ -84,15 +89,15 @@ func newMetricsName(module, name string) string {
 
 type LegacyCollector func() (map[string]map[uint32]uint64, error)
 
-func NewLegacyBatchMetrics(module string, metrics []string, collector LegacyCollector) prometheus.Collector {
+func NewLegacyBatchMetrics(module string, metrics []LegacyMetric, collector LegacyCollector) prometheus.Collector {
 	return newLegacyBatchMetrics(module, metrics, collector)
 }
 
-func newLegacyBatchMetrics(module string, metrics []string, collector LegacyCollector) prometheus.Collector {
+func newLegacyBatchMetrics(module string, metrics []LegacyMetric, collector LegacyCollector) prometheus.Collector {
 	descs := make(map[string]*prometheus.Desc)
 	for _, m := range metrics {
-		newName := newMetricsName(module, m)
-		descs[newName] = prometheus.NewDesc(newName, "", StandardMetricsLabels, nil)
+		newName := newMetricsName(module, m.Name)
+		descs[newName] = prometheus.NewDesc(newName, m.Help, StandardMetricsLabels, nil)
 	}
 	return &legacyBatchMetrics{
 		module:    module,

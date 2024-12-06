@@ -28,8 +28,15 @@ const (
 )
 
 var (
-	TCPSockStatMetrics = []string{TCPSockInuse, TCPSockOrphan, TCPSockTimewait, TCPSockeAlloc, TCPSockeMem}
-	probeName          = "sock"
+	TCPSockStatMetrics = []probe.LegacyMetric{
+		{Name: TCPSockInuse, Help: "The total number of TCP sockets currently in use."},
+		{Name: TCPSockOrphan, Help: "The total number of orphaned TCP sockets."},
+		{Name: TCPSockTimewait, Help: "The total number of TCP sockets in the TIME_WAIT state."},
+		{Name: TCPSockeAlloc, Help: "The total number of TCP sockets allocated."},
+		{Name: TCPSockeMem, Help: "The total amount of memory allocated for TCP sockets."},
+	}
+
+	probeName = "sock"
 )
 
 func init() {
@@ -70,7 +77,7 @@ type tcpsockstat struct {
 func collect() (resMap map[string]map[uint32]uint64, err error) {
 	resMap = make(map[string]map[uint32]uint64)
 	for _, stat := range TCPSockStatMetrics {
-		resMap[stat] = map[uint32]uint64{}
+		resMap[stat.Name] = map[uint32]uint64{}
 	}
 
 	// for _, nslogic := range nslist {
