@@ -105,19 +105,23 @@ func (g *FlowGraph) AddNodesFromVector(v model.Vector) {
 }
 
 func (g *FlowGraph) AddNodesFromSample(v *model.Sample) {
-	ip := string(v.Metric["src"])
-	t := string(v.Metric["src_type"])
-	podName := string(v.Metric["src_pod"])
-	podNamespace := string(v.Metric["src_namespace"])
-	nodeName := string(v.Metric["src_node"])
-	g.AddNode(createNode(t, ip, podNamespace, podName, nodeName))
+	srcIP := string(v.Metric["src"])
+	if srcIP != "" {
+		t := string(v.Metric["src_type"])
+		podName := string(v.Metric["src_pod"])
+		podNamespace := string(v.Metric["src_namespace"])
+		nodeName := string(v.Metric["src_node"])
+		g.AddNode(createNode(t, srcIP, podNamespace, podName, nodeName))
+	}
 
-	ip = string(v.Metric["dst"])
-	t = string(v.Metric["dst_type"])
-	podName = string(v.Metric["dst_pod"])
-	podNamespace = string(v.Metric["dst_namespace"])
-	nodeName = string(v.Metric["dst_node"])
-	g.AddNode(createNode(t, ip, podNamespace, podName, nodeName))
+	dstIP := string(v.Metric["dst"])
+	if dstIP != "" {
+		t := string(v.Metric["dst_type"])
+		podName := string(v.Metric["dst_pod"])
+		podNamespace := string(v.Metric["dst_namespace"])
+		nodeName := string(v.Metric["dst_node"])
+		g.AddNode(createNode(t, dstIP, podNamespace, podName, nodeName))
+	}
 }
 
 func (g *FlowGraph) AddNode(n Node) {
