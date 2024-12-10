@@ -58,7 +58,12 @@ const (
 var (
 	probeName            = "socketlatency"
 	_socketLatency       = &socketLatencyProbe{}
-	socketlatencyMetrics = []string{READ100MS, READ1MS, WRITE100MS, WRITE1MS}
+	socketlatencyMetrics = []probe.LegacyMetric{
+		{Name: READ100MS, Help: "The total count of read operations that took longer than 100 milliseconds."},
+		{Name: READ1MS, Help: "The total count of read operations that took longer than 1 millisecond."},
+		{Name: WRITE100MS, Help: "The total count of write operations that took longer than 100 milliseconds."},
+		{Name: WRITE1MS, Help: "The total count of write operations that took longer than 1 millisecond."},
+	}
 )
 
 func init() {
@@ -235,7 +240,7 @@ func (p *socketLatencyProbe) perfLoop() {
 func (p *socketLatencyProbe) collect() (map[string]map[uint32]uint64, error) {
 	res := map[string]map[uint32]uint64{}
 	for _, mtr := range socketlatencyMetrics {
-		res[mtr] = map[uint32]uint64{}
+		res[mtr.Name] = map[uint32]uint64{}
 	}
 	// 从map中获取数据
 	m, err := bpfutil.MustLoadPin(ModuleName)

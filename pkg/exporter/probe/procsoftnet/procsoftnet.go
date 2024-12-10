@@ -25,7 +25,10 @@ const (
 )
 
 var (
-	softnetMetrics = []string{SNProcessed, SNDropped}
+	softnetMetrics = []probe.LegacyMetric{
+		{Name: SNProcessed, Help: "The total number of packets processed by the softnet layer"},
+		{Name: SNDropped, Help: "The total number of packets dropped by the softnet layer"},
+	}
 )
 
 func init() {
@@ -63,7 +66,7 @@ func collect(nslist []*nettop.Entity) (map[string]map[uint32]uint64, error) {
 	resMap := make(map[string]map[uint32]uint64)
 
 	for _, m := range softnetMetrics {
-		resMap[m] = map[uint32]uint64{}
+		resMap[m.Name] = map[uint32]uint64{}
 	}
 
 	for _, ns := range nslist {
@@ -72,7 +75,7 @@ func collect(nslist []*nettop.Entity) (map[string]map[uint32]uint64, error) {
 			continue
 		}
 		for _, m := range softnetMetrics {
-			resMap[m][uint32(ns.GetNetns())] = stat[m]
+			resMap[m.Name][uint32(ns.GetNetns())] = stat[m.Name]
 		}
 	}
 	return resMap, nil

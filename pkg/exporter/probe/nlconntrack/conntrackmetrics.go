@@ -26,7 +26,19 @@ var (
 	MaxEntries = "maxentries"
 
 	// stats of conntrack status summary
-	conntrackMetrics = []string{Found, Invalid, Ignore, Insert, InsertFailed, Drop, EarlyDrop, Error, SearchRestart, Entries, MaxEntries}
+	conntrackMetrics = []probe.LegacyMetric{
+		{Name: Found, Help: "The total number of tracked connections found in the conntrack table."},
+		{Name: Invalid, Help: "The total number of invalid connections encountered."},
+		{Name: Ignore, Help: "The total number of connections that were ignored by the conntrack module."},
+		{Name: Insert, Help: "The total number of connections inserted into the conntrack table."},
+		{Name: InsertFailed, Help: "The total number of failed attempts to insert a connection into the conntrack table."},
+		{Name: Drop, Help: "The total number of connections dropped from the conntrack table."},
+		{Name: EarlyDrop, Help: "The total number of connections dropped early before they were fully established."},
+		{Name: Error, Help: "The total number of errors encountered while managing connections in the conntrack table."},
+		{Name: SearchRestart, Help: "The total number of times the search for a connection entry was restarted."},
+		{Name: Entries, Help: "The current number of connections tracked in the conntrack table."},
+		{Name: MaxEntries, Help: "The maximum number of entries allowed in the conntrack table."},
+	}
 )
 
 func metricsProbeCreator() (probe.MetricsProbe, error) {
@@ -80,7 +92,7 @@ func (c *conntrackMetricsProbe) CollectOnce() (map[string]map[uint32]uint64, err
 	}
 
 	for _, metric := range conntrackMetrics {
-		resMap[metric] = map[uint32]uint64{uint32(nettop.InitNetns): stats[metric]}
+		resMap[metric.Name] = map[uint32]uint64{uint32(nettop.InitNetns): stats[metric.Name]}
 	}
 
 	return resMap, nil
