@@ -71,8 +71,8 @@ func LookupDefaultIfaceName(ifaces []Interface) string {
 		}
 	}
 
-	// find first interfaces matched enp[0-9]+s[0-9]+.*
-	regex := regexp.MustCompile("^enp[0-9]+s[0-9]+.*$")
+	// find first interfaces matched (enp[0-9]+s[0-9]+.*|eth[0-9]+|ens[0-9]+)$")
+	regex := regexp.MustCompile("^(enp[0-9]+s[0-9]+.*|eth[0-9]+|ens[0-9]+)$")
 	filtered := lo.Filter(ifaces, func(i Interface, _ int) bool {
 		return regex.MatchString(i.Name)
 	})

@@ -24,6 +24,10 @@ func TestLookupDefaultIfaceName(t *testing.T) {
 			ifaces:   []string{"wg0", "ipvs0", "cni0", "aaenp1s1"},
 			expected: "",
 		},
+		{
+			ifaces:   []string{"ens160", "cali85f094c216c", "vxlan.calico", "calie92c3084733"},
+			expected: "ens160",
+		},
 	}
 
 	for _, c := range testcases {
