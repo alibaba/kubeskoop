@@ -45,6 +45,7 @@ type SimplePodCollectorManagerOptions struct {
 
 type simplePodCollectorManager struct {
 	image                string
+	imagePullPolicy      v1.PullPolicy
 	namespace            string
 	runtimeAPIAddress    string
 	client               *kubernetes.Clientset
@@ -77,6 +78,7 @@ func NewSimplePodCollectorManager(ctx *ctx.Context) (collector.Manager, error) {
 
 	return &simplePodCollectorManager{
 		image:                Config.SimplePodCollectorConfig.Image,
+		imagePullPolicy:      utils.ConvertToImagePullPolicy(Config.SimplePodCollectorConfig.ImagePullPolicy),
 		namespace:            Config.SimplePodCollectorConfig.CollectorNamespace,
 		client:               ctx.KubernetesClient(),
 		restConfig:           ctx.KubernetesRestClient(),
@@ -332,7 +334,7 @@ func (m *simplePodCollectorManager) createCollectorPod(nodeName string) (*v1.Pod
 				{
 					Name:            "collector",
 					Image:           m.image,
-					ImagePullPolicy: "Always",
+					ImagePullPolicy: m.imagePullPolicy,
 					SecurityContext: &v1.SecurityContext{
 						Privileged: pointer.Bool(true),
 					},
@@ -359,8 +361,9 @@ func (m *simplePodCollectorManager) createCollectorPod(nodeName string) (*v1.Pod
 			},
 			Containers: []v1.Container{
 				{
-					Name:  "alive",
-					Image: m.image,
+					Name:            "alive",
+					Image:           m.image,
+					ImagePullPolicy: m.imagePullPolicy,
 					Command: []string{
 						"/bin/sh",
 						"-c",
