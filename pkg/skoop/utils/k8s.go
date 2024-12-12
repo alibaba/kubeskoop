@@ -155,7 +155,7 @@ func ContainsLoadBalancerIP(svc *v1.Service, ip string) bool {
 	return false
 }
 
-func ConvertToImagePullPolicy(policy string) v1.PullPolicy {
+func ConvertToImagePullPolicy(policy string) (v1.PullPolicy, error) {
 	policyMap := map[string]v1.PullPolicy{
 		"Always":       v1.PullAlways,
 		"IfNotPresent": v1.PullIfNotPresent,
@@ -163,7 +163,7 @@ func ConvertToImagePullPolicy(policy string) v1.PullPolicy {
 	}
 
 	if pullPolicy, exists := policyMap[policy]; exists {
-		return pullPolicy
+		return pullPolicy, nil
 	}
-	return v1.PullAlways
+	return "", fmt.Errorf("invalid image pull policy: %s, valid options are: Always, IfNotPresent, Never", policy)
 }

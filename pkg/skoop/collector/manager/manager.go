@@ -76,9 +76,14 @@ func NewSimplePodCollectorManager(ctx *ctx.Context) (collector.Manager, error) {
 		Config.SimplePodCollectorConfig.WaitTimeout = defaultWaitTimeout * time.Second
 	}
 
+	pullPolicy, err := utils.ConvertToImagePullPolicy(Config.SimplePodCollectorConfig.ImagePullPolicy)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pod collector manager: %w", err)
+	}
+
 	return &simplePodCollectorManager{
 		image:                Config.SimplePodCollectorConfig.Image,
-		imagePullPolicy:      utils.ConvertToImagePullPolicy(Config.SimplePodCollectorConfig.ImagePullPolicy),
+		imagePullPolicy:      pullPolicy,
 		namespace:            Config.SimplePodCollectorConfig.CollectorNamespace,
 		client:               ctx.KubernetesClient(),
 		restConfig:           ctx.KubernetesRestClient(),
