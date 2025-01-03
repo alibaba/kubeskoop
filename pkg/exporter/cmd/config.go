@@ -15,6 +15,7 @@ type InspServerConfig struct {
 
 	Address          string        `yaml:"address" mapstructure:"address" json:"address"`
 	EnableController bool          `yaml:"enableController" mapstructure:"enableController" json:"enableController"`
+	ControllerAddr   string        `yaml:"controllerAddr" mapstructure:"controllerAddr" json:"controllerAddr"`
 	MetricsConfig    MetricsConfig `yaml:"metrics" mapstructure:"metrics" json:"metrics"`
 	EventConfig      EventConfig   `yaml:"event" mapstructure:"event" json:"event"`
 }

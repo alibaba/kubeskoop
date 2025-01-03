@@ -3,7 +3,6 @@ package taskagent
 import (
 	"context"
 	"fmt"
-	"os"
 	"time"
 
 	"google.golang.org/grpc/codes"
@@ -17,26 +16,24 @@ import (
 	"google.golang.org/grpc"
 )
 
-var (
-	//fixme replace to endpoint discovery
-	controllerAddr = os.Getenv("CONTROLLER_SERVICE_HOST") + ":10263"
-	//controllerAddr = "127.0.0.1:10263"
-)
-
-func NewTaskAgent() *Agent {
-	return &Agent{NodeName: nettop.GetNodeName()}
+func NewTaskAgent(controllerAddr string) *Agent {
+	return &Agent{
+		NodeName:       nettop.GetNodeName(),
+		controllerAddr: controllerAddr,
+	}
 }
 
 type Agent struct {
-	NodeName      string
-	grpcClient    rpc.ControllerRegisterServiceClient
-	ipCacheClient rpc.IPCacheServiceClient
+	NodeName       string
+	grpcClient     rpc.ControllerRegisterServiceClient
+	ipCacheClient  rpc.IPCacheServiceClient
+	controllerAddr string
 }
 
 func (a *Agent) rpcConnect() (*grpc.ClientConn, error) {
 	var opts []grpc.CallOption
 	opts = append(opts, grpc.MaxCallSendMsgSize(102*1024*1024))
-	return grpc.Dial(controllerAddr, grpc.WithDefaultCallOptions(opts...),
+	return grpc.Dial(a.controllerAddr, grpc.WithDefaultCallOptions(opts...),
 		grpc.WithTransportCredentials(insecure.NewCredentials()))
 }
 
@@ -48,6 +45,7 @@ func retry(msg string, maxAttempts int, work func() error) error {
 		if err == nil {
 			return nil
 		}
+		log.Errorf("retry %s error: %s", msg, err)
 		attempts++
 		if maxAttempts > 0 && attempts >= maxAttempts {
 			return fmt.Errorf("failed %s after %d attempts", msg, attempts)

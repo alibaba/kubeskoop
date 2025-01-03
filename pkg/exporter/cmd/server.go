@@ -75,7 +75,11 @@ var (
 			defer nettop.StopCache()
 
 			if cfg.EnableController {
-				if err := task_agent.NewTaskAgent().Run(); err != nil {
+				if cfg.ControllerAddr == "" {
+					log.Infof("controller address is empty, use dns:controller:10263 as default")
+					cfg.ControllerAddr = "dns:controller:10263"
+				}
+				if err := task_agent.NewTaskAgent(cfg.ControllerAddr).Run(); err != nil {
 					log.Errorf("failed start agent: %v", err)
 					return
 				}
