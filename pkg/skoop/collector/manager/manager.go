@@ -444,7 +444,7 @@ func (m *simplePodCollectorManager) ensurePodClean(podName string) error {
 		return err
 	}
 
-	err = wait.Poll(1*time.Second, 20*time.Second, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 20*time.Second, false, func(_ context.Context) (bool, error) {
 		_, err := m.client.CoreV1().Pods(m.namespace).Get(context.TODO(), podName, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
 			return true, nil
@@ -456,12 +456,11 @@ func (m *simplePodCollectorManager) ensurePodClean(podName string) error {
 
 		return false, nil
 	})
-
 	return err
 }
 
 func (m *simplePodCollectorManager) waitPodRunning(pod *v1.Pod) error {
-	err := wait.PollImmediate(m.waitInterval, m.waitTimeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(context.Background(), m.waitInterval, m.waitTimeout, true, func(_ context.Context) (bool, error) {
 		current, err := m.client.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		if err != nil {
 			klog.V(2).Infof("Get pod %s/%s failed, will retry. error: %s", pod.Namespace, pod.Name, err.Error())
@@ -524,7 +523,7 @@ func (m *simplePodCollectorManager) readCollectorData(pod *v1.Pod) (*k8s.NodeNet
 		return nil, err
 	}
 
-	err = exec.Stream(remotecommand.StreamOptions{
+	err = exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
 		Stdin:  nil,
 		Stdout: outBuffer,
 		Stderr: errBuffer,

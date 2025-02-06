@@ -29,12 +29,15 @@ func lookupCgroupRoot() (string, error) {
 	return "/sys/fs/cgroup", nil
 }
 
-func tasksInsidePodCgroup(path string) []int {
+func tasksInsidePodCgroup(path string, absolutePath bool) []int {
 	//TODO watch file changes by inotify
 	if cgroupRoot == "" || path == "" {
 		return nil
 	}
-	base := filepath.Join(cgroupRoot, "memory", path)
+	base := path
+	if !absolutePath {
+		base = filepath.Join(cgroupRoot, "memory", path)
+	}
 	m := make(map[int]int)
 	err := filepath.Walk(base, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
