@@ -162,17 +162,23 @@ func NewService(podInformer coreinformers.PodInformer, nodeInformer coreinformer
 		clients: list.New(),
 		period:  uuid.NewString(),
 	}
-	podInformer.Informer().AddEventHandler(&cache.ResourceEventHandlerFuncs{
+	_, err := podInformer.Informer().AddEventHandler(&cache.ResourceEventHandlerFuncs{
 		AddFunc:    s.onAddPod,
 		DeleteFunc: s.onDeletePod,
 		UpdateFunc: s.onUpdatePod,
 	})
+	if err != nil {
+		log.Fatalf("failed to add pod resource handler: %v", err)
+	}
 
-	nodeInformer.Informer().AddEventHandler(&cache.ResourceEventHandlerFuncs{
+	_, err = nodeInformer.Informer().AddEventHandler(&cache.ResourceEventHandlerFuncs{
 		AddFunc:    s.onAddNode,
 		DeleteFunc: s.onDeleteNode,
 		UpdateFunc: s.onUpdateNode,
 	})
+	if err != nil {
+		log.Fatalf("failed to add node resource handler: %v", err)
+	}
 
 	go s.syncControl()
 

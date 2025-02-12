@@ -225,10 +225,15 @@ func (e *Entity) GetPids() []int {
 func StartCache(ctx context.Context, sidecarMode bool) error {
 	if !sidecarMode {
 		if err := initCriClient(runtimeEndpoints); err != nil {
-			return err
-		}
-		if err := initCriInfo(); err != nil {
-			return err
+			// fallback to node level apiserver watch
+			apiserverClient, err = StartPodCacheWatch(ctx)
+			if err != nil {
+				return err
+			}
+		} else {
+			if err := initCriInfo(); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -281,7 +286,11 @@ func cachePodsWithTimeout(timeout time.Duration) error {
 
 	cacheDone := make(chan struct{})
 	go func(done chan struct{}) {
-		err = cacheNetTopology(ctx)
+		if apiserverClient != nil {
+			err = cacheNetTopologyNoCri(ctx)
+		} else {
+			err = cacheNetTopology(ctx)
+		}
 		close(done)
 	}(cacheDone)
 
@@ -343,6 +352,45 @@ func getSandboxInfoSpec(sandboxStatus *v1.PodSandboxStatusResponse) (*sandboxInf
 	return info, nil
 }
 
+func cacheNetTopologyNoCri(_ context.Context) error {
+	lock.Lock()
+	defer lock.Unlock()
+	pods := apiserverClient.GetAllLocalPods()
+	var newEntities []*Entity
+	newEntities = append(newEntities, defaultEntity)
+	for _, pod := range pods {
+		if pod.Name == "" || pod.Namespace == "" {
+			continue
+		}
+		pids := tasksInsidePodCgroup(pod.CgroupPath, true)
+		if len(pids) == 0 {
+			log.Warnf("sandbox %s/%s: found 0 pids under cgroup %s", pod.Namespace, pod.Name, pod.CgroupPath)
+		}
+		e := &Entity{
+			netnsMeta: &netnsMeta{
+				inum:          int(pod.NetNSInode),
+				mountPath:     pod.NetNSPath,
+				isHostNetwork: pod.IsHostNetwork,
+				ipList:        []string{pod.IP},
+			},
+			podMeta: podMeta{
+				name:      pod.Name,
+				namespace: pod.Namespace,
+			},
+			initPid: pod.SandboxPID,
+			labels:  pod.Labels,
+			pids:    pids,
+		}
+
+		newEntities = append(newEntities, e)
+		addEntityToCache(e, true, false)
+	}
+
+	entities.Store(&newEntities)
+	log.Debug("finished cache process")
+	return nil
+}
+
 func cacheNetTopology(ctx context.Context) error {
 	lock.Lock()
 	defer lock.Unlock()
@@ -399,7 +447,7 @@ func cacheNetTopology(ctx context.Context) error {
 		podCgroupPath := info.Config.Linux.CgroupParent
 		var pids []int
 		if podCgroupPath != "" {
-			pids = tasksInsidePodCgroup(podCgroupPath)
+			pids = tasksInsidePodCgroup(podCgroupPath, false)
 			if len(pids) == 0 {
 				log.Warnf("sandbox %s/%s: found 0 pids under cgroup %s", namespace, name, podCgroupPath)
 			}

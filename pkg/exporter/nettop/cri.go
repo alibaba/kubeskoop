@@ -23,8 +23,9 @@ import (
 )
 
 var (
-	criClient internalapi.RuntimeService
-	criInfo   *CRIInfo
+	criClient       internalapi.RuntimeService
+	criInfo         *CRIInfo
+	apiserverClient *PodCache
 )
 
 const (
