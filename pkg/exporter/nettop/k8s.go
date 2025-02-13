@@ -360,6 +360,7 @@ func StartPodCacheWatch(ctx context.Context) (*PodCache, error) {
 	utilruntime.Must(v1.AddToScheme(scheme))
 	// Create manager
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+		MetricsBindAddress: "0",
 		Cache: cache.Options{
 			Scheme: scheme,
 			ByObject: map[client.Object]cache.ByObject{
