@@ -655,6 +655,26 @@ func (h *calicoHost) ToService(upstream *model.Link, dst model.Endpoint, protoco
 		return nil, err
 	}
 
+	if len(service.Spec.LoadBalancerSourceRanges) > 0 {
+		cidrAllow := false
+		for _, sourceRange := range service.Spec.LoadBalancerSourceRanges {
+			_, cidr, err := net.ParseCIDR(sourceRange)
+			if err != nil {
+				klog.Errorf("source range(%s) format invalid, %v", cidr, err)
+				continue
+			}
+			if cidr.Contains(pkt.Src) {
+				cidrAllow = true
+			}
+		}
+		if !cidrAllow {
+			h.netNode.Suspicions = append(h.netNode.Suspicions, model.Suspicion{
+				Level:   model.SuspicionLevelWarning,
+				Message: fmt.Sprintf("service sourcePortRange(%v) not allow source ip(%v) access", service.Spec.LoadBalancerSourceRanges, pkt.Src),
+			})
+		}
+	}
+
 	backends := h.serviceProcessor.Process(*pkt, service, node)
 	if len(backends) == 0 {
 		h.netNode.Suspicions = append(h.netNode.Suspicions, model.Suspicion{
