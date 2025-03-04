@@ -1,4 +1,4 @@
-FROM kubeskoop/ci-builder:latest AS build
+FROM --platform=$BUILDPLATFORM kubeskoop/ci-builder:latest AS build
 
 WORKDIR /go/src/github.com/alibaba/kubeskoop/
 RUN go env -w GOMODCACHE=/root/.cache/go-build
@@ -13,7 +13,7 @@ WORKDIR /webconsole
 ADD ./webui /webconsole
 RUN yarn install && yarn build
 
-FROM docker.io/library/alpine:3.19 as base
+FROM --platform=$BUILDPLATFORM docker.io/library/alpine:3.19 as base
 
 ARG ALPINE_MIRROR
 ENV ALPINE_MIRROR=$ALPINE_MIRROR

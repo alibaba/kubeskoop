@@ -55,7 +55,7 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
-        if: ${{ github.event_name != 'pull_request' && github.event.action != 'unassigned' }}
+        if: ${{ github.event_name != 'pull_request' && github.event.action != 'unassigned' && github.repository == 'alibaba/kubeskoop' }}
 
       - name: Go Build Cache for Docker
         uses: actions/cache@v3
@@ -75,7 +75,7 @@ jobs:
           context: .
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ github.event_name != 'pull_request' && github.repository == 'alibaba/kubeskoop' }}
           tags: ${{ steps.meta-agent.outputs.tags }}
           target: agent
           labels: ${{ steps.meta-agent.outputs.labels }}
@@ -87,7 +87,7 @@ jobs:
           context: .
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ github.event_name != 'pull_request' && github.repository == 'alibaba/kubeskoop' }}
           tags: ${{ steps.meta-controller.outputs.tags }}
           target: controller
           labels: ${{ steps.meta-controller.outputs.labels }}
