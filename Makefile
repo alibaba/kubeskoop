@@ -59,7 +59,7 @@ build-collector: ## Build collector binary.
 
 .PHONY: build-controller
 build-controller: ## Build controller binary.
-	go build -o bin/controller -ldflags $(ldflags) ./cmd/controller
+	CGO_ENABLED=0 go build -o bin/controller -ldflags $(ldflags) ./cmd/controller
 
 .PHONY: build-btfhack
 build-btfhack: ## Build btfhack binary.
