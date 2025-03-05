@@ -80,4 +80,4 @@ generate-bpf: ## Generate bpf.
 
 .PHONY: generate-bpf-in-container
 generate-bpf-in-container: ## Generate bpf in container.
-	$(CONTAINER_TOOL) run --rm -v $(PWD):/go/src/github.com/alibaba/kubeskoop --workdir /go/src/github.com/alibaba/kubeskoop kubeskoop/bpf-build:go122-clang17 make generate-bpf
+	$(CONTAINER_TOOL) run --rm -v $(PWD):/go/src/github.com/alibaba/kubeskoop --workdir /go/src/github.com/alibaba/kubeskoop kubeskoop/ci-builder:go124clang191 make generate-bpf
