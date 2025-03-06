@@ -59,7 +59,7 @@ build-collector: ## Build collector binary.
 
 .PHONY: build-controller
 build-controller: ## Build controller binary.
-	go build -o bin/controller -ldflags $(ldflags) ./cmd/controller
+	CGO_ENABLED=0 go build -o bin/controller -ldflags $(ldflags) ./cmd/controller
 
 .PHONY: build-btfhack
 build-btfhack: ## Build btfhack binary.
@@ -80,4 +80,4 @@ generate-bpf: ## Generate bpf.
 
 .PHONY: generate-bpf-in-container
 generate-bpf-in-container: ## Generate bpf in container.
-	$(CONTAINER_TOOL) run --rm -v $(PWD):/go/src/github.com/alibaba/kubeskoop --workdir /go/src/github.com/alibaba/kubeskoop kubeskoop/bpf-build:go122-clang17 make generate-bpf
+	$(CONTAINER_TOOL) run --rm -v $(PWD):/go/src/github.com/alibaba/kubeskoop --workdir /go/src/github.com/alibaba/kubeskoop kubeskoop/ci-builder:go124clang191 make generate-bpf
