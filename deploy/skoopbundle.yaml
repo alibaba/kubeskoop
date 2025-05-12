@@ -27,7 +27,7 @@ spec:
     spec:
       hostNetwork: true
       hostPID: true
-      hostIPC: true
+      automountServiceAccountToken: false
       dnsPolicy: ClusterFirstWithHostNet
       initContainers:
         - name: inspector-prepare
@@ -73,7 +73,15 @@ spec:
             name: hostname
         command: [/bin/inspector,server,-d]
         securityContext:
-          privileged: true
+          capabilities:
+            add:
+            - NET_ADMIN
+            - SYS_PTRACE
+            - SYS_ADMIN
+            - SYS_RESOURCE
+            - DAC_OVERRIDE
+            drop:
+            - ALL
         resources:
           requests:
             cpu: 1000m
