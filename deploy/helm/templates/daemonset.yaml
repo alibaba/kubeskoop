@@ -22,7 +22,7 @@ spec:
     spec:
       hostNetwork: true
       hostPID: true
-      hostIPC: true
+      automountServiceAccountToken: false
       dnsPolicy: ClusterFirstWithHostNet
       {{- if .btfhack.enabled }}
       initContainers:
@@ -79,7 +79,15 @@ spec:
           - server
           - -d
         securityContext:
-          privileged: true
+          capabilities:
+            add:
+            - NET_ADMIN
+            - SYS_PTRACE
+            - SYS_ADMIN
+            - SYS_RESOURCE
+            - DAC_OVERRIDE
+            drop:
+            - ALL
         resources:
           {{- toYaml .resources | nindent 12 }}
       {{- with .nodeSelector }}
