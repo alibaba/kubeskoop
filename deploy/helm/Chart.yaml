@@ -5,8 +5,8 @@ type: application
 annotations:
   category: Analytics
   licenses: Apache-2.0
-version: 1.0.2
-appVersion: 1.0.0-rc.1
+version: 1.0.3
+appVersion: 1.0.1
 icon: https://img.shields.io/github/v/tag/alibaba/kubeskoop
 keywords:
   - kubeskoop

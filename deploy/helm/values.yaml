@@ -34,7 +34,7 @@ agent:
     port: 9102
   image:
     repository: kubeskoop/agent
-    tag: v1.0.0
+    tag: v1.0.1
     imagePullPolicy: IfNotPresent
   resources:
     limits:
@@ -46,7 +46,7 @@ agent:
   btfhack:
     enabled: true
     repository: kubeskoop/agent
-    tag: v1.0.0
+    tag: v1.0.1
     imagePullPolicy: IfNotPresent
   nodeSelector: {}
   tolerations: {}
@@ -59,7 +59,7 @@ controller:
     lokiEndpoint: http://loki-service:3100
   image:
     repository: kubeskoop/controller
-    tag: v1.0.0
+    tag: v1.0.1
     imagePullPolicy: IfNotPresent
   resources:
     limits:
@@ -88,7 +88,7 @@ webconsole:
     password: kubeskoop
   image:
     repository: kubeskoop/controller
-    tag: v1.0.0
+    tag: v1.0.1
     imagePullPolicy: IfNotPresent
   resources:
     limits:
