@@ -108,7 +108,7 @@ func NewCollector(podNamespace, podName, runtimeEndpoint string) (collector.Coll
 			log.Infof("found cri endpoint: %s", s)
 			socket = s
 		} else {
-			return nil, fmt.Errorf("cannot found comportable endpoint address for cri-api, please specify cri address by -runtime-endpoint")
+			return nil, fmt.Errorf("cannot find a compatible endpoint address for CRI API, please specify the CRI address using the -runtime-endpoint flag")
 		}
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
