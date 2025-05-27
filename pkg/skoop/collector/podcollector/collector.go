@@ -12,6 +12,9 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -83,36 +86,34 @@ func NewCollector(podNamespace, podName, runtimeEndpoint string) (collector.Coll
 	if runtimeEndpoint != "" {
 		socket = runtimeEndpoint
 	}
-	if socket == "" {
-		socket = "unix:///var/run/dockershim.sock"
-		_, err := os.Stat("/var/run/dockershim.sock")
-		if err != nil {
-			if os.IsNotExist(err) {
-				containerdSockets := []string{
-					"unix:///run/containerd/containerd.sock",
-					"unix:///run/k3s/containerd/containerd.sock",
-				}
 
-				for _, containerdAddr := range containerdSockets {
-					if _, err = os.Stat(strings.TrimPrefix(containerdAddr, "unix://")); err == nil {
-						socket = containerdAddr
-						break
-					}
-				}
-				if socket == "" {
-					return nil, fmt.Errorf("cannot found comportable endpoint address for cri-api, please specify cri address by --collector-cri-address")
-				}
-			} else {
-				return nil, err
-			}
-		} else {
+	var err error
+	if socket == "" {
+		dockerSockets := []string{
+			"unix:///var/run/dockershim.sock",
+			"unix:///var/run/cri-dockerd.sock",
+		}
+		containerdSockets := []string{
+			"unix:///run/containerd/containerd.sock",
+			"unix:///run/k3s/containerd/containerd.sock",
+		}
+		if s := unixSocketExists(dockerSockets); s != "" {
+			log.Infof("found cri endpoint with docker: %s", s)
+			socket = s
 			pc.dockerCli, err = client.NewClientWithOpts(client.WithVersion("1.25"))
 			if err != nil {
 				return nil, err
 			}
+		} else if s := unixSocketExists(containerdSockets); s != "" {
+			log.Infof("found cri endpoint: %s", s)
+			socket = s
+		} else {
+			return nil, fmt.Errorf("cannot found comportable endpoint address for cri-api, please specify cri address by -runtime-endpoint")
 		}
 	}
-	conn, err := grpc.Dial(socket, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	conn, err := grpc.DialContext(ctx, socket, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
 	if err != nil {
 		return nil, err
 	}
@@ -185,6 +186,15 @@ func (a *podCollector) PodInfo(sandbox *pb.PodSandbox) (k8s.PodNetInfo, error) {
 		p.Netns = ""
 	}
 	return p, nil
+}
+
+func unixSocketExists(sockets []string) string {
+	for _, addr := range sockets {
+		if _, err := os.Stat(strings.TrimPrefix(addr, "unix://")); err == nil {
+			return addr
+		}
+	}
+	return ""
 }
 
 func alphaRespTov1Resp(
