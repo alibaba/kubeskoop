@@ -171,6 +171,7 @@ require (
 	github.com/prometheus/client_model v0.4.0 // indirect
 	github.com/rivo/uniseg v0.4.3 // indirect
 	github.com/stefanberger/go-pkcs11uri v0.0.0-20201008174630-78d3cae3a980 // indirect
+	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/tchap/go-patricia v2.2.6+incompatible // indirect
 	github.com/tetratelabs/wazero v1.9.0 // indirect
 	github.com/tjfoc/gmsm v1.3.2 // indirect
