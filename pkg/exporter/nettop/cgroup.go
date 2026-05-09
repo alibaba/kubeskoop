@@ -2,10 +2,8 @@ package nettop
 
 import (
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -57,26 +55,18 @@ func tasksInsidePodCgroup(path string, absolutePath bool) []int {
 		tasksFileName = "cgroup.threads"
 	}
 
-	m := make(map[int]int)
-	err := filepath.Walk(base, func(path string, info fs.FileInfo, err error) error {
+	m := make(map[int]struct{})
+	err := filepath.WalkDir(base, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if !info.IsDir() && strings.HasSuffix(path, "/"+tasksFileName) {
+		if !entry.IsDir() && strings.HasSuffix(path, "/"+tasksFileName) {
 			tasks, err := os.ReadFile(path)
 			if err != nil {
 				return fmt.Errorf("failed read cgroup tasks %s: %w", path, err)
 			}
-			for _, s := range strings.Split(string(tasks), "\n") {
-				s = strings.TrimSpace(s)
-				if s == "" {
-					continue
-				}
-				i, err := strconv.Atoi(s)
-				if err != nil {
-					return fmt.Errorf("invalid tasks pid format in %s : %w", path, err)
-				}
-				m[i] = 1
+			if err := parseTaskPIDs(tasks, m); err != nil {
+				return fmt.Errorf("invalid tasks pid format in %s : %w", path, err)
 			}
 		}
 		return nil
@@ -86,9 +76,33 @@ func tasksInsidePodCgroup(path string, absolutePath bool) []int {
 		log.Errorf("failed list tasks: %v", err)
 	}
 
-	var ret []int
+	ret := make([]int, 0, len(m))
 	for k := range m {
 		ret = append(ret, k)
 	}
 	return ret
+}
+
+func parseTaskPIDs(data []byte, pids map[int]struct{}) error {
+	pid := 0
+	hasDigit := false
+	for _, b := range data {
+		switch {
+		case b >= '0' && b <= '9':
+			hasDigit = true
+			pid = pid*10 + int(b-'0')
+		case b == '\n' || b == '\r' || b == '\t' || b == ' ':
+			if hasDigit {
+				pids[pid] = struct{}{}
+				pid = 0
+				hasDigit = false
+			}
+		default:
+			return fmt.Errorf("unexpected byte %q", b)
+		}
+	}
+	if hasDigit {
+		pids[pid] = struct{}{}
+	}
+	return nil
 }

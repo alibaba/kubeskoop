@@ -21,8 +21,9 @@ type InspServerConfig struct {
 }
 
 type MetricsConfig struct {
-	Probes           []ProbeConfig `yaml:"probes" mapstructure:"probes" json:"probes"`
-	AdditionalLabels []string      `yaml:"additionalLabels" mapstructure:"additionalLabels" json:"additionalLabels"`
+	Probes             []ProbeConfig `yaml:"probes" mapstructure:"probes" json:"probes"`
+	AdditionalLabels   []string      `yaml:"additionalLabels" mapstructure:"additionalLabels" json:"additionalLabels"`
+	DisableCompression bool          `yaml:"disableCompression" mapstructure:"disableCompression" json:"disableCompression"`
 }
 
 type EventConfig struct {
@@ -41,7 +42,11 @@ type ProbeConfig struct {
 }
 
 func loadConfig(path string) (*InspServerConfig, error) {
-	cfg := InspServerConfig{}
+	cfg := InspServerConfig{
+		MetricsConfig: MetricsConfig{
+			DisableCompression: true,
+		},
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed read config file %s: %w", path, err)

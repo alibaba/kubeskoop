@@ -1,4 +1,5 @@
 config:
+  disableMetricsCompression: true
 #  additionalLabels:
 #    - application=${labels:application}
 #      businessline=${labels:businessline}

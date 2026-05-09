@@ -9,6 +9,7 @@ data:
     port: {{ .Values.agent.config.port }}
     enableController: {{ .Values.controller.enabled }}
     metrics:
+      disableCompression: {{ .Values.config.disableMetricsCompression }}
       additionalLabels:
       {{- toYaml .Values.config.additionalLabels | nindent 8 }}
       probes:
