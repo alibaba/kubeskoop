@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"net/http"
+	"sync/atomic"
 
 	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
 	"github.com/alibaba/kubeskoop/pkg/exporter/util"
@@ -11,21 +12,20 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func newMetricsServer() (*MetricsServer, error) {
+func newMetricsServer(config MetricsConfig) (*MetricsServer, error) {
 
 	r := prometheus.NewRegistry()
-	handler := promhttp.HandlerFor(prometheus.Gatherers{
-		r,
-	}, promhttp.HandlerOpts{})
 
 	probeManager := &MetricsProbeManager{
 		prometheusRegistry: r,
 	}
 
-	return &MetricsServer{
+	server := &MetricsServer{
 		DynamicProbeServer: NewDynamicProbeServer[probe.MetricsProbe](probeManager),
-		httpHandler:        handler,
-	}, nil
+		prometheusRegistry: r,
+	}
+	server.SetDisableCompression(config.DisableCompression)
+	return server, nil
 }
 
 type MetricsProbeManager struct {
@@ -65,9 +65,17 @@ var _ ProbeManager[probe.MetricsProbe] = &MetricsProbeManager{}
 
 type MetricsServer struct {
 	*DynamicProbeServer[probe.MetricsProbe]
-	httpHandler http.Handler
+	prometheusRegistry *prometheus.Registry
+	httpHandler        atomic.Value
+}
+
+func (s *MetricsServer) SetDisableCompression(disable bool) {
+	handler := promhttp.HandlerFor(prometheus.Gatherers{
+		s.prometheusRegistry,
+	}, promhttp.HandlerOpts{DisableCompression: disable})
+	s.httpHandler.Store(handler)
 }
 
 func (s *MetricsServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.httpHandler.ServeHTTP(w, r)
+	s.httpHandler.Load().(http.Handler).ServeHTTP(w, r)
 }

@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"sync"
 	"syscall"
+	"time"
 
 	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
 
@@ -39,6 +41,8 @@ const (
 	// __TCAStats_MAX
 
 	familyRoute = 0
+
+	ifaceMapTTL = time.Minute
 )
 
 var (
@@ -59,6 +63,13 @@ var (
 		{Name: Backlog, Help: "The total amount of data currently in the queue (in bytes)."},
 		{Name: Overlimits, Help: "The total number of packets that exceeded the configured limits."},
 	}
+
+	qdiscReqPool = sync.Pool{New: func() interface{} {
+		return &netlink.Message{Data: make([]byte, 20)}
+	}}
+	linkReqPool = sync.Pool{New: func() interface{} {
+		return &netlink.Message{Data: make([]byte, 16)}
+	}}
 )
 
 func init() {
@@ -66,20 +77,45 @@ func init() {
 }
 
 func qdiscProbeCreator() (probe.MetricsProbe, error) {
-	p := &Probe{}
+	p := &Probe{
+		clients: make(map[int]*qdiscClient),
+	}
 
 	batchMetrics := probe.NewLegacyBatchMetrics(probeName, qdiscMetrics, p.CollectOnce)
 
 	return probe.NewMetricsProbe(probeName, p, batchMetrics), nil
 }
 
-type Probe struct{}
+type Probe struct {
+	lock    sync.Mutex
+	clients map[int]*qdiscClient
+	stopped bool
+}
+
+type qdiscClient struct {
+	lock          sync.Mutex
+	conn          *netlink.Conn
+	ifaceMap      map[int]string
+	ifaceMapUntil time.Time
+}
 
 func (p *Probe) Start(_ context.Context) error {
+	p.lock.Lock()
+	p.stopped = false
+	p.lock.Unlock()
 	return nil
 }
 
 func (p *Probe) Stop(_ context.Context) error {
+	p.lock.Lock()
+	p.stopped = true
+	clients := p.clients
+	p.clients = make(map[int]*qdiscClient)
+	p.lock.Unlock()
+	for netns, client := range clients {
+		client.close()
+		delete(clients, netns)
+	}
 	return nil
 }
 
@@ -90,8 +126,10 @@ func (p *Probe) CollectOnce() (map[string]map[uint32]uint64, error) {
 	}
 
 	ets := nettop.GetAllUniqueNetnsEntity()
+	activeNetns := make(map[int]struct{}, len(ets))
 	for _, et := range ets {
-		stats, err := getQdiscStats(et)
+		activeNetns[et.GetNetns()] = struct{}{}
+		stats, err := p.getQdiscStats(et)
 		if err != nil {
 			log.Errorf("%s failed get qdisc stats: %v", probeName, err)
 			continue
@@ -109,22 +147,27 @@ func (p *Probe) CollectOnce() (map[string]map[uint32]uint64, error) {
 			}
 		}
 	}
+	p.closeUnusedClients(activeNetns)
 
 	return resMap, nil
 }
 
-func getQdiscStats(entity *nettop.Entity) ([]QdiscInfo, error) {
+func (p *Probe) getQdiscStats(entity *nettop.Entity) ([]QdiscInfo, error) {
 	nsHandle, err := entity.OpenNsHandle()
 	if err != nil {
 		return nil, err
 	}
 	defer nsHandle.Close()
 
-	c, err := getConn(int(nsHandle))
+	client, err := p.getClient(entity.GetNetns(), int(nsHandle))
 	if err != nil {
 		return nil, err
 	}
-	defer c.Close()
+	client.lock.Lock()
+	if client.conn == nil {
+		client.lock.Unlock()
+		return nil, fmt.Errorf("netlink connection for netns %d is closed", entity.GetNetns())
+	}
 
 	// Build interface index -> name map for this namespace.
 	var ifaceMap map[int]string
@@ -135,25 +178,19 @@ func getQdiscStats(entity *nettop.Entity) ([]QdiscInfo, error) {
 			ifaceMap[l.Index] = l.Name
 		}
 	} else {
-		ifaceMap, err = getInterfaceMap(c)
-		if err != nil {
-			log.Warnf("%s failed get interface map for netns %d: %v", probeName, entity.GetNetns(), err)
-			ifaceMap = make(map[int]string)
-		}
+		ifaceMap = client.cachedInterfaceMap(entity.GetNetns())
 	}
 
-	req := netlink.Message{
-		Header: netlink.Header{
-			Flags: netlink.Request | netlink.Dump,
-			Type:  38, // RTM_GETQDISC
-		},
-		Data: make([]byte, 20),
-	}
+	req := qdiscRequest()
+	defer putQdiscRequest(req)
 
-	msgs, err := c.Execute(req)
+	msgs, err := client.conn.Execute(*req)
 	if err != nil {
+		client.lock.Unlock()
+		p.dropClient(entity.GetNetns(), client)
 		return nil, fmt.Errorf("failed to execute request: %v", err)
 	}
+	client.lock.Unlock()
 
 	res := []QdiscInfo{}
 	for _, msg := range msgs {
@@ -168,18 +205,128 @@ func getQdiscStats(entity *nettop.Entity) ([]QdiscInfo, error) {
 	return res, nil
 }
 
+func (p *Probe) getClient(netns, nsfd int) (*qdiscClient, error) {
+	p.lock.Lock()
+	if p.stopped {
+		p.lock.Unlock()
+		return nil, fmt.Errorf("%s probe is stopped", probeName)
+	}
+	client := p.clients[netns]
+	p.lock.Unlock()
+	if client != nil {
+		return client, nil
+	}
+
+	c, err := getConn(nsfd)
+	if err != nil {
+		return nil, err
+	}
+	client = &qdiscClient{conn: c}
+
+	p.lock.Lock()
+	if p.stopped {
+		p.lock.Unlock()
+		client.close()
+		return nil, fmt.Errorf("%s probe is stopped", probeName)
+	}
+	if existing := p.clients[netns]; existing != nil {
+		p.lock.Unlock()
+		client.close()
+		return existing, nil
+	}
+	p.clients[netns] = client
+	p.lock.Unlock()
+	return client, nil
+}
+
+func (p *Probe) dropClient(netns int, client *qdiscClient) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	if p.clients[netns] == client {
+		client.close()
+		delete(p.clients, netns)
+	}
+}
+
+func (p *Probe) closeUnusedClients(active map[int]struct{}) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	for netns, client := range p.clients {
+		if _, ok := active[netns]; ok {
+			continue
+		}
+		client.close()
+		delete(p.clients, netns)
+	}
+}
+
+func (c *qdiscClient) close() {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	if c.conn != nil {
+		_ = c.conn.Close()
+		c.conn = nil
+	}
+	c.ifaceMap = nil
+	c.ifaceMapUntil = time.Time{}
+}
+
+func (c *qdiscClient) cachedInterfaceMap(netns int) map[int]string {
+	now := time.Now()
+	if c.ifaceMap != nil && now.Before(c.ifaceMapUntil) {
+		return c.ifaceMap
+	}
+	ifaceMap, err := getInterfaceMap(c.conn)
+	if err != nil {
+		log.Warnf("%s failed get interface map for netns %d: %v", probeName, netns, err)
+		ifaceMap = make(map[int]string)
+	}
+	c.ifaceMap = ifaceMap
+	c.ifaceMapUntil = now.Add(ifaceMapTTL)
+	return ifaceMap
+}
+
+func qdiscRequest() *netlink.Message {
+	req := qdiscReqPool.Get().(*netlink.Message)
+	req.Header = netlink.Header{Flags: netlink.Request | netlink.Dump, Type: 38} // RTM_GETQDISC
+	if cap(req.Data) < 20 {
+		req.Data = make([]byte, 20)
+	} else {
+		req.Data = req.Data[:20]
+	}
+	clear(req.Data)
+	return req
+}
+
+func putQdiscRequest(req *netlink.Message) {
+	req.Header = netlink.Header{}
+	qdiscReqPool.Put(req)
+}
+
+func linkRequest() *netlink.Message {
+	req := linkReqPool.Get().(*netlink.Message)
+	req.Header = netlink.Header{Flags: netlink.Request | netlink.Dump, Type: 18} // RTM_GETLINK
+	if cap(req.Data) < 16 {
+		req.Data = make([]byte, 16)
+	} else {
+		req.Data = req.Data[:16]
+	}
+	clear(req.Data)
+	return req
+}
+
+func putLinkRequest(req *netlink.Message) {
+	req.Header = netlink.Header{}
+	linkReqPool.Put(req)
+}
+
 // getInterfaceMap queries RTM_GETLINK on an existing netlink connection
 // and returns a map of interface index to interface name.
 func getInterfaceMap(c *netlink.Conn) (map[int]string, error) {
-	req := netlink.Message{
-		Header: netlink.Header{
-			Flags: netlink.Request | netlink.Dump,
-			Type:  18, // RTM_GETLINK
-		},
-		Data: make([]byte, 16), // struct ifinfomsg
-	}
+	req := linkRequest()
+	defer putLinkRequest(req)
 
-	msgs, err := c.Execute(req)
+	msgs, err := c.Execute(*req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute RTM_GETLINK request: %v", err)
 	}

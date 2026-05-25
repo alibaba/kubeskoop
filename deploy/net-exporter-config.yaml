@@ -19,7 +19,7 @@ metrics:
       enablePortInLabel: false
   - name: tcpretrans
 event:
-  probes: 
+  probes:
   - name: biolatency
   - name: kernellatency
   - name: packetloss
@@ -27,6 +27,5 @@ event:
       enableStack: false
   - name: tcpreset
   - name: tcpretrans
-  sinks: 
+  sinks:
   - name: stderr
-

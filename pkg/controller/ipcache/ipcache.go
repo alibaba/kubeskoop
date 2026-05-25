@@ -22,8 +22,11 @@ import (
 )
 
 const (
-	MaxSyncBatchSize = 20
-	CompactThreshold = 10240
+	MaxSyncBatchSize      = 20
+	CompactThreshold      = 1024
+	MaxRetainedLogEntries = 10 * CompactThreshold
+	ClientBufferSize      = 1024
+	LogBufferSize         = 4 * 1024
 )
 
 type changeLog struct {
@@ -104,7 +107,7 @@ func (s *Service) WatchCache(request *rpc.WatchCacheRequest, server rpc.IPCacheS
 		revision: request.Revision,
 		closed:   false,
 		state:    stale,
-		ch:       make(chan *changeLog, 4*1024),
+		ch:       make(chan *changeLog, ClientBufferSize),
 	}
 
 	s.clients.PushBack(c)
@@ -116,9 +119,12 @@ loop:
 	for {
 		select {
 		case <-server.Context().Done():
-			c.closed = true
+			s.markClientClosed(c)
 			break loop
-		case cl := <-c.ch:
+		case cl, ok := <-c.ch:
+			if !ok {
+				return status.Error(codes.DataLoss, "watch client fell behind")
+			}
 			err := server.Send(&rpc.WatchCacheResponse{
 				Revision: cl.revision,
 				Opcode:   cl.opcode,
@@ -126,13 +132,19 @@ loop:
 			})
 			if err != nil {
 				log.Warningf("failed send watch response to client: %v", err)
-				c.closed = true
+				s.markClientClosed(c)
 				break loop
 			}
 		}
 	}
 
 	return nil
+}
+
+func (s *Service) markClientClosed(c *client) {
+	s.clientsLock.Lock()
+	c.closed = true
+	s.clientsLock.Unlock()
 }
 
 func findNext(slice []*changeLog, target uint64) int {
@@ -158,7 +170,7 @@ func NewService(podInformer coreinformers.PodInformer, nodeInformer coreinformer
 				entries: make(map[string]*rpc.CacheEntry),
 			},
 		},
-		logChan: make(chan *changeLog, 10*1024),
+		logChan: make(chan *changeLog, LogBufferSize),
 		clients: list.New(),
 		period:  uuid.NewString(),
 	}
@@ -391,25 +403,28 @@ func (s *Service) compactLog() {
 	s.storage.snapshot.lock.Lock()
 	defer s.storage.snapshot.lock.Unlock()
 
-	var minRevision uint64
+	minRevision := s.storage.revision.Load()
+	hasActiveClient := false
 
 	for e := s.clients.Front(); e != nil; e = e.Next() {
 		c := e.Value.(*client)
 		if c.closed {
 			continue
 		}
+		hasActiveClient = true
 		if c.revision < minRevision {
 			minRevision = c.revision
 		}
 	}
 
-	if minRevision == 0 {
+	if len(s.storage.log) == 0 || (!hasActiveClient && minRevision == s.storage.snapshot.revision) {
 		return
 	}
 
 	var first, last uint64
+	compactTo := 0
 
-	for i := 0; i < len(s.storage.log); {
+	for i := 0; i < len(s.storage.log); i++ {
 		cl := s.storage.log[i]
 		if cl.revision > minRevision {
 			break
@@ -420,34 +435,63 @@ func (s *Service) compactLog() {
 		last = cl.revision
 		apply(s.storage.snapshot.entries, cl)
 		s.storage.snapshot.revision = cl.revision
+		compactTo = i + 1
+	}
+
+	if compactTo > 0 {
+		copy(s.storage.log, s.storage.log[compactTo:])
+		for i := len(s.storage.log) - compactTo; i < len(s.storage.log); i++ {
+			s.storage.log[i] = nil
+		}
+		s.storage.log = s.storage.log[:len(s.storage.log)-compactTo]
 	}
 
 	if last > 0 {
-		log.Infof("compact log from %d(include) to %d(include)", first, last)
+		log.Infof("compact log from %d(include) to %d(include), remain %d", first, last, len(s.storage.log))
 	}
 }
 
 func (s *Service) copyClients(filter ...clientstate) []*client {
-	s.clientsLock.RLock()
-	defer s.clientsLock.RUnlock()
+	s.clientsLock.Lock()
+	defer s.clientsLock.Unlock()
 
 	var ret []*client
-	for e := s.clients.Front(); e != nil; e = e.Next() {
+	for e := s.clients.Front(); e != nil; {
+		next := e.Next()
 		c := e.Value.(*client)
 		if c.closed {
 			close(c.ch)
 			s.clients.Remove(e)
+			e = next
 			continue
 		}
 		if len(filter) == 0 || slices.Contains(filter, c.state) {
 			ret = append(ret, c)
 		}
+		e = next
 	}
 	return ret
 }
 
+func (s *Service) closeBackpressuredClients() int {
+	s.clientsLock.Lock()
+	defer s.clientsLock.Unlock()
+
+	closed := 0
+	for e := s.clients.Front(); e != nil; e = e.Next() {
+		c := e.Value.(*client)
+		if c.closed || c.state != blocking || len(c.ch) < cap(c.ch) {
+			continue
+		}
+		c.closed = true
+		closed++
+	}
+	return closed
+}
+
 func (s *Service) syncControl() {
 	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
 
 	var pendingLogs []*changeLog
 
@@ -459,7 +503,12 @@ func (s *Service) syncControl() {
 			//TODO check change log effectiveness, if change log has no effect on current data, ignore it to reduce sync
 
 			s.storage.log = append(s.storage.log, cl)
-			if len(s.storage.log) > CompactThreshold {
+			if len(s.storage.log) > MaxRetainedLogEntries {
+				if closed := s.closeBackpressuredClients(); closed > 0 {
+					log.Warnf("closed %d slow ipcache clients to compact retained logs", closed)
+				}
+				s.compactLog()
+			} else if len(s.storage.log) > CompactThreshold {
 				s.compactLog()
 			}
 
@@ -477,6 +526,7 @@ func (s *Service) syncControl() {
 			}
 
 			s.syncClients(maxSyncedRevision)
+			s.compactLog()
 		}
 	}
 }

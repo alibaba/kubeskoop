@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/alibaba/kubeskoop/pkg/exporter/bpfutil"
 	"github.com/alibaba/kubeskoop/pkg/exporter/nettop"
@@ -15,9 +16,32 @@ var StandardMetricsLabels = []string{"k8s_node", "k8s_namespace", "k8s_pod"}
 var TupleMetricsLabels = []string{"protocol", "src", "src_type", "src_node", "src_namespace", "src_pod", "dst", "dst_type", "dst_node", "dst_namespace", "dst_pod", "sport", "dport"}
 var AdditionalLabelValueExpr []string
 
+var standardLabelValuePool = sync.Pool{New: func() interface{} {
+	values := make([]string, 0, len(StandardMetricsLabels))
+	return &values
+}}
+
 func BuildStandardMetricsLabelValues(entity *nettop.Entity) []string {
-	metaPodLabels := []string{nettop.GetNodeName(), entity.GetPodNamespace(), entity.GetPodName()}
-	return append(metaPodLabels, BuildAdditionalLabelsValues(entity.GetLabels())...)
+	return appendStandardMetricsLabelValues(nil, entity)
+}
+
+func getStandardMetricsLabelValues(entity *nettop.Entity) *[]string {
+	values := standardLabelValuePool.Get().(*[]string)
+	*values = appendStandardMetricsLabelValues((*values)[:0], entity)
+	return values
+}
+
+func putStandardMetricsLabelValues(values *[]string) {
+	for i := range *values {
+		(*values)[i] = ""
+	}
+	*values = (*values)[:0]
+	standardLabelValuePool.Put(values)
+}
+
+func appendStandardMetricsLabelValues(dst []string, entity *nettop.Entity) []string {
+	dst = append(dst, nettop.GetNodeName(), entity.GetPodNamespace(), entity.GetPodName())
+	return appendAdditionalLabelsValues(dst, entity.GetLabels())
 }
 
 type LegacyMetric struct {
@@ -41,11 +65,17 @@ func InitAdditionalLabels(additionalLabels []string) error {
 }
 
 func BuildAdditionalLabelsValues(podLabels map[string]string) []string {
-	if len(AdditionalLabelValueExpr) == 0 {
+	values := appendAdditionalLabelsValues(nil, podLabels)
+	if values == nil {
 		return []string{}
 	}
+	return values
+}
 
-	var values []string
+func appendAdditionalLabelsValues(values []string, podLabels map[string]string) []string {
+	if len(AdditionalLabelValueExpr) == 0 {
+		return values
+	}
 
 	var replaceAllStringSubmatchFunc = func(re *regexp.Regexp, str string, repl func([]string) string) string {
 		result := ""
@@ -135,8 +165,9 @@ func (l *legacyBatchMetrics) Collect(metrics chan<- prometheus.Metric) {
 			if err != nil || et == nil {
 				continue
 			}
-			labelValues := BuildStandardMetricsLabelValues(et)
-			emit(newMetricsName(l.module, key), labelValues, float64(value))
+			labelValues := getStandardMetricsLabelValues(et)
+			emit(newMetricsName(l.module, key), *labelValues, float64(value))
+			putStandardMetricsLabelValues(labelValues)
 		}
 	}
 }
