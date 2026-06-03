@@ -163,6 +163,7 @@ func (s *Server) ListCaptureTasks(ctx *gin.Context) {
 	tasks, err := s.controller.CaptureList(ctx)
 	if err != nil {
 		ctx.AsciiJSON(http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("error list capture task: %v", err)})
+		return
 	}
 	ctx.AsciiJSON(http.StatusOK, tasks)
 }
@@ -241,6 +242,7 @@ func (s *Server) GetFlowGraph(ctx *gin.Context) {
 		ti, err := strconv.Atoi(t)
 		if err != nil {
 			ctx.AsciiJSON(http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("cannot convert timestamp: %v", err)})
+			return
 		}
 		ts = time.Unix(int64(ti), 0)
 	} else {
@@ -250,6 +252,7 @@ func (s *Server) GetFlowGraph(ctx *gin.Context) {
 		ti, err := strconv.Atoi(f)
 		if err != nil {
 			ctx.AsciiJSON(http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("cannot convert timestamp: %v", err)})
+			return
 		}
 		fs = time.Unix(int64(ti), 0)
 	} else {
