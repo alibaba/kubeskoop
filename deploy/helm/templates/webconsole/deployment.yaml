@@ -20,6 +20,14 @@ spec:
         - name: webconsole
           image: "{{ .image.repository }}:{{ .image.tag }}"
           imagePullPolicy: {{ .image.imagePullPolicy }}
+          securityContext:
+            runAsUser: 65534
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           command: [ "/bin/webconsole" ]
           env:
             - name: CONTROLLER_ENDPOINT

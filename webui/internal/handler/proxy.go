@@ -26,6 +26,7 @@ func proxyHandler(ctx *gin.Context) {
 	remote, err := url.Parse(host + path)
 	if err != nil {
 		ctx.String(http.StatusBadRequest, "parse url failed: %s", err.Error())
+		return
 	}
 	proxy := httputil.NewSingleHostReverseProxy(remote)
 	proxy.Director = func(req *http.Request) {
@@ -42,12 +43,12 @@ func proxyHandler(ctx *gin.Context) {
 }
 
 func proxyControllerHandler(ctx *gin.Context) {
-	// todo whitelist for path
 	host := config.Global.Controller.Endpoint
 	path := ctx.Param("path")
 	remote, err := url.Parse(host + path)
 	if err != nil {
 		ctx.String(http.StatusBadRequest, "parse url failed: %s", err.Error())
+		return
 	}
 	proxy := httputil.NewSingleHostReverseProxy(remote)
 	proxy.Director = func(req *http.Request) {

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"net/http"
 	"time"
 
 	jwt "github.com/appleboy/gin-jwt/v2"
@@ -47,8 +48,11 @@ func GetAuthMiddleware() (*jwt.GinJWTMiddleware, error) {
 				"error": message,
 			})
 		},
-		SendCookie:  true,
-		TokenLookup: "cookie: jwt",
+		SendCookie:     true,
+		SecureCookie:   false,
+		CookieHTTPOnly: true,
+		CookieSameSite: http.SameSiteLaxMode,
+		TokenLookup:    "cookie: jwt",
 	})
 }
 
