@@ -78,6 +78,18 @@ spec:
           - /bin/inspector
           - server
           - -d
+        livenessProbe:
+          httpGet:
+            path: /metrics
+            port: {{ .config.port }}
+          initialDelaySeconds: 30
+          periodSeconds: 60
+        readinessProbe:
+          httpGet:
+            path: /metrics
+            port: {{ .config.port }}
+          initialDelaySeconds: 10
+          periodSeconds: 30
         securityContext:
           capabilities:
             add:

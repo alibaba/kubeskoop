@@ -22,6 +22,18 @@ spec:
           imagePullPolicy: {{ .image.imagePullPolicy }}
           command:
             - "/bin/controller"
+          livenessProbe:
+            httpGet:
+              path: /nodes
+              port: 10264
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /nodes
+              port: 10264
+            initialDelaySeconds: 5
+            periodSeconds: 10
           volumeMounts:
             - name: lib
               mountPath: /var/lib/kubeskoop

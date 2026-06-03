@@ -36,6 +36,18 @@ spec:
               value: "{{ .auth.username }}"
             - name: AUTH_PASSWORD
               value: "{{ .auth.password }}"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
           resources:
             {{- toYaml .resources | nindent 12 }}
           ports:
