@@ -9,6 +9,7 @@ import (
 	"path"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/alibaba/kubeskoop/pkg/controller/k8s"
 	"k8s.io/apimachinery/pkg/labels"
@@ -124,9 +125,37 @@ type CaptureTaskResult struct {
 	Message string    `json:"message"`
 }
 
+const captureTaskTTL = 1 * time.Hour
+
 var (
-	captureTasks = sync.Map{}
+	captureTasks    = sync.Map{}
+	captureTaskTime = sync.Map{}
 )
+
+func init() {
+	go cleanupExpiredCaptureTasks()
+}
+
+func cleanupExpiredCaptureTasks() {
+	ticker := time.NewTicker(10 * time.Minute)
+	defer ticker.Stop()
+	for range ticker.C {
+		captureTaskTime.Range(func(key, value interface{}) bool {
+			createdAt := value.(time.Time)
+			if time.Since(createdAt) > captureTaskTTL {
+				id := key.(int)
+				captureTasks.Delete(id)
+				captureTaskTime.Delete(id)
+				taskPath := fmt.Sprintf("/tmp/task_%d/", id)
+				os.RemoveAll(taskPath)
+				tarPath := fmt.Sprintf("/tmp/capture_task_%d.tar.gz", id)
+				os.Remove(tarPath)
+				log.Infof("cleaned up expired capture task %d", id)
+			}
+			return true
+		})
+	}
+}
 
 func (c *controller) Capture(ctx context.Context, capture *CaptureArgs) (int, error) {
 	taskID := int(getTaskIdx())
@@ -191,6 +220,7 @@ func (c *controller) Capture(ctx context.Context, capture *CaptureArgs) (int, er
 	}
 
 	captureTasks.Store(taskID, resultList)
+	captureTaskTime.Store(taskID, time.Now())
 
 	return taskID, nil
 }
