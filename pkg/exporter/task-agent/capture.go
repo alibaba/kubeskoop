@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -16,18 +17,43 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const (
-	//fixme: increase capture size by grpc
-	dumpCommand = "%v tcpdump -i any -C 100 -w %v %v" // size limit 100M
-)
+var validFilterRegex = regexp.MustCompile(`^[a-zA-Z0-9 ._:/\(\)\[\]!=<>&|,+*^%\-]+$`)
 
 type capture struct {
-	captureCommand string
-	captureFile    string
-	timeout        time.Duration
+	args        []string
+	captureFile string
+	timeout     time.Duration
+}
+
+func validateCaptureFilter(filter string) error {
+	if filter == "" {
+		return nil
+	}
+	if !validFilterRegex.MatchString(filter) {
+		return fmt.Errorf("invalid capture filter %q: contains disallowed characters", filter)
+	}
+	for _, token := range strings.Fields(filter) {
+		if strings.HasPrefix(token, "-") {
+			return fmt.Errorf("invalid capture filter: token %q looks like a flag, not a BPF expression", token)
+		}
+	}
+	return nil
+}
+
+func buildTcpdumpArgs(file, filter string) []string {
+	args := []string{"-i", "any", "-C", "100", "-w", file}
+	if filter != "" {
+		args = append(args, "--")
+		args = append(args, strings.Fields(filter)...)
+	}
+	return args
 }
 
 func (a *Agent) generateCaptures(id string, task *rpc.CaptureInfo) ([]capture, error) {
+	if err := validateCaptureFilter(task.GetFilter()); err != nil {
+		return nil, err
+	}
+
 	if task.Pod != nil && !task.Pod.HostNetwork {
 		var podEntry *nettop.Entity
 		entries := nettop.GetAllUniqueNetnsEntity()
@@ -40,25 +66,27 @@ func (a *Agent) generateCaptures(id string, task *rpc.CaptureInfo) ([]capture, e
 			return nil, fmt.Errorf("pod not found on nettop cache")
 		}
 		file := fmt.Sprintf("/tmp/%s_%s_%s_pod.pcap", id, task.Pod.Namespace, task.Pod.Name)
-		files := []capture{
+		tcpdumpArgs := buildTcpdumpArgs(file, task.GetFilter())
+		nsenterArgs := []string{"-t", fmt.Sprintf("%d", podEntry.GetPid()), "-n", "--", "tcpdump"}
+		nsenterArgs = append(nsenterArgs, tcpdumpArgs...)
+		return []capture{
 			{
-				captureCommand: fmt.Sprintf(dumpCommand, fmt.Sprintf("nsenter -t %v -n --", podEntry.GetPid()), file, task.GetFilter()),
-				captureFile:    file,
-				timeout:        time.Duration(task.CaptureDurationSeconds) * time.Second,
+				args:        append([]string{"nsenter"}, nsenterArgs...),
+				captureFile: file,
+				timeout:     time.Duration(task.CaptureDurationSeconds) * time.Second,
 			},
-		}
-		return files, nil
+		}, nil
 	}
 
 	file := fmt.Sprintf("/tmp/%s_%s_host.pcap", id, task.Node.Name)
+	tcpdumpArgs := buildTcpdumpArgs(file, task.GetFilter())
 	return []capture{
 		{
-			captureCommand: fmt.Sprintf(dumpCommand, "", file, task.GetFilter()),
-			captureFile:    file,
-			timeout:        time.Duration(task.CaptureDurationSeconds) * time.Second,
+			args:        append([]string{"tcpdump"}, tcpdumpArgs...),
+			captureFile: file,
+			timeout:     time.Duration(task.CaptureDurationSeconds) * time.Second,
 		},
 	}, nil
-
 }
 
 func (a *Agent) execute(captures []capture) (string, []byte, error) {
@@ -70,7 +98,7 @@ func (a *Agent) execute(captures []capture) (string, []byte, error) {
 			var (
 				output []byte
 				err    error
-				cmd    = exec.Command("sh", "-c", task.captureCommand)
+				cmd    = exec.Command(task.args[0], task.args[1:]...)
 			)
 			go func() {
 				output, err = cmd.CombinedOutput()
@@ -98,10 +126,12 @@ func (a *Agent) execute(captures []capture) (string, []byte, error) {
 	}()
 
 	fileType := "pcap"
-	outputCmd := exec.Command("sh", "-c", fmt.Sprintf("cat %v", captures[0].captureFile))
+	var outputCmd *exec.Cmd
 	if len(captures) > 1 {
 		fileType = "tar.gz"
 		outputCmd = exec.Command("tar", append([]string{"-czf", "-"}, lo.Map(captures, func(c capture, _ int) string { return c.captureFile })...)...)
+	} else {
+		outputCmd = exec.Command("cat", captures[0].captureFile)
 	}
 	output, err := outputCmd.Output()
 	if err != nil {
