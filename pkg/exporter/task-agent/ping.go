@@ -3,6 +3,7 @@ package taskagent
 import (
 	"context"
 	"fmt"
+	"net"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -38,7 +39,13 @@ func getLatency(pingResult string) (float64, float64, float64, error) {
 }
 
 func (a *Agent) ping(task *rpc.PingInfo) (string, error) {
-	var pingCmd string
+	destination := task.GetDestination()
+	if net.ParseIP(destination) == nil {
+		return "", fmt.Errorf("invalid ping destination: %q is not a valid IP address", destination)
+	}
+
+	var cmd *exec.Cmd
+	pingArgs := []string{"-A", "-c", "100", "-q", "-n", destination}
 	if task.Pod != nil && !task.Pod.HostNetwork {
 		var podEntry *nettop.Entity
 		entries := nettop.GetAllUniqueNetnsEntity()
@@ -50,12 +57,13 @@ func (a *Agent) ping(task *rpc.PingInfo) (string, error) {
 		if podEntry == nil {
 			return "", fmt.Errorf("pod not found on nettop cache")
 		}
-		pingCmd = fmt.Sprintf("nsenter -t %v -n -- ping -A -c 100 -q -n %v", podEntry.GetPid(), task.GetDestination())
+		nsenterArgs := []string{"-t", fmt.Sprintf("%d", podEntry.GetPid()), "-n", "--", "ping"}
+		nsenterArgs = append(nsenterArgs, pingArgs...)
+		cmd = exec.Command("nsenter", nsenterArgs...)
 	} else {
-		pingCmd = fmt.Sprintf("ping -A -c 100 -q -n %v", task.GetDestination())
+		cmd = exec.Command("ping", pingArgs...)
 	}
-	log.Infof("running command: %v", pingCmd)
-	cmd := exec.Command("sh", "-c", pingCmd)
+	log.Infof("running command: %v", cmd.Args)
 	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("error running command: %v, output: %v", err, string(output))
