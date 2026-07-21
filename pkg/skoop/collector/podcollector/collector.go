@@ -30,9 +30,8 @@ import (
 	"github.com/alibaba/kubeskoop/pkg/skoop/netstack"
 
 	"github.com/bastjan/netstat"
-	"github.com/containerd/containerd/pkg/cri/server"
-	"github.com/docker/docker/client"
 	"github.com/moby/ipvs"
+	"github.com/moby/moby/client"
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
 	"golang.org/x/exp/slices"
@@ -100,7 +99,7 @@ func NewCollector(podNamespace, podName, runtimeEndpoint string) (collector.Coll
 		if s := unixSocketExists(dockerSockets); s != "" {
 			log.Infof("found cri endpoint with docker: %s", s)
 			socket = s
-			pc.dockerCli, err = client.NewClientWithOpts(client.WithVersion("1.25"))
+			pc.dockerCli, err = client.New()
 			if err != nil {
 				return nil, err
 			}
@@ -164,13 +163,15 @@ func (a *podCollector) PodInfo(sandbox *pb.PodSandbox) (k8s.PodNetInfo, error) {
 	p.PodUID = sandboxStatus.Status.GetMetadata().Uid
 
 	if a.dockerCli != nil {
-		sandboxInfo, err := a.dockerCli.ContainerInspect(context.TODO(), sandbox.Id)
+		sandboxInfo, err := a.dockerCli.ContainerInspect(context.TODO(), sandbox.Id, client.ContainerInspectOptions{})
 		if err != nil {
 			return p, err
 		}
-		p.PID = uint32(sandboxInfo.State.Pid)
+		p.PID = uint32(sandboxInfo.Container.State.Pid)
 	} else {
-		sandboxInfo := server.SandboxInfo{}
+		sandboxInfo := struct {
+			Pid uint32 `json:"pid"`
+		}{}
 		err = json.Unmarshal([]byte(sandboxStatus.GetInfo()["info"]), &sandboxInfo)
 		if err != nil {
 			return p, err

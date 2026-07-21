@@ -10,6 +10,7 @@ endif
 # scaffolded by default. However, you might want to replace it to use other
 # tools. (i.e. podman)
 CONTAINER_TOOL ?= docker
+BUILDER_IMAGE ?= kubeskoop/ci-builder:go125clang211
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # This is a requirement for 'setup-envtest.sh' in the test target.
@@ -78,6 +79,10 @@ endif
 generate-bpf: ## Generate bpf.
 	go generate ./pkg/exporter/probe/...
 
+.PHONY: build-builder
+build-builder: ## Build the local BPF builder image.
+	$(CONTAINER_TOOL) build --build-arg GOPROXY="$(GOPROXY)" -t $(BUILDER_IMAGE) tools/builder
+
 .PHONY: generate-bpf-in-container
-generate-bpf-in-container: ## Generate bpf in container.
-	$(CONTAINER_TOOL) run --rm -v $(PWD):/go/src/github.com/alibaba/kubeskoop --workdir /go/src/github.com/alibaba/kubeskoop kubeskoop/ci-builder:go124clang191 make generate-bpf
+generate-bpf-in-container: build-builder ## Generate bpf in container.
+	$(CONTAINER_TOOL) run --rm -v $(PWD):/go/src/github.com/alibaba/kubeskoop --workdir /go/src/github.com/alibaba/kubeskoop $(BUILDER_IMAGE) make generate-bpf
