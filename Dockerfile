@@ -1,4 +1,4 @@
-FROM --platform=$TARGETPLATFORM kubeskoop/ci-builder:go124clang191 AS bpf-build
+FROM --platform=$TARGETPLATFORM kubeskoop/ci-builder:go12512clang211 AS bpf-build
 WORKDIR /go/src/github.com/alibaba/kubeskoop/
 RUN go env -w GOMODCACHE=/root/.cache/go-build
 COPY go.mod go.sum /go/src/github.com/alibaba/kubeskoop/
@@ -6,7 +6,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build go mod download
 ADD . /go/src/github.com/alibaba/kubeskoop/
 RUN --mount=type=cache,target=/root/.cache/go-build make generate-bpf
 
-FROM --platform=$BUILDPLATFORM kubeskoop/ci-builder:go124clang191 AS cross-build
+FROM --platform=$BUILDPLATFORM kubeskoop/ci-builder:go12512clang211 AS cross-build
 WORKDIR /go/src/github.com/alibaba/kubeskoop/
 RUN go env -w GOMODCACHE=/root/.cache/go-build
 COPY go.mod go.sum /go/src/github.com/alibaba/kubeskoop/
@@ -20,7 +20,7 @@ WORKDIR /webconsole
 ADD ./webui /webconsole
 RUN yarn install && yarn build
 
-FROM --platform=$TARGETPLATFORM docker.io/library/alpine:3.19 AS base
+FROM --platform=$TARGETPLATFORM docker.io/library/alpine:3.24 AS base
 
 ARG ALPINE_MIRROR
 ENV ALPINE_MIRROR=$ALPINE_MIRROR
