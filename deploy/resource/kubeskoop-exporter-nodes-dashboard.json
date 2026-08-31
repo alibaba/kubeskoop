@@ -3201,7 +3201,7 @@
                 "name": "node",
                 "options": [],
                 "query": {
-                    "query": "label_values(node)",
+                    "query": "label_values(k8s_node)",
                     "refId": "StandardVariableQuery"
                 },
                 "refresh": 1,
