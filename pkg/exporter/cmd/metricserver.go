@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"sync/atomic"
+	"time"
 
 	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
 	"github.com/alibaba/kubeskoop/pkg/exporter/util"
@@ -11,6 +12,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 )
+
+const metricsWriteTimeout = 30 * time.Second
 
 func newMetricsServer(config MetricsConfig) (*MetricsServer, error) {
 
@@ -67,6 +70,7 @@ type MetricsServer struct {
 	*DynamicProbeServer[probe.MetricsProbe]
 	prometheusRegistry *prometheus.Registry
 	httpHandler        atomic.Value
+	writeTimeout       time.Duration
 }
 
 func (s *MetricsServer) SetDisableCompression(disable bool) {
@@ -77,5 +81,16 @@ func (s *MetricsServer) SetDisableCompression(disable bool) {
 }
 
 func (s *MetricsServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Bound writes on this response only. A write deadline does not interrupt
+	// Gather, and concurrent scrapes are handled independently.
+	// Keep other endpoints, such as long-running CPU profiles, unaffected.
+	timeout := s.writeTimeout
+	if timeout <= 0 {
+		timeout = metricsWriteTimeout
+	}
+	if err := http.NewResponseController(w).SetWriteDeadline(time.Now().Add(timeout)); err != nil {
+		log.Debugf("cannot set metrics response write deadline: %v", err)
+	}
+
 	s.httpHandler.Load().(http.Handler).ServeHTTP(w, r)
 }

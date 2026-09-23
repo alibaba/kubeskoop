@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"sync"
 
@@ -82,41 +83,76 @@ func (s *ProcIO) collectOnce(emit probe.Emit) error {
 }
 
 func collectProcessIO(entity *nettop.Entity, emit probe.Emit) {
-	var (
-		readSyscall  uint64
-		writeSyscall uint64
-		readBytes    uint64
-		writeBytes   uint64
-	)
-	for _, pid := range entity.GetPids() {
-		iodata, err := getProcessIOStat(pid)
-		if err != nil {
-			log.Warningf("probe %s: failed get process io data: %v", probeName, err)
-			continue
-		}
-
-		readSyscall += iodata.SyscR
-		writeSyscall += iodata.SyscW
-		readBytes += iodata.ReadBytes
-		writeBytes += iodata.WriteBytes
-	}
+	stats := collectProcessIOStats("/proc", entity.GetPids())
 	labels := probe.BuildStandardMetricsLabelValues(entity)
-	emit(IOReadSyscall, labels, float64(readSyscall))
-	emit(IOWriteSyscall, labels, float64(writeSyscall))
-	emit(IOReadBytes, labels, float64(readBytes))
-	emit(IOWriteBytes, labels, float64(writeBytes))
+	emit(IOReadSyscall, labels, float64(stats.SyscR))
+	emit(IOWriteSyscall, labels, float64(stats.SyscW))
+	emit(IOReadBytes, labels, float64(stats.ReadBytes))
+	emit(IOWriteBytes, labels, float64(stats.WriteBytes))
 }
 
-// IO creates a new ProcIO instance from a given Proc instance.
-func getProcessIOStat(pid int) (procfs.ProcIO, error) {
-	pio := procfs.ProcIO{}
+func collectProcessIOStats(procRoot string, tids []int) procfs.ProcIO {
+	var total procfs.ProcIO
+	seen := make(map[int]struct{})
+	for _, tid := range tids {
+		tgid, err := getThreadGroupID(procRoot, tid)
+		if err != nil {
+			if !os.IsNotExist(err) {
+				log.Warningf("probe %s: failed get thread group: %v", probeName, err)
+			}
+			continue
+		}
+		if _, ok := seen[tgid]; ok {
+			continue
+		}
+		// /proc/<tid>/io reports the whole thread group's counters, even for
+		// non-leader threads. Read it only once per process. Use the live TID
+		// rather than the leader, which may already have exited.
+		stats, err := getProcessIOStat(procRoot, tid)
+		if err != nil {
+			if !os.IsNotExist(err) {
+				log.Warningf("probe %s: failed get process io data: %v", probeName, err)
+			}
+			continue
+		}
+		seen[tgid] = struct{}{}
+		total.SyscR += stats.SyscR
+		total.SyscW += stats.SyscW
+		total.ReadBytes += stats.ReadBytes
+		total.WriteBytes += stats.WriteBytes
+	}
+	return total
+}
 
-	data, putBuffer, err := readFileNoStat(fmt.Sprintf("/proc/%d/io", pid))
+func getThreadGroupID(procRoot string, tid int) (int, error) {
+	data, putBuffer, err := readFileNoStat(filepath.Join(procRoot, strconv.Itoa(tid), "status"))
+	if err != nil {
+		return 0, err
+	}
+	defer putBuffer()
+	for len(data) > 0 {
+		line, rest, _ := bytes.Cut(data, []byte("\n"))
+		data = rest
+		key, value, ok := bytes.Cut(line, []byte(":"))
+		if !ok || !bytes.Equal(key, []byte("Tgid")) {
+			continue
+		}
+		tgid, err := strconv.Atoi(string(bytes.TrimSpace(value)))
+		if err != nil || tgid <= 0 {
+			return 0, fmt.Errorf("invalid Tgid for task %d: %q", tid, value)
+		}
+		return tgid, nil
+	}
+	return 0, fmt.Errorf("missing Tgid for task %d", tid)
+}
+
+func getProcessIOStat(procRoot string, pid int) (procfs.ProcIO, error) {
+	pio := procfs.ProcIO{}
+	data, putBuffer, err := readFileNoStat(filepath.Join(procRoot, strconv.Itoa(pid), "io"))
 	if err != nil {
 		return pio, err
 	}
 	defer putBuffer()
-
 	return pio, parseProcIOStat(data, &pio)
 }
 
