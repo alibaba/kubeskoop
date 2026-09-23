@@ -11,6 +11,7 @@ const (
 	Stderr = "stderr"
 	File   = "file"
 	Loki   = "loki"
+    Flame  = "flame"
 )
 
 type Sink interface {
@@ -30,6 +31,8 @@ func CreateSink(name string, args interface{}) (Sink, error) {
 	case File:
 		path := argsMap["path"].(string)
 		return NewFileSink(path)
+    case Flame:
+        return NewFlameSink(), nil
 	}
 	return nil, fmt.Errorf("unknown sink type %s", name)
 }

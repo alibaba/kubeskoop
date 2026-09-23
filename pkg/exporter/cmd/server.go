@@ -345,6 +345,7 @@ func (i *inspServer) newHTTPServer(cfg *InspServerConfig) (*http.Server, net.Lis
 	http.Handle("/metrics", i.metricsServer)
 	http.Handle("/", http.HandlerFunc(defaultPage))
 	http.Handle("/status", http.HandlerFunc(i.statusPage))
+    http.HandleFunc("/flamegraph/collapsed", sink.ServeFlameCollapsed)
 	if cfg.DebugMode {
 		reg := prometheus.NewRegistry()
 
