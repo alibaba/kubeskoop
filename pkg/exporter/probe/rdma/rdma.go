@@ -53,6 +53,8 @@ func metricsProbeCreator() (probe.MetricsProbe, error) {
 	}
 	opts.SingleMetricsOpts = append(opts.SingleMetricsOpts, mlx5Metrics...)
 	opts.SingleMetricsOpts = append(opts.SingleMetricsOpts, erdmaMetrics...)
+	opts.SingleMetricsOpts = append(opts.SingleMetricsOpts, troceMetrics...)
+	opts.SingleMetricsOpts = append(opts.SingleMetricsOpts, troceNetdevMetrics...)
 	batchMetrics := probe.NewBatchMetrics(opts, p.collectOnce)
 	return probe.NewMetricsProbe(probeName, p, batchMetrics), nil
 }
@@ -104,29 +106,65 @@ func (p *metricsProbe) collectOnce(emit probe.Emit) error {
 		if linkType == "unknown" {
 			continue
 		}
+		if linkType == linkTypeTroce {
+			if err := p.collectTroceNetdev(res.Name, deviceLabelValues, emit); err != nil {
+				log.Warnf("failed get SNIC netdev statistics %s: %v", res.Name, err)
+			}
+		}
 
 		linkStatistics, err := p.netlink.RdmaStatistic(link)
 		if err != nil {
 			log.Errorf("failed get rdma statistics %v, error: %v", res.Name, err)
-			continue
 		}
 
-		for _, port := range linkStatistics.RdmaPortStatistics {
-			devicePortLabelValues := append(deviceLabelValues, strconv.FormatUint(uint64(port.PortIndex), 10))
-			for statKey, statVal := range port.Statistics {
-				emit(strings.Join([]string{linkType, statKey}, "_"), devicePortLabelValues, float64(statVal))
+		seen := make(map[string]bool)
+		emitCounter := func(port uint32, key string, value uint64) {
+			series := strconv.FormatUint(uint64(port), 10) + "/" + key
+			if seen[series] {
+				return
+			}
+			if linkType == linkTypeTroce {
+				known := false
+				for _, name := range troceCounters {
+					if key == name {
+						known = true
+						break
+					}
+				}
+				if !known {
+					return
+				}
+			}
+			seen[series] = true
+			emit(linkType+"_"+key, append(append([]string{}, deviceLabelValues...), strconv.FormatUint(uint64(port), 10)), float64(value))
+		}
+		if linkStatistics != nil && err == nil {
+			for _, port := range linkStatistics.RdmaPortStatistics {
+				for statKey, statVal := range port.Statistics {
+					emitCounter(port.PortIndex, statKey, statVal)
+				}
 			}
 		}
 
+		if linkType == linkTypeTroce {
+			hardware, hwErr := metricsFromSysFSDirectory(link, p.basePath, "hw_counters")
+			if hwErr != nil {
+				log.Warnf("failed get SNIC hardware counters %s: %v", res.Name, hwErr)
+			}
+			for _, port := range hardware {
+				for key, value := range port.Statistics {
+					emitCounter(port.PortIndex, key, value)
+				}
+			}
+		}
 		linkCounterStatistics, err := metricsFromSysFS(link, p.basePath)
 		if err != nil {
 			log.Warnf("failed get rdma counter statistics %v, error: %v", res.Name, err)
 			continue
 		}
 		for _, port := range linkCounterStatistics {
-			devicePortLabelValues := append(deviceLabelValues, strconv.FormatUint(uint64(port.PortIndex), 10))
 			for statKey, statVal := range port.Statistics {
-				emit(strings.Join([]string{linkType, statKey}, "_"), devicePortLabelValues, float64(statVal))
+				emitCounter(port.PortIndex, statKey, statVal)
 			}
 		}
 	}
@@ -134,6 +172,10 @@ func (p *metricsProbe) collectOnce(emit probe.Emit) error {
 }
 
 func metricsFromSysFS(link *netlink.RdmaLink, basePath string) ([]netlink.RdmaPortStatistic, error) {
+	return metricsFromSysFSDirectory(link, basePath, "counters")
+}
+
+func metricsFromSysFSDirectory(link *netlink.RdmaLink, basePath, directory string) ([]netlink.RdmaPortStatistic, error) {
 	if basePath == "" {
 		basePath = ibDefaultBasePath
 	}
@@ -147,7 +189,7 @@ func metricsFromSysFS(link *netlink.RdmaLink, basePath string) ([]netlink.RdmaPo
 	}
 	var ret []netlink.RdmaPortStatistic
 	for _, port := range ports {
-		portCountersPath := filepath.Join(devPathPorts, port.Name(), "counters")
+		portCountersPath := filepath.Join(devPathPorts, port.Name(), directory)
 		portIndex, err := strconv.ParseUint(port.Name(), 10, 32)
 		if err != nil {
 			log.Errorf("failed parse rdma port index %s: %v", port.Name(), err)
@@ -191,6 +233,8 @@ func rdmaLinkType(link *netlink.RdmaLink) string {
 		return linkTypeMellanox
 	case linkTypeERdma:
 		return linkTypeERdma
+	case linkTypeTroce:
+		return linkTypeTroce
 	default:
 		return linkTypeUnknown
 	}

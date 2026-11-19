@@ -37,6 +37,7 @@ require (
 	github.com/prometheus/client_golang v1.15.1
 	github.com/prometheus/common v0.42.0
 	github.com/prometheus/procfs v0.9.0
+	github.com/safchain/ethtool v0.5.10
 	github.com/samber/lo v1.37.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.6.1
