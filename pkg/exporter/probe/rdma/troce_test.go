@@ -21,7 +21,7 @@ func TestTrocePrometheusDescriptors(t *testing.T) {
 	}, func(emit probe.Emit) error {
 		labels := make([]string, len(probe.StandardMetricsLabels))
 		labels = append(labels, "troce_bond_0", "troce", "1")
-		for _, name := range troceCounters {
+		for name := range troceCounters {
 			emit("troce_"+name, labels, 3)
 		}
 		return nil
@@ -39,16 +39,18 @@ func TestTroceUsesSharedCollection(t *testing.T) {
 	require.NoError(t, os.MkdirAll(path, 0755))
 	hardware := make(map[string]uint64)
 	expected := map[string]float64{"qp": 2}
-	for i, key := range troceCounters {
-		value := uint64(i + 1)
+	for key := range troceCounters {
+		value := uint64(123)
 		if key == "port_rcv_data" {
 			value = 34226688
 		}
 		expected["troce_"+key] = float64(value)
-		if i < 21 {
-			require.NoError(t, os.WriteFile(filepath.Join(path, key), []byte(fmt.Sprint(value)), 0644))
-		} else {
+		switch key {
+		case "packet_seq_err", "out_of_buffer", "out_of_seq", "local_ack_timeout_err",
+			"rnr_nak_retry_err", "implied_nak_seq_err", "req_cqe_err", "resp_cqe_err", "duplicate_request":
 			hardware[key] = value
+		default:
+			require.NoError(t, os.WriteFile(filepath.Join(path, key), []byte(fmt.Sprint(value)), 0644))
 		}
 	}
 	nl := new(MockNetlink)
