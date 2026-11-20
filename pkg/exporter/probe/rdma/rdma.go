@@ -54,7 +54,6 @@ func metricsProbeCreator() (probe.MetricsProbe, error) {
 	opts.SingleMetricsOpts = append(opts.SingleMetricsOpts, mlx5Metrics...)
 	opts.SingleMetricsOpts = append(opts.SingleMetricsOpts, erdmaMetrics...)
 	opts.SingleMetricsOpts = append(opts.SingleMetricsOpts, troceMetrics...)
-	opts.SingleMetricsOpts = append(opts.SingleMetricsOpts, troceNetdevMetrics...)
 	batchMetrics := probe.NewBatchMetrics(opts, p.collectOnce)
 	return probe.NewMetricsProbe(probeName, p, batchMetrics), nil
 }
@@ -106,12 +105,6 @@ func (p *metricsProbe) collectOnce(emit probe.Emit) error {
 		if linkType == "unknown" {
 			continue
 		}
-		if linkType == linkTypeTroce {
-			if err := p.collectTroceNetdev(res.Name, deviceLabelValues, emit); err != nil {
-				log.Warnf("failed get SNIC netdev statistics %s: %v", res.Name, err)
-			}
-		}
-
 		linkStatistics, err := p.netlink.RdmaStatistic(link)
 		if err != nil {
 			log.Errorf("failed get rdma statistics %v, error: %v", res.Name, err)
