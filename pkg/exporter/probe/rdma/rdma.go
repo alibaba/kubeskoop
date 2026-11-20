@@ -53,6 +53,7 @@ func metricsProbeCreator() (probe.MetricsProbe, error) {
 	}
 	opts.SingleMetricsOpts = append(opts.SingleMetricsOpts, mlx5Metrics...)
 	opts.SingleMetricsOpts = append(opts.SingleMetricsOpts, erdmaMetrics...)
+	opts.SingleMetricsOpts = append(opts.SingleMetricsOpts, troceMetrics...)
 	batchMetrics := probe.NewBatchMetrics(opts, p.collectOnce)
 	return probe.NewMetricsProbe(probeName, p, batchMetrics), nil
 }
@@ -191,6 +192,8 @@ func rdmaLinkType(link *netlink.RdmaLink) string {
 		return linkTypeMellanox
 	case linkTypeERdma:
 		return linkTypeERdma
+	case linkTypeTroce:
+		return linkTypeTroce
 	default:
 		return linkTypeUnknown
 	}
