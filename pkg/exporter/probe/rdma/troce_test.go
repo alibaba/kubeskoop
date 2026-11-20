@@ -51,6 +51,26 @@ func TestTroceSysfsSurvivesNetlinkFailure(t *testing.T) {
 	nl.AssertExpectations(t)
 }
 
+func TestLegacyNetlinkFailureSkipsPortCounters(t *testing.T) {
+	for _, name := range []string{"mlx5_0", "erdma_0"} {
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			path := filepath.Join(root, name, "ports", "1", "counters")
+			require.NoError(t, os.MkdirAll(path, 0755))
+			require.NoError(t, os.WriteFile(filepath.Join(path, "port_rcv_packets"), []byte("123"), 0644))
+			nl := new(MockNetlink)
+			nl.On("RdmaResourceList").Return([]*netlink.RdmaResource{{Name: name, RdmaResourceSummaryEntries: map[string]uint64{"qp": 2}}}, nil)
+			nl.On("RdmaLinkByName", name).Return(&netlink.RdmaLink{Attrs: netlink.RdmaLinkAttrs{Name: name}}, nil)
+			nl.On("RdmaStatistic", mock.Anything).Return((*netlink.RdmaDeviceStatistic)(nil), fmt.Errorf("operation not supported"))
+			p := &metricsProbe{netlink: nl, basePath: root}
+			values := map[string]float64{}
+			require.NoError(t, p.collectOnce(func(name string, _ []string, value float64) { values[name] = value }))
+			require.Equal(t, map[string]float64{"qp": 2}, values, "preserve existing mlx5/eRDMA failure behavior")
+			nl.AssertExpectations(t)
+		})
+	}
+}
+
 func TestTroceHardwareFallbackAndPrecedence(t *testing.T) {
 	root := t.TempDir()
 	name := "troce_bond_0"

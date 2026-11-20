@@ -105,59 +105,33 @@ func (p *metricsProbe) collectOnce(emit probe.Emit) error {
 		if linkType == "unknown" {
 			continue
 		}
+		if linkType == linkTypeTroce {
+			p.collectTroce(link, deviceLabelValues, emit)
+			continue
+		}
+
 		linkStatistics, err := p.netlink.RdmaStatistic(link)
 		if err != nil {
 			log.Errorf("failed get rdma statistics %v, error: %v", res.Name, err)
+			continue
 		}
 
-		seen := make(map[string]bool)
-		emitCounter := func(port uint32, key string, value uint64) {
-			series := strconv.FormatUint(uint64(port), 10) + "/" + key
-			if seen[series] {
-				return
-			}
-			if linkType == linkTypeTroce {
-				known := false
-				for _, name := range troceCounters {
-					if key == name {
-						known = true
-						break
-					}
-				}
-				if !known {
-					return
-				}
-			}
-			seen[series] = true
-			emit(linkType+"_"+key, append(append([]string{}, deviceLabelValues...), strconv.FormatUint(uint64(port), 10)), float64(value))
-		}
-		if linkStatistics != nil && err == nil {
-			for _, port := range linkStatistics.RdmaPortStatistics {
-				for statKey, statVal := range port.Statistics {
-					emitCounter(port.PortIndex, statKey, statVal)
-				}
+		for _, port := range linkStatistics.RdmaPortStatistics {
+			devicePortLabelValues := append(deviceLabelValues, strconv.FormatUint(uint64(port.PortIndex), 10))
+			for statKey, statVal := range port.Statistics {
+				emit(strings.Join([]string{linkType, statKey}, "_"), devicePortLabelValues, float64(statVal))
 			}
 		}
 
-		if linkType == linkTypeTroce {
-			hardware, hwErr := metricsFromSysFSDirectory(link, p.basePath, "hw_counters")
-			if hwErr != nil {
-				log.Warnf("failed get SNIC hardware counters %s: %v", res.Name, hwErr)
-			}
-			for _, port := range hardware {
-				for key, value := range port.Statistics {
-					emitCounter(port.PortIndex, key, value)
-				}
-			}
-		}
 		linkCounterStatistics, err := metricsFromSysFS(link, p.basePath)
 		if err != nil {
 			log.Warnf("failed get rdma counter statistics %v, error: %v", res.Name, err)
 			continue
 		}
 		for _, port := range linkCounterStatistics {
+			devicePortLabelValues := append(deviceLabelValues, strconv.FormatUint(uint64(port.PortIndex), 10))
 			for statKey, statVal := range port.Statistics {
-				emitCounter(port.PortIndex, statKey, statVal)
+				emit(strings.Join([]string{linkType, statKey}, "_"), devicePortLabelValues, float64(statVal))
 			}
 		}
 	}
