@@ -4,7 +4,13 @@ Enable the existing `rdma` probe. SNIC `troce_*` devices use `type="troce"`.
 SNIC metrics use the `kubeskoop_rdma_troce_*` prefix and retain native driver
 counter names, including `out_of_seq`, `req_cqe_err`, and `resp_cqe_err`.
 No SNIC values are mapped to mlx5 or vendor-neutral aliases. Existing mlx5 and
-eRDMA metric definitions remain unchanged. No dashboard changes are included.
+eRDMA metric definitions remain unchanged.
+
+The existing nodes dashboard at `deploy/resource/kubeskoop-exporter-nodes-dashboard.json`
+includes troce queries in the RDMA receive/transmit byte-rate, packet-rate,
+transmit-discard, and receive-buffer-drop panels. Import or update this dashboard
+in Grafana to use these queries; upgrading the exporter alone does not update
+an already imported dashboard. Existing mlx5/eRDMA queries are preserved.
 
 The 30 native RDMA counters use labels `device`, `type`, `port`, plus the
 standard `k8s_node` label. No netdev or ethtool statistics are collected,

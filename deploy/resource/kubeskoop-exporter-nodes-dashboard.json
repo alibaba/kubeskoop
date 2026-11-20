@@ -2399,6 +2399,20 @@
                     "legendFormat": "{{device}}:{{port}} (mlx5)",
                     "range": true,
                     "refId": "B"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DS_PROMETHEUS}"
+                    },
+                    "editorMode": "code",
+                    "exemplar": false,
+                    "expr": "rate(kubeskoop_rdma_troce_port_rcv_data{k8s_node=\"$node\"}[1m]) * 4",
+                    "instant": false,
+                    "interval": "",
+                    "legendFormat": "{{device}}:{{port}} (troce)",
+                    "range": true,
+                    "refId": "C"
                 }
             ],
             "description": "Bytes per second received by RDMA devices. Note: mlx5 port_rcv_data is reported in 4-byte words (per IB spec), so the query multiplies by 4 to convert to bytes.",
@@ -2507,6 +2521,20 @@
                     "legendFormat": "{{device}}:{{port}} (mlx5)",
                     "range": true,
                     "refId": "B"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DS_PROMETHEUS}"
+                    },
+                    "editorMode": "code",
+                    "exemplar": false,
+                    "expr": "rate(kubeskoop_rdma_troce_port_xmit_data{k8s_node=\"$node\"}[1m]) * 4",
+                    "instant": false,
+                    "interval": "",
+                    "legendFormat": "{{device}}:{{port}} (troce)",
+                    "range": true,
+                    "refId": "C"
                 }
             ],
             "description": "Bytes per second transmitted by RDMA devices. Note: mlx5 port_xmit_data is reported in 4-byte words (per IB spec), so the query multiplies by 4 to convert to bytes.",
@@ -2615,6 +2643,20 @@
                     "legendFormat": "{{device}}:{{port}} (mlx5)",
                     "range": true,
                     "refId": "B"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DS_PROMETHEUS}"
+                    },
+                    "editorMode": "code",
+                    "exemplar": false,
+                    "expr": "rate(kubeskoop_rdma_troce_port_rcv_packets{k8s_node=\"$node\"}[1m])",
+                    "instant": false,
+                    "interval": "",
+                    "legendFormat": "{{device}}:{{port}} (troce)",
+                    "range": true,
+                    "refId": "C"
                 }
             ],
             "title": "RDMA Devices RX Packets Rate",
@@ -2722,6 +2764,20 @@
                     "legendFormat": "{{device}}:{{port}} (mlx5)",
                     "range": true,
                     "refId": "B"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DS_PROMETHEUS}"
+                    },
+                    "editorMode": "code",
+                    "exemplar": false,
+                    "expr": "rate(kubeskoop_rdma_troce_port_xmit_packets{k8s_node=\"$node\"}[1m])",
+                    "instant": false,
+                    "interval": "",
+                    "legendFormat": "{{device}}:{{port}} (troce)",
+                    "range": true,
+                    "refId": "C"
                 }
             ],
             "title": "RDMA Devices TX Packets Rate",
@@ -3033,6 +3089,21 @@
                     "legendFormat": "{{device}}:{{port}}-xmit-discards (mlx5)",
                     "range": true,
                     "refId": "C"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DS_PROMETHEUS}"
+                    },
+                    "editorMode": "code",
+                    "exemplar": false,
+                    "expr": "kubeskoop_rdma_troce_port_xmit_discards{k8s_node=\"$node\"}",
+                    "hide": false,
+                    "instant": false,
+                    "interval": "",
+                    "legendFormat": "{{device}}:{{port}}-xmit-discards (troce)",
+                    "range": true,
+                    "refId": "D"
                 }
             ],
             "title": "RDMA Devices TX Packets Drop Count",
@@ -3171,6 +3242,21 @@
                     "legendFormat": "{{device}}:{{port}}-out-of-buffer (mlx5)",
                     "range": true,
                     "refId": "D"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DS_PROMETHEUS}"
+                    },
+                    "editorMode": "code",
+                    "exemplar": false,
+                    "expr": "kubeskoop_rdma_troce_out_of_buffer{k8s_node=\"$node\"}",
+                    "hide": false,
+                    "instant": false,
+                    "interval": "",
+                    "legendFormat": "{{device}}:{{port}}-out-of-buffer (troce)",
+                    "range": true,
+                    "refId": "E"
                 }
             ],
             "title": "RDMA Devices RX Packets Drop Count",
