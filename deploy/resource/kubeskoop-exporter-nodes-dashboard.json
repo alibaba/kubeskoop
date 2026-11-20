@@ -3082,6 +3082,21 @@
                     },
                     "editorMode": "code",
                     "exemplar": false,
+                    "expr": "kubeskoop_rdma_erdma_hw_disable_drop_cnt{k8s_node=\"$node\"}",
+                    "hide": false,
+                    "instant": false,
+                    "interval": "",
+                    "legendFormat": "{{device}}-disabled (erdma)",
+                    "range": true,
+                    "refId": "E"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DS_PROMETHEUS}"
+                    },
+                    "editorMode": "code",
+                    "exemplar": false,
                     "expr": "kubeskoop_rdma_mlx5_port_xmit_discards{k8s_node=\"$node\"}",
                     "hide": false,
                     "instant": false,
@@ -3212,6 +3227,21 @@
                     "legendFormat": "{{device}}-pps-limit (erdma)",
                     "range": true,
                     "refId": "B"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DS_PROMETHEUS}"
+                    },
+                    "editorMode": "code",
+                    "exemplar": false,
+                    "expr": "kubeskoop_rdma_erdma_hw_rx_disable_drop_cnt{k8s_node=\"$node\"}",
+                    "hide": false,
+                    "instant": false,
+                    "interval": "",
+                    "legendFormat": "{{device}}-disabled (erdma)",
+                    "range": true,
+                    "refId": "F"
                 },
                 {
                     "datasource": {
