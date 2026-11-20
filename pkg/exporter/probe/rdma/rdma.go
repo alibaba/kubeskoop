@@ -105,10 +105,6 @@ func (p *metricsProbe) collectOnce(emit probe.Emit) error {
 		if linkType == "unknown" {
 			continue
 		}
-		if linkType == linkTypeTroce {
-			p.collectTroce(link, deviceLabelValues, emit)
-			continue
-		}
 
 		linkStatistics, err := p.netlink.RdmaStatistic(link)
 		if err != nil {
@@ -139,10 +135,6 @@ func (p *metricsProbe) collectOnce(emit probe.Emit) error {
 }
 
 func metricsFromSysFS(link *netlink.RdmaLink, basePath string) ([]netlink.RdmaPortStatistic, error) {
-	return metricsFromSysFSDirectory(link, basePath, "counters")
-}
-
-func metricsFromSysFSDirectory(link *netlink.RdmaLink, basePath, directory string) ([]netlink.RdmaPortStatistic, error) {
 	if basePath == "" {
 		basePath = ibDefaultBasePath
 	}
@@ -156,7 +148,7 @@ func metricsFromSysFSDirectory(link *netlink.RdmaLink, basePath, directory strin
 	}
 	var ret []netlink.RdmaPortStatistic
 	for _, port := range ports {
-		portCountersPath := filepath.Join(devPathPorts, port.Name(), directory)
+		portCountersPath := filepath.Join(devPathPorts, port.Name(), "counters")
 		portIndex, err := strconv.ParseUint(port.Name(), 10, 32)
 		if err != nil {
 			log.Errorf("failed parse rdma port index %s: %v", port.Name(), err)

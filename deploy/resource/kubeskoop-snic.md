@@ -10,11 +10,11 @@ The 30 native RDMA counters use labels `device`, `type`, `port`, plus the
 standard `k8s_node` label. No netdev or ethtool statistics are collected,
 and no new dependency is required.
 
-Hardware statistics use netlink first, falling back per counter to sysfs
-`hw_counters`; standard port counters are collected independently. Duplicate
-series are suppressed. Missing or unsupported fields are omitted, never zero-filled.
-Only registered fields are exported; `lifespan`
-are excluded. Unpopulated GID entries returning EINVAL are skipped.
+Collection uses the existing shared RDMA path: hardware statistics come from
+RDMA netlink, and standard port statistics come from
+`/sys/class/infiniband/<device>/ports/<port>/counters`. No driver-specific
+fallback or filtering is added. As with mlx5/eRDMA, a failed netlink statistics
+request skips port statistics for that device during that collection.
 
 `port_rcv_data` and `port_xmit_data` retain 4-byte-word units, verified with
 fixed-size bidirectional RDMA writes. Query their rates

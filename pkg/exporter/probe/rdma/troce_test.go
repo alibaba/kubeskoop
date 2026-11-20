@@ -20,39 +20,57 @@ func TestTrocePrometheusDescriptors(t *testing.T) {
 		VariableLabels: probe.StandardMetricsLabels, SingleMetricsOpts: troceMetrics,
 	}, func(emit probe.Emit) error {
 		labels := make([]string, len(probe.StandardMetricsLabels))
-		labels = append(labels, "troce_bond_0", "troce")
-		emit("troce_out_of_seq", append(append([]string{}, labels...), "1"), 3)
+		labels = append(labels, "troce_bond_0", "troce", "1")
+		for _, name := range troceCounters {
+			emit("troce_"+name, labels, 3)
+		}
 		return nil
 	})
 	require.NoError(t, registry.Register(collector))
 	families, err := registry.Gather()
 	require.NoError(t, err)
-	require.Len(t, families, 1, "SNIC fields must have valid descriptors and labels")
+	require.Len(t, families, len(troceCounters))
 }
 
-func TestTroceSysfsSurvivesNetlinkFailure(t *testing.T) {
+func TestTroceUsesSharedCollection(t *testing.T) {
 	root := t.TempDir()
 	name := "troce_bond_0"
 	path := filepath.Join(root, name, "ports", "1", "counters")
 	require.NoError(t, os.MkdirAll(path, 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(path, "port_rcv_packets"), []byte("123\n"), 0644))
+	hardware := make(map[string]uint64)
+	expected := map[string]float64{"qp": 2}
+	for i, key := range troceCounters {
+		value := uint64(i + 1)
+		if key == "port_rcv_data" {
+			value = 34226688
+		}
+		expected["troce_"+key] = float64(value)
+		if i < 21 {
+			require.NoError(t, os.WriteFile(filepath.Join(path, key), []byte(fmt.Sprint(value)), 0644))
+		} else {
+			hardware[key] = value
+		}
+	}
 	nl := new(MockNetlink)
 	nl.On("RdmaResourceList").Return([]*netlink.RdmaResource{{Name: name, RdmaResourceSummaryEntries: map[string]uint64{"qp": 2}}}, nil)
 	nl.On("RdmaLinkByName", name).Return(&netlink.RdmaLink{Attrs: netlink.RdmaLinkAttrs{Name: name}}, nil)
-	nl.On("RdmaStatistic", mock.Anything).Return((*netlink.RdmaDeviceStatistic)(nil), fmt.Errorf("operation not supported"))
+	nl.On("RdmaStatistic", mock.Anything).Return(&netlink.RdmaDeviceStatistic{RdmaPortStatistics: []*netlink.RdmaPortStatistic{{PortIndex: 1, Statistics: hardware}}}, nil)
 	p := &metricsProbe{netlink: nl, basePath: root}
 	values := map[string]float64{}
-	require.NoError(t, p.collectOnce(func(name string, labels []string, value float64) {
-		values[name] = value
+	require.NoError(t, p.collectOnce(func(metric string, labels []string, value float64) {
 		require.Contains(t, labels, linkTypeTroce)
+		if metric != "qp" {
+			require.Equal(t, "1", labels[len(labels)-1])
+		}
+		require.NotContains(t, values, metric, "each source must emit a unique series")
+		values[metric] = value
 	}))
-	require.Equal(t, float64(123), values["troce_port_rcv_packets"])
-	require.Equal(t, float64(2), values["qp"])
+	require.Equal(t, expected, values, "collect native hardware and port counters without unit conversion")
 	nl.AssertExpectations(t)
 }
 
-func TestLegacyNetlinkFailureSkipsPortCounters(t *testing.T) {
-	for _, name := range []string{"mlx5_0", "erdma_0"} {
+func TestNetlinkFailureSkipsPortCounters(t *testing.T) {
+	for _, name := range []string{"mlx5_0", "erdma_0", "troce_bond_0"} {
 		t.Run(name, func(t *testing.T) {
 			root := t.TempDir()
 			path := filepath.Join(root, name, "ports", "1", "counters")
@@ -65,35 +83,8 @@ func TestLegacyNetlinkFailureSkipsPortCounters(t *testing.T) {
 			p := &metricsProbe{netlink: nl, basePath: root}
 			values := map[string]float64{}
 			require.NoError(t, p.collectOnce(func(name string, _ []string, value float64) { values[name] = value }))
-			require.Equal(t, map[string]float64{"qp": 2}, values, "preserve existing mlx5/eRDMA failure behavior")
+			require.Equal(t, map[string]float64{"qp": 2}, values, "preserve the shared failure behavior for all supported drivers")
 			nl.AssertExpectations(t)
 		})
 	}
-}
-
-func TestTroceHardwareFallbackAndPrecedence(t *testing.T) {
-	root := t.TempDir()
-	name := "troce_bond_0"
-	for _, directory := range []string{"counters", "hw_counters"} {
-		require.NoError(t, os.MkdirAll(filepath.Join(root, name, "ports", "1", directory), 0755))
-	}
-	require.NoError(t, os.WriteFile(filepath.Join(root, name, "ports", "1", "counters", "port_rcv_data"), []byte("34226688"), 0644))
-	for key, value := range map[string]string{"out_of_seq": "9", "req_cqe_err": "7", "lifespan": "10"} {
-		require.NoError(t, os.WriteFile(filepath.Join(root, name, "ports", "1", "hw_counters", key), []byte(value), 0644))
-	}
-	nl := new(MockNetlink)
-	nl.On("RdmaResourceList").Return([]*netlink.RdmaResource{{Name: name}}, nil)
-	nl.On("RdmaLinkByName", name).Return(&netlink.RdmaLink{Attrs: netlink.RdmaLinkAttrs{Name: name}}, nil)
-	nl.On("RdmaStatistic", mock.Anything).Return(&netlink.RdmaDeviceStatistic{RdmaPortStatistics: []*netlink.RdmaPortStatistic{{PortIndex: 1, Statistics: map[string]uint64{"out_of_seq": 12}}}}, nil)
-	p := &metricsProbe{netlink: nl, basePath: root}
-	values := map[string][]float64{}
-	require.NoError(t, p.collectOnce(func(name string, _ []string, value float64) { values[name] = append(values[name], value) }))
-	require.Equal(t, []float64{12}, values["troce_out_of_seq"])
-	require.Equal(t, []float64{7}, values["troce_req_cqe_err"])
-	require.Equal(t, []float64{34226688}, values["troce_port_rcv_data"], "preserve the driver's 4-byte-word unit")
-	for metric := range values {
-		require.Contains(t, metric, "troce_", "SNIC statistics must not emit mlx5 or shared aliases")
-	}
-	require.NotContains(t, values, "troce_lifespan")
-	nl.AssertExpectations(t)
 }

@@ -1,12 +1,8 @@
 package rdma
 
 import (
-	"strconv"
-
 	"github.com/alibaba/kubeskoop/pkg/exporter/probe"
 	"github.com/prometheus/client_golang/prometheus"
-	log "github.com/sirupsen/logrus"
-	"github.com/vishvananda/netlink"
 )
 
 const linkTypeTroce = "troce"
@@ -38,46 +34,3 @@ var troceMetrics = func() []probe.SingleMetricsOpts {
 	}
 	return opts
 }()
-
-// collectTroce keeps driver-specific filtering and fallback out of the shared collector.
-func (p *metricsProbe) collectTroce(link *netlink.RdmaLink, labels []string, emit probe.Emit) {
-	seen := make(map[string]bool)
-	emitCounter := func(port uint32, key string, value uint64) {
-		known := false
-		for _, name := range troceCounters {
-			if key == name {
-				known = true
-				break
-			}
-		}
-		series := strconv.FormatUint(uint64(port), 10) + "/" + key
-		if !known || seen[series] {
-			return
-		}
-		seen[series] = true
-		portLabels := append(append([]string{}, labels...), strconv.FormatUint(uint64(port), 10))
-		emit(linkTypeTroce+"_"+key, portLabels, float64(value))
-	}
-	statistics, err := p.netlink.RdmaStatistic(link)
-	if err != nil {
-		log.Errorf("failed get SNIC statistics %s: %v", link.Attrs.Name, err)
-	} else if statistics != nil {
-		for _, port := range statistics.RdmaPortStatistics {
-			for key, value := range port.Statistics {
-				emitCounter(port.PortIndex, key, value)
-			}
-		}
-	}
-	for _, directory := range []string{"hw_counters", "counters"} {
-		ports, err := metricsFromSysFSDirectory(link, p.basePath, directory)
-		if err != nil {
-			log.Warnf("failed get SNIC %s %s: %v", directory, link.Attrs.Name, err)
-			continue
-		}
-		for _, port := range ports {
-			for key, value := range port.Statistics {
-				emitCounter(port.PortIndex, key, value)
-			}
-		}
-	}
-}
